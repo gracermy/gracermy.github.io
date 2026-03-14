@@ -13,12 +13,13 @@
     --pink-glow: rgba(244, 114, 182, 0.3);
     --pink-soft: rgba(244, 114, 182, 0.1);
     --blue: #60a5fa;
+    --blue-faded: rgba(96, 165, 250, 0.38);
     --blue-soft: rgba(96, 165, 250, 0.1);
     --text: #e8eaf0;
     --text-dim: #7b8ba8;
     --cell-bg: rgba(255,255,255,0.03);
     --cell-selected: rgba(244, 114, 182, 0.18);
-    --cell-clue: rgba(96, 165, 250, 0.06);
+    --cell-clue: rgba(96, 165, 250, 0.04);
     --border-soft: rgba(255,255,255,0.05);
     --border-box: rgba(96, 165, 250, 0.2);
     --success: #34d399;
@@ -48,6 +49,16 @@
   .screen { display: none; flex-direction: column; align-items: center; position: relative; z-index: 1; }
   .screen.active { display: flex; }
 
+  /* Back link */
+  .back-link {
+    position: fixed; top: 14px; left: 16px; z-index: 50;
+    font-family: 'Outfit', sans-serif; font-size: 0.78rem; font-weight: 400;
+    color: var(--text-dim); text-decoration: none;
+    display: flex; align-items: center; gap: 5px;
+    opacity: 0.6; transition: opacity 0.2s; letter-spacing: 0.02em;
+  }
+  .back-link:hover { opacity: 1; }
+
   /* ── HOME ── */
   #home { justify-content: center; gap: 36px; padding: 24px; min-height: 100dvh; }
   .logo-cluster { text-align: center; }
@@ -61,6 +72,11 @@
   .logo-cluster p {
     font-size: 0.9rem; color: var(--text-dim); margin-top: 10px;
     font-weight: 300; letter-spacing: 0.18em; text-transform: uppercase;
+  }
+
+  .home-actions {
+    display: flex; align-items: center; gap: 12px;
+    position: absolute; top: 16px; right: 16px;
   }
 
   .difficulty-select { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 300px; }
@@ -115,6 +131,7 @@
   .btn-icon.give-up:hover { border-color: var(--error); color: var(--error); }
   .btn-icon.restart:hover { border-color: var(--success); color: var(--success); }
   .btn-icon.undo:hover { border-color: var(--pink); color: var(--pink); }
+  .btn-icon.info:hover { border-color: var(--blue); color: var(--blue); }
   .btn-icon:disabled { opacity: 0.25; pointer-events: none; }
 
   /* ── GRID ── */
@@ -145,22 +162,16 @@
   .cell[data-row="8"][data-col="0"] { border-bottom-left-radius: 10px; }
   .cell[data-row="8"][data-col="8"] { border-bottom-right-radius: 10px; }
 
-  .cell.clue { color: var(--blue); background: var(--cell-clue); }
+  .cell.clue { color: var(--blue-faded); background: var(--cell-clue); }
   .cell.selected { background: var(--cell-selected) !important; box-shadow: inset 0 0 0 2px var(--pink); z-index: 2; }
   .cell.constrained { background: rgba(190, 220, 255, 0.12) !important; }
-  .cell.user-filled { color: var(--pink); }
+  .cell.user-filled { color: var(--blue); }
   .cell.same-number { font-weight: 800 !important; text-shadow: 0 0 8px currentColor; }
-  .cell.error-cell { color: var(--error) !important; animation: shake 0.35s ease; }
+  .cell.error-cell { color: var(--pink) !important; }
   .cell.hidden-cell { color: transparent !important; }
   .cell.reveal-correct { color: var(--success) !important; background: rgba(52, 211, 153, 0.08) !important; }
   .cell.reveal-wrong { color: var(--error) !important; background: rgba(251, 113, 133, 0.08) !important; }
   .cell.reveal-filled { color: var(--error) !important; background: rgba(251, 113, 133, 0.08) !important; }
-
-  @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-3px); }
-    75% { transform: translateX(3px); }
-  }
 
   /* Pause overlay */
   .pause-overlay {
@@ -245,14 +256,6 @@
   .modal p { color: var(--text-dim); font-size: 0.9rem; line-height: 1.6; margin-bottom: 6px; }
   .modal .new-best { color: var(--pink); font-weight: 600; font-size: 0.85rem; margin-top: 4px; }
 
-  .modal .error-list {
-    text-align: left; margin: 14px 0; max-height: 170px; overflow-y: auto;
-    padding: 10px 14px; background: rgba(0,0,0,0.2); border-radius: 10px;
-    font-size: 0.8rem; line-height: 1.8; color: var(--text-dim);
-  }
-  .modal .error-list .err-line { display: flex; align-items: center; gap: 8px; }
-  .modal .error-list .err-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--error); flex-shrink: 0; }
-
   .modal-actions { display: flex; gap: 10px; margin-top: 22px; justify-content: center; flex-wrap: wrap; }
   .modal-actions button {
     padding: 13px 28px; border-radius: 50px; border: none;
@@ -283,36 +286,70 @@
   .revealed-bar .stats span.g { color: var(--success); }
   .revealed-bar .stats span.r { color: var(--error); }
 
-  /* Back link */
-  .back-link {
-    position: fixed; top: 14px; left: 16px; z-index: 50;
-    font-family: 'Outfit', sans-serif; font-size: 0.78rem; font-weight: 400;
-    color: var(--text-dim); text-decoration: none;
-    display: flex; align-items: center; gap: 5px;
-    opacity: 0.6; transition: opacity 0.2s;
-    letter-spacing: 0.02em;
-  }
-  .back-link:hover { opacity: 1; }
-
-  /* Loading overlay */
+  /* Loading */
   .loading-overlay {
-    display: none; position: fixed; inset: 0;
-    background: var(--bg);
+    display: none; position: fixed; inset: 0; background: var(--bg);
     z-index: 200; align-items: center; justify-content: center;
     flex-direction: column; gap: 16px;
   }
   .loading-overlay.active { display: flex; }
-  .loading-overlay p {
-    color: var(--text-dim); font-size: 0.95rem; letter-spacing: 0.06em;
-  }
+  .loading-overlay p { color: var(--text-dim); font-size: 0.95rem; letter-spacing: 0.06em; }
   .spinner {
     width: 36px; height: 36px;
-    border: 3px solid var(--border-soft);
-    border-top-color: var(--pink);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+    border: 3px solid var(--border-soft); border-top-color: var(--pink);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── TUTORIAL ── */
+  .tutorial-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+    z-index: 150; align-items: center; justify-content: center; padding: 20px;
+  }
+  .tutorial-overlay.active { display: flex; }
+
+  .tutorial-panel {
+    background: var(--bg-surface); border: 1px solid var(--border-soft);
+    border-radius: 20px; padding: 32px 24px;
+    max-width: 420px; width: 100%; max-height: 85vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5); animation: modalIn 0.3s ease;
+  }
+  .tutorial-panel h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.5rem; margin-bottom: 20px; text-align: center;
+  }
+
+  .tut-step {
+    display: flex; gap: 14px; padding: 16px 0;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .tut-step:last-child { border-bottom: none; }
+
+  .tut-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; font-weight: 600;
+    color: var(--pink); min-width: 22px;
+    padding-top: 2px;
+  }
+  .tut-content h4 {
+    font-size: 0.95rem; font-weight: 600; margin-bottom: 4px;
+  }
+  .tut-content p {
+    font-size: 0.82rem; color: var(--text-dim);
+    line-height: 1.55; font-weight: 300;
+  }
+
+  .tut-close {
+    display: block; margin: 20px auto 0; padding: 12px 36px;
+    border-radius: 50px; border: none;
+    background: linear-gradient(135deg, var(--pink), var(--blue));
+    color: #fff; font-family: 'Outfit', sans-serif;
+    font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    letter-spacing: 0.04em; transition: all 0.2s;
+    box-shadow: 0 4px 20px rgba(244,114,182,0.2);
+  }
+  .tut-close:hover { transform: translateY(-1px); }
 </style>
 </head>
 <body>
@@ -325,11 +362,66 @@
   <p>Generating puzzle…</p>
 </div>
 
+<!-- TUTORIAL -->
+<div class="tutorial-overlay" id="tutorial">
+  <div class="tutorial-panel">
+    <h2>How to Play</h2>
+    <div class="tut-step">
+      <span class="tut-num">01</span>
+      <div class="tut-content">
+        <h4>The Grid</h4>
+        <p>Sudoku is a 9×9 grid divided into nine 3×3 boxes. Some cells are pre-filled with numbers — these are your clues.</p>
+      </div>
+    </div>
+    <div class="tut-step">
+      <span class="tut-num">02</span>
+      <div class="tut-content">
+        <h4>The Rule</h4>
+        <p>Fill every empty cell with a number from 1 to 9. Each number must appear exactly once in every row, every column, and every 3×3 box.</p>
+      </div>
+    </div>
+    <div class="tut-step">
+      <span class="tut-num">03</span>
+      <div class="tut-content">
+        <h4>Start with What You Know</h4>
+        <p>Look for rows, columns, or boxes that are nearly complete. If eight of nine numbers are placed, the missing one is your answer.</p>
+      </div>
+    </div>
+    <div class="tut-step">
+      <span class="tut-num">04</span>
+      <div class="tut-content">
+        <h4>Use Elimination</h4>
+        <p>Tap a cell to see its constrained cells highlighted. Check which numbers already appear in the same row, column, and box — the remaining options narrow down quickly.</p>
+      </div>
+    </div>
+    <div class="tut-step">
+      <span class="tut-num">05</span>
+      <div class="tut-content">
+        <h4>Look for Singles</h4>
+        <p>If a number can only go in one cell within a row, column, or box, that's where it belongs — even if the cell has other possibilities.</p>
+      </div>
+    </div>
+    <div class="tut-step">
+      <span class="tut-num">06</span>
+      <div class="tut-content">
+        <h4>Don't Guess</h4>
+        <p>Every puzzle here has one unique solution. If you're stuck, look harder — there's always a logical next step. Use undo if you make a mistake.</p>
+      </div>
+    </div>
+    <button class="tut-close" onclick="closeTutorial()">Got it</button>
+  </div>
+</div>
+
 <!-- HOME -->
 <div id="home" class="screen active">
+  <div class="home-actions">
+    <button class="btn-icon info" onclick="openTutorial()" title="How to play">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </button>
+  </div>
   <div class="logo-cluster">
     <h1>Sudoku</h1>
-    <p>A mindful number puzzle</p>
+    <p>A number puzzle</p>
   </div>
   <div class="difficulty-select" id="diffSelect"></div>
 </div>
@@ -355,6 +447,9 @@
       </button>
       <button class="btn-icon" onclick="togglePause()" title="Pause" id="btnPause">
         <svg id="pauseIcon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      </button>
+      <button class="btn-icon info" id="btnInfo" onclick="openTutorial()" title="How to play">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
       </button>
       <button class="btn-icon give-up" onclick="confirmGiveUp()" title="Give Up" id="btnGiveUp">
         <svg viewBox="0 0 24 24" fill="none"><path d="M4 4l16 16M4 20L20 4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
@@ -396,7 +491,6 @@
     <h3 id="modal-title"></h3>
     <p id="modal-text"></p>
     <div id="modal-best" class="new-best" style="display:none;"></div>
-    <div id="modal-errors" class="error-list" style="display:none;"></div>
     <div class="modal-actions" id="modal-actions"></div>
   </div>
 </div>
@@ -452,7 +546,24 @@ let selectedCell = null;
 let timerInterval = null, seconds = 0, paused = false;
 let currentDifficulty = 'easy';
 let revealed = false;
-let undoStack = []; // { row, col, prevVal }
+let undoStack = [];
+let errorCells = new Set(); // track cells marked as errors "r,c"
+
+/* ── TUTORIAL ── */
+let wasPausedBeforeTutorial = false;
+function openTutorial() {
+  wasPausedBeforeTutorial = paused;
+  if (!paused && document.getElementById('game').classList.contains('active')) {
+    paused = true;
+  }
+  document.getElementById('tutorial').classList.add('active');
+}
+function closeTutorial() {
+  document.getElementById('tutorial').classList.remove('active');
+  if (!wasPausedBeforeTutorial && document.getElementById('game').classList.contains('active')) {
+    paused = false;
+  }
+}
 
 /* ── STORAGE ── */
 function getBestTimes() {
@@ -491,12 +602,11 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active');
 }
 
-/* ── MODALS HELPERS ── */
+/* ── MODALS ── */
 function cancelAnyModal() {
   document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
   paused = false;
 }
-
 function confirmHome() {
   if (revealed) { doGoHome(); return; }
   paused = true;
@@ -507,13 +617,11 @@ function doGoHome() {
   clearInterval(timerInterval); revealed = false;
   buildHome(); showScreen('home');
 }
-
 function confirmGiveUp() {
   if (revealed) return;
   paused = true;
   document.getElementById('giveUpModal').classList.add('active');
 }
-
 function confirmRestart() {
   if (revealed) return;
   paused = true;
@@ -525,12 +633,11 @@ function doRestart() {
   document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
   userGrid = puzzle.map(r => [...r]);
   undoStack = [];
-  selectedCell = null;
-  revealed = false;
+  errorCells = new Set();
+  selectedCell = null; revealed = false;
   document.getElementById('picker').classList.remove('visible');
   updateUndoBtn();
   buildGrid();
-  // Reset timer
   clearInterval(timerInterval);
   startTimer();
 }
@@ -540,30 +647,28 @@ function doGiveUp() {
   document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
   clearInterval(timerInterval);
   revealed = true; paused = true;
-
   document.getElementById('picker').classList.remove('visible');
   document.getElementById('btnFinish').disabled = true;
   document.getElementById('btnGiveUp').style.display = 'none';
   document.getElementById('btnPause').style.display = 'none';
   document.getElementById('btnRestart').style.display = 'none';
   document.getElementById('btnUndo').style.display = 'none';
+  document.getElementById('btnInfo').style.display = 'none';
   selectedCell = null;
-  document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected', 'constrained'));
+  document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected', 'constrained', 'same-number', 'error-cell'));
 
   let correctCount = 0, wrongCount = 0, emptyCount = 0;
-
   for (let r = 0; r < 9; r++) {
     for (let c = 0; c < 9; c++) {
       if (clueMap[r][c]) continue;
       const el = getCellEl(r, c);
       const uv = userGrid[r][c], sv = solution[r][c];
-      el.classList.remove('user-filled', 'error-cell');
+      el.classList.remove('user-filled');
       if (uv === 0) { el.textContent = sv; el.classList.add('reveal-filled'); emptyCount++; }
       else if (uv === sv) { el.classList.add('reveal-correct'); correctCount++; }
       else { el.textContent = sv; el.classList.add('reveal-wrong'); wrongCount++; }
     }
   }
-
   const total = correctCount + wrongCount + emptyCount;
   document.getElementById('revealStats').innerHTML =
     `<span class="g">✓ ${correctCount} correct</span> · <span class="r">✕ ${wrongCount} wrong</span> · <span class="r">○ ${emptyCount} empty</span><br>out of ${total} cells to fill`;
@@ -592,7 +697,7 @@ function togglePause() {
   if (paused) {
     document.getElementById('picker').classList.remove('visible');
     selectedCell = null;
-    document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected', 'constrained'));
+    document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected', 'constrained', 'same-number'));
   }
 }
 
@@ -603,21 +708,15 @@ function undoMove() {
   userGrid[move.row][move.col] = move.prevVal;
   const el = getCellEl(move.row, move.col);
   el.textContent = move.prevVal === 0 ? '' : move.prevVal;
-  el.classList.toggle('user-filled', move.prevVal !== 0);
+  el.classList.remove('user-filled', 'error-cell');
+  errorCells.delete(`${move.row},${move.col}`);
+  if (move.prevVal !== 0) el.classList.add('user-filled');
   updateUndoBtn();
-
-  // Re-select that cell
   selectCell(move.row, move.col);
 }
+function updateUndoBtn() { document.getElementById('btnUndo').disabled = undoStack.length === 0; }
 
-function updateUndoBtn() {
-  document.getElementById('btnUndo').disabled = undoStack.length === 0;
-}
-
-/* ═══════════════════════════════════════
-   SUDOKU GENERATOR — UNIQUE SOLUTION
-   ═══════════════════════════════════════ */
-
+/* ── GENERATOR ── */
 function shuffle(a) {
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -625,7 +724,6 @@ function shuffle(a) {
   }
   return a;
 }
-
 function isValid(b, r, c, n) {
   for (let i = 0; i < 9; i++) if (b[r][i] === n || b[i][c] === n) return false;
   const br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
@@ -634,7 +732,6 @@ function isValid(b, r, c, n) {
       if (b[rr][cc] === n) return false;
   return true;
 }
-
 function generateSolution() {
   const b = Array.from({ length: 9 }, () => Array(9).fill(0));
   function solve(b) {
@@ -651,8 +748,6 @@ function generateSolution() {
   solve(b);
   return b;
 }
-
-// Count solutions (stop at 2 — we only need to know if it's unique)
 function countSolutions(board, limit) {
   let count = 0;
   function solve(b) {
@@ -662,78 +757,54 @@ function countSolutions(board, limit) {
         if (b[r][c] === 0) {
           for (let n = 1; n <= 9; n++) {
             if (isValid(b, r, c, n)) {
-              b[r][c] = n;
-              solve(b);
-              b[r][c] = 0;
+              b[r][c] = n; solve(b); b[r][c] = 0;
               if (count >= limit) return;
             }
           }
-          return; // no valid number → backtrack
+          return;
         }
-    count++; // all cells filled → found a solution
+    count++;
   }
   solve(board);
   return count;
 }
-
 function generatePuzzle(sol, numClues) {
   const puz = sol.map(r => [...r]);
   const cells = shuffle([...Array(81).keys()]);
-  let removed = 0;
-  const target = 81 - numClues;
-
+  let removed = 0; const target = 81 - numClues;
   for (const idx of cells) {
     if (removed >= target) break;
     const r = Math.floor(idx / 9), c = idx % 9;
     const backup = puz[r][c];
     puz[r][c] = 0;
-
-    // Check uniqueness: if removing this cell creates >1 solution, put it back
     const test = puz.map(row => [...row]);
-    if (countSolutions(test, 2) !== 1) {
-      puz[r][c] = backup; // restore — can't remove this cell
-    } else {
-      removed++;
-    }
+    if (countSolutions(test, 2) !== 1) { puz[r][c] = backup; }
+    else { removed++; }
   }
-
   return puz;
 }
 
-/* ── START GAME ── */
+/* ── START ── */
 function startGame(diff) {
   currentDifficulty = diff;
-  revealed = false;
-  undoStack = [];
+  revealed = false; undoStack = []; errorCells = new Set();
   const cfg = DIFFICULTIES[diff];
-
-  // Show loading since unique-solution generation can take a moment
   document.getElementById('loading').classList.add('active');
-
-  // Use setTimeout so the loading screen renders before blocking computation
   setTimeout(() => {
     solution = generateSolution();
     puzzle = generatePuzzle(solution, cfg.clues);
     userGrid = puzzle.map(r => [...r]);
     clueMap = puzzle.map(r => r.map(v => v !== 0));
     selectedCell = null;
-
     const tag = document.getElementById('diffTag');
-    tag.textContent = cfg.label;
-    tag.className = 'diff-tag ' + diff;
-
+    tag.textContent = cfg.label; tag.className = 'diff-tag ' + diff;
     document.getElementById('btnFinish').disabled = false;
-    document.getElementById('btnGiveUp').style.display = '';
-    document.getElementById('btnPause').style.display = '';
-    document.getElementById('btnRestart').style.display = '';
-    document.getElementById('btnUndo').style.display = '';
+    ['btnGiveUp','btnPause','btnRestart','btnUndo','btnInfo'].forEach(id => document.getElementById(id).style.display = '');
     document.getElementById('revealedBar').classList.remove('active');
     updateUndoBtn();
-
     buildGrid();
     document.getElementById('loading').classList.remove('active');
-    showScreen('game');
-    startTimer();
+    showScreen('game'); startTimer();
     document.getElementById('picker').classList.remove('visible');
     document.getElementById('pauseOverlay').classList.remove('active');
     document.getElementById('pauseIcon').innerHTML =
@@ -757,7 +828,7 @@ function buildGrid() {
 /* ── SELECT ── */
 function selectCell(row, col) {
   if (paused || revealed) return;
-  document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected', 'constrained', 'error-cell', 'same-number'));
+  document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected', 'constrained', 'same-number'));
 
   getCellEl(row, col).classList.add('selected');
 
@@ -769,7 +840,6 @@ function selectCell(row, col) {
         getCellEl(r, c).classList.add('constrained');
     }
 
-  // Highlight all cells with the same number
   const val = userGrid[row][col];
   if (val !== 0) {
     for (let r = 0; r < 9; r++)
@@ -794,9 +864,8 @@ function placeNumber(num) {
   if (!selectedCell || paused || revealed) return;
   const { row, col } = selectedCell;
   if (clueMap[row][col]) return;
-
   const prevVal = userGrid[row][col];
-  if (prevVal === num) return; // no change
+  if (prevVal === num) return;
 
   undoStack.push({ row, col, prevVal });
   updateUndoBtn();
@@ -804,6 +873,11 @@ function placeNumber(num) {
   userGrid[row][col] = num;
   const el = getCellEl(row, col);
   el.textContent = num === 0 ? '' : num;
+
+  // Clear error state on this cell whenever value changes
+  el.classList.remove('error-cell');
+  errorCells.delete(`${row},${col}`);
+
   el.classList.toggle('user-filled', num !== 0);
 
   // Refresh same-number highlights
@@ -821,46 +895,45 @@ function checkSolution() {
   if (paused || revealed) return;
   clearInterval(timerInterval);
 
+  // Check empty
   for (let r = 0; r < 9; r++)
     for (let c = 0; c < 9; c++)
       if (userGrid[r][c] === 0) { showModal('incomplete'); return; }
 
-  const errors = [];
-  function dup(cells, label) {
-    const cnt = {};
-    for (const { r, c } of cells) { const v = userGrid[r][c]; cnt[v] = (cnt[v] || 0) + 1; }
-    for (const [val, count] of Object.entries(cnt))
-      if (count > 1) {
-        errors.push(`${label}: value ${val} appears ${count}×`);
-        for (const { r, c } of cells)
-          if (userGrid[r][c] === parseInt(val)) getCellEl(r, c).classList.add('error-cell');
-      }
-  }
+  // Check against solution
+  let hasError = false;
+  // Clear old errors
+  errorCells.forEach(key => {
+    const [r, c] = key.split(',').map(Number);
+    getCellEl(r, c).classList.remove('error-cell');
+  });
+  errorCells = new Set();
 
-  for (let r = 0; r < 9; r++) { const cs = []; for (let c = 0; c < 9; c++) cs.push({r,c}); dup(cs, `Row ${r+1}`); }
-  for (let c = 0; c < 9; c++) { const cs = []; for (let r = 0; r < 9; r++) cs.push({r,c}); dup(cs, `Col ${c+1}`); }
-  for (let br = 0; br < 3; br++)
-    for (let bc = 0; bc < 3; bc++) {
-      const cs = [];
-      for (let r = br*3; r < br*3+3; r++) for (let c = bc*3; c < bc*3+3; c++) cs.push({r,c});
-      dup(cs, `Box ${br*3+bc+1}`);
+  for (let r = 0; r < 9; r++)
+    for (let c = 0; c < 9; c++) {
+      if (clueMap[r][c]) continue;
+      if (userGrid[r][c] !== solution[r][c]) {
+        hasError = true;
+        errorCells.add(`${r},${c}`);
+        getCellEl(r, c).classList.add('error-cell');
+      }
     }
 
-  if (errors.length === 0) showModal('success');
-  else showModal('errors', [...new Set(errors)]);
+  if (!hasError) {
+    showModal('success');
+  } else {
+    showModal('errors');
+  }
 }
 
 /* ── MODAL ── */
-function showModal(type, errors) {
+function showModal(type) {
   const modal = document.getElementById('modal');
   const icon = document.getElementById('modal-icon');
   const title = document.getElementById('modal-title');
   const text = document.getElementById('modal-text');
   const bestEl = document.getElementById('modal-best');
-  const errDiv = document.getElementById('modal-errors');
   const actions = document.getElementById('modal-actions');
-
-  errDiv.style.display = 'none'; errDiv.innerHTML = '';
   bestEl.style.display = 'none'; actions.innerHTML = '';
 
   if (type === 'success') {
@@ -880,9 +953,7 @@ function showModal(type, errors) {
   } else if (type === 'errors') {
     icon.textContent = '✕'; icon.style.color = 'var(--error)';
     title.textContent = 'Not Quite';
-    text.textContent = 'Duplicate values found:';
-    errDiv.style.display = 'block';
-    for (const e of errors) errDiv.innerHTML += `<div class="err-line"><span class="err-dot"></span>${e}</div>`;
+    text.textContent = 'Some values are incorrect. The wrong cells are highlighted — try fixing them.';
     actions.innerHTML = `<button class="btn-primary" onclick="closeModal(); resumeTimer()">Try Again</button>`;
   }
 
