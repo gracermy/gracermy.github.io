@@ -27,104 +27,68 @@
     --number-bg: rgba(255,255,255,0.04);
     --number-hover: rgba(244, 114, 182, 0.2);
   }
-
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
   body {
-    background: var(--bg); color: var(--text);
-    font-family: 'Outfit', sans-serif;
-    min-height: 100dvh;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    overflow-x: hidden; position: relative;
+    background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif;
+    min-height: 100dvh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; overflow-x: hidden; position: relative;
   }
   body::before {
     content: ''; position: fixed; top: -50%; left: -50%; width: 200%; height: 200%;
-    background:
-      radial-gradient(ellipse at 25% 15%, rgba(244,114,182,0.05) 0%, transparent 50%),
-      radial-gradient(ellipse at 75% 85%, rgba(96,165,250,0.05) 0%, transparent 50%);
+    background: radial-gradient(ellipse at 25% 15%, rgba(244,114,182,0.05) 0%, transparent 50%),
+                radial-gradient(ellipse at 75% 85%, rgba(96,165,250,0.05) 0%, transparent 50%);
     pointer-events: none; z-index: 0;
   }
-
   .screen { display: none; flex-direction: column; align-items: center; position: relative; z-index: 1; }
   .screen.active { display: flex; }
-
-  /* Back link */
   .back-link {
     position: fixed; top: 14px; left: 16px; z-index: 50;
     font-family: 'Outfit', sans-serif; font-size: 0.78rem; font-weight: 400;
     color: var(--text-dim); text-decoration: none;
-    display: flex; align-items: center; gap: 5px;
-    opacity: 0.6; transition: opacity 0.2s; letter-spacing: 0.02em;
+    display: flex; align-items: center; gap: 5px; opacity: 0.6; transition: opacity 0.2s;
   }
   .back-link:hover { opacity: 1; }
 
-  /* ── HOME ── */
+  /* HOME */
   #home { justify-content: center; gap: 36px; padding: 24px; min-height: 100dvh; }
+  .home-actions { display: flex; align-items: center; gap: 12px; position: absolute; top: 16px; right: 16px; }
   .logo-cluster { text-align: center; }
   .logo-cluster h1 {
-    font-family: 'DM Serif Display', serif;
-    font-size: clamp(3rem, 8vw, 5rem); letter-spacing: 0.06em;
+    font-family: 'DM Serif Display', serif; font-size: clamp(3rem, 8vw, 5rem);
+    letter-spacing: 0.06em;
     background: linear-gradient(135deg, var(--blue) 0%, var(--pink) 100%);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    background-clip: text; line-height: 1.1;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1.1;
   }
-  .logo-cluster p {
-    font-size: 0.9rem; color: var(--text-dim); margin-top: 10px;
-    font-weight: 300; letter-spacing: 0.18em; text-transform: uppercase;
-  }
-
-  .home-actions {
-    display: flex; align-items: center; gap: 12px;
-    position: absolute; top: 16px; right: 16px;
-  }
-
+  .logo-cluster p { font-size: 0.9rem; color: var(--text-dim); margin-top: 10px; font-weight: 300; letter-spacing: 0.18em; text-transform: uppercase; }
   .difficulty-select { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 300px; }
   .diff-btn {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 16px 24px; border-radius: 14px;
-    border: 1.5px solid var(--border-soft); background: var(--bg-surface);
-    color: var(--text); font-family: 'Outfit', sans-serif;
-    font-size: 1rem; font-weight: 500; cursor: pointer;
-    transition: all 0.2s; letter-spacing: 0.03em;
+    display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-radius: 14px;
+    border: 1.5px solid var(--border-soft); background: var(--bg-surface); color: var(--text);
+    font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 500; cursor: pointer; transition: all 0.2s;
   }
   .diff-btn:hover { border-color: var(--pink); background: var(--pink-soft); }
   .diff-btn:active { transform: scale(0.98); }
-  .diff-btn .best-badge {
-    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
-    color: var(--blue); background: var(--blue-soft);
-    padding: 3px 8px; border-radius: 20px;
-  }
+  .diff-btn .best-badge { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--blue); background: var(--blue-soft); padding: 3px 8px; border-radius: 20px; }
   .diff-label { display: flex; align-items: center; gap: 10px; }
   .diff-dot { width: 8px; height: 8px; border-radius: 50%; }
   .diff-dot.easy { background: var(--success); }
   .diff-dot.medium { background: var(--blue); }
   .diff-dot.hard { background: var(--pink); }
 
-  /* ── GAME ── */
+  /* GAME */
   #game { padding: 14px; gap: 12px; min-height: 100dvh; justify-content: center; width: 100%; max-width: 520px; }
   .top-bar { display: flex; justify-content: space-between; align-items: center; width: 100%; }
-  .top-bar h2 { font-family: 'DM Serif Display', serif; font-size: 1.3rem; letter-spacing: 0.04em; }
-  .top-bar .diff-tag {
-    font-size: 0.7rem; font-weight: 500; letter-spacing: 0.1em;
-    text-transform: uppercase; padding: 3px 10px; border-radius: 20px; margin-left: 10px;
-  }
+  .top-bar h2 { font-family: 'DM Serif Display', serif; font-size: 1.3rem; }
+  .top-bar .diff-tag { font-size: 0.7rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 10px; border-radius: 20px; margin-left: 10px; }
   .top-bar .diff-tag.easy { color: var(--success); background: rgba(52,211,153,0.1); }
   .top-bar .diff-tag.medium { color: var(--blue); background: var(--blue-soft); }
   .top-bar .diff-tag.hard { color: var(--pink); background: var(--pink-soft); }
-
   .timer-group { display: flex; align-items: center; gap: 6px; }
-  .timer {
-    font-family: 'JetBrains Mono', monospace; font-size: 1rem;
-    color: var(--text-dim); letter-spacing: 0.05em; min-width: 52px; text-align: right;
-  }
-
+  .timer { font-family: 'JetBrains Mono', monospace; font-size: 1rem; color: var(--text-dim); min-width: 52px; text-align: right; }
   .btn-icon {
-    width: 34px; height: 34px; border-radius: 50%;
-    border: 1.5px solid var(--border-soft); background: transparent;
-    color: var(--text-dim); cursor: pointer;
-    display: flex; align-items: center; justify-content: center; transition: all 0.2s;
-    flex-shrink: 0;
+    width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--border-soft);
+    background: transparent; color: var(--text-dim); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0;
   }
   .btn-icon:hover { border-color: var(--blue); color: var(--blue); }
   .btn-icon svg { width: 14px; height: 14px; fill: currentColor; }
@@ -133,282 +97,227 @@
   .btn-icon.undo:hover { border-color: var(--pink); color: var(--pink); }
   .btn-icon.info:hover { border-color: var(--blue); color: var(--blue); }
   .btn-icon:disabled { opacity: 0.25; pointer-events: none; }
+  /* ! icon text style */
+  .btn-icon .icon-bang { font-family: 'DM Serif Display', serif; font-size: 16px; font-weight: 700; line-height: 1; fill: none; stroke: none; }
 
-  /* ── GRID ── */
+  /* GRID */
   .grid-wrapper {
-    width: 100%; aspect-ratio: 1; max-width: 468px;
-    background: var(--bg-surface); border-radius: 14px; padding: 5px;
+    width: 100%; aspect-ratio: 1; max-width: 468px; background: var(--bg-surface);
+    border-radius: 14px; padding: 5px;
     box-shadow: 0 8px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.03);
     border: 1px solid var(--border-soft); position: relative;
   }
-  .grid {
-    display: grid; grid-template-columns: repeat(9, 1fr);
-    grid-template-rows: repeat(9, 1fr); width: 100%; height: 100%; gap: 0;
-  }
-
+  .grid { display: grid; grid-template-columns: repeat(9,1fr); grid-template-rows: repeat(9,1fr); width: 100%; height: 100%; gap: 0; }
   .cell {
-    display: flex; align-items: center; justify-content: center;
-    background: var(--cell-bg);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: clamp(0.95rem, 3.5vw, 1.45rem);
-    font-weight: 600; cursor: pointer; position: relative;
-    transition: background 0.15s, color 0.15s;
+    display: flex; align-items: center; justify-content: center; background: var(--cell-bg);
+    font-family: 'JetBrains Mono', monospace; font-size: clamp(0.95rem,3.5vw,1.45rem);
+    font-weight: 600; cursor: pointer; transition: background 0.15s, color 0.15s;
     color: var(--text); border: 0.5px solid var(--border-soft); user-select: none;
   }
-  .cell[data-col="2"], .cell[data-col="5"] { border-right: 2px solid var(--border-box); }
-  .cell[data-row="2"], .cell[data-row="5"] { border-bottom: 2px solid var(--border-box); }
+  .cell[data-col="2"],.cell[data-col="5"] { border-right: 2px solid var(--border-box); }
+  .cell[data-row="2"],.cell[data-row="5"] { border-bottom: 2px solid var(--border-box); }
   .cell[data-row="0"][data-col="0"] { border-top-left-radius: 10px; }
   .cell[data-row="0"][data-col="8"] { border-top-right-radius: 10px; }
   .cell[data-row="8"][data-col="0"] { border-bottom-left-radius: 10px; }
   .cell[data-row="8"][data-col="8"] { border-bottom-right-radius: 10px; }
-
-  .cell.clue { color: var(--blue-faded); background: var(--cell-clue); }
+  .cell.clue { color: rgba(255,255,255,0.85); background: var(--cell-clue); }
   .cell.selected { background: var(--cell-selected) !important; box-shadow: inset 0 0 0 2px var(--pink); z-index: 2; }
-  .cell.constrained { background: rgba(190, 220, 255, 0.12) !important; }
+  .cell.constrained { background: rgba(190,220,255,0.12) !important; }
   .cell.user-filled { color: var(--blue); }
   .cell.same-number { font-weight: 800 !important; text-shadow: 0 0 8px currentColor; }
   .cell.error-cell { color: var(--pink) !important; }
   .cell.hidden-cell { color: transparent !important; }
-  .cell.reveal-correct { color: var(--success) !important; background: rgba(52, 211, 153, 0.08) !important; }
-  .cell.reveal-wrong { color: var(--error) !important; background: rgba(251, 113, 133, 0.08) !important; }
-  .cell.reveal-filled { color: var(--error) !important; background: rgba(251, 113, 133, 0.08) !important; }
+  .cell.reveal-correct { color: var(--success) !important; background: rgba(52,211,153,0.08) !important; }
+  .cell.reveal-wrong { color: var(--error) !important; background: rgba(251,113,133,0.08) !important; }
+  .cell.reveal-filled { color: var(--error) !important; background: rgba(251,113,133,0.08) !important; }
 
-  /* Pause overlay */
   .pause-overlay {
-    display: none; position: absolute; inset: 0;
-    background: rgba(13, 15, 26, 0.88); backdrop-filter: blur(6px);
-    border-radius: 14px; z-index: 10;
+    display: none; position: absolute; inset: 0; background: rgba(13,15,26,0.88);
+    backdrop-filter: blur(6px); border-radius: 14px; z-index: 10;
     flex-direction: column; align-items: center; justify-content: center; gap: 16px;
   }
   .pause-overlay.active { display: flex; }
   .pause-overlay span { font-family: 'DM Serif Display', serif; font-size: 1.6rem; color: var(--text-dim); }
-  .btn-resume {
-    padding: 12px 36px; border-radius: 50px; border: 1.5px solid var(--blue);
-    background: transparent; color: var(--blue); font-family: 'Outfit', sans-serif;
-    font-size: 0.9rem; font-weight: 600; cursor: pointer;
-    letter-spacing: 0.06em; text-transform: uppercase; transition: all 0.2s;
-  }
+  .btn-resume { padding: 12px 36px; border-radius: 50px; border: 1.5px solid var(--blue); background: transparent; color: var(--blue); font-family: 'Outfit', sans-serif; font-size: 0.9rem; font-weight: 600; cursor: pointer; letter-spacing: 0.06em; text-transform: uppercase; transition: all 0.2s; }
   .btn-resume:hover { background: var(--blue-soft); }
 
-  /* ── NUMBER PICKER ── */
-  .number-picker {
-    display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
-    opacity: 0; pointer-events: none; transition: opacity 0.2s; width: 100%; min-height: 44px;
-  }
+  .number-picker { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; width: 100%; min-height: 44px; }
   .number-picker.visible { opacity: 1; pointer-events: auto; }
-
-  .num-btn {
-    width: 42px; height: 42px; border-radius: 50%;
-    border: 1.5px solid rgba(244,114,182,0.2);
-    background: var(--number-bg); color: var(--text);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1.05rem; font-weight: 600; cursor: pointer;
-    transition: all 0.15s; display: flex; align-items: center; justify-content: center;
-  }
+  .num-btn { width: 42px; height: 42px; border-radius: 50%; border: 1.5px solid rgba(244,114,182,0.2); background: var(--number-bg); color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; font-weight: 600; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; }
   .num-btn:hover { background: var(--number-hover); border-color: var(--pink); transform: scale(1.1); }
   .num-btn:active { transform: scale(0.95); }
-  .num-btn.erase {
-    font-size: 1.1rem; font-weight: 400;
-    color: var(--text-dim); border-color: rgba(255,255,255,0.08);
-  }
+  .num-btn.erase { font-size: 1.1rem; font-weight: 400; color: var(--text-dim); border-color: rgba(255,255,255,0.08); }
 
-  /* ── ACTIONS ── */
   .actions { display: flex; gap: 12px; width: 100%; }
-  .btn-finish {
-    flex: 1; padding: 15px; border: none; border-radius: 12px;
-    font-family: 'Outfit', sans-serif; font-size: 0.95rem; font-weight: 600;
-    letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: all 0.2s;
-    background: linear-gradient(135deg, var(--pink), var(--blue));
-    color: #fff; box-shadow: 0 4px 20px rgba(244,114,182,0.2);
-  }
-  .btn-finish:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(244,114,182,0.25); }
+  .btn-finish { flex: 1; padding: 15px; border: none; border-radius: 12px; font-family: 'Outfit', sans-serif; font-size: 0.95rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; background: linear-gradient(135deg,var(--pink),var(--blue)); color: #fff; box-shadow: 0 4px 20px rgba(244,114,182,0.2); }
+  .btn-finish:hover { transform: translateY(-1px); }
   .btn-finish:active { transform: translateY(0); }
   .btn-finish:disabled { opacity: 0.4; pointer-events: none; }
-
-  .btn-home-bottom {
-    padding: 15px 22px; border: 1.5px solid var(--border-soft); border-radius: 12px;
-    background: transparent; color: var(--text-dim);
-    font-family: 'Outfit', sans-serif; font-size: 0.8rem; font-weight: 500;
-    letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: all 0.2s;
-  }
+  .btn-home-bottom { padding: 15px 22px; border: 1.5px solid var(--border-soft); border-radius: 12px; background: transparent; color: var(--text-dim); font-family: 'Outfit', sans-serif; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; }
   .btn-home-bottom:hover { border-color: var(--blue); color: var(--text); }
 
-  /* ── MODALS ── */
-  .modal-overlay {
-    display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
-    z-index: 100; align-items: center; justify-content: center; padding: 20px;
-  }
-  .modal-overlay.active { display: flex; }
-
-  .modal {
-    background: var(--bg-surface); border: 1px solid var(--border-soft);
-    border-radius: 20px; padding: 36px 28px; text-align: center;
-    max-width: 380px; width: 100%;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5); animation: modalIn 0.3s ease;
-  }
-  @keyframes modalIn {
-    from { opacity: 0; transform: translateY(20px) scale(0.95); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
-  }
-
-  .modal h3 { font-family: 'DM Serif Display', serif; font-size: 1.7rem; margin-bottom: 10px; }
-  .modal p { color: var(--text-dim); font-size: 0.9rem; line-height: 1.6; margin-bottom: 6px; }
-  .modal .new-best { color: var(--pink); font-weight: 600; font-size: 0.85rem; margin-top: 4px; }
-
-  .modal-actions { display: flex; gap: 10px; margin-top: 22px; justify-content: center; flex-wrap: wrap; }
-  .modal-actions button {
-    padding: 13px 28px; border-radius: 50px; border: none;
-    font-family: 'Outfit', sans-serif; font-size: 0.9rem; font-weight: 600;
-    cursor: pointer; transition: all 0.2s; letter-spacing: 0.04em;
-  }
-  .modal-actions .btn-primary {
-    background: linear-gradient(135deg, var(--pink), var(--blue));
-    color: #fff; box-shadow: 0 4px 20px rgba(244,114,182,0.2);
-  }
-  .modal-actions .btn-primary:hover { transform: translateY(-1px); }
-  .modal-actions .btn-secondary {
-    background: transparent; color: var(--text-dim); border: 1.5px solid var(--border-soft);
-  }
-  .modal-actions .btn-secondary:hover { border-color: var(--text-dim); color: var(--text); }
-
-  .success-icon { font-size: 2.8rem; margin-bottom: 10px; }
-
-  .revealed-bar {
-    display: none; width: 100%; text-align: center;
-    padding: 8px 0; color: var(--text-dim); font-size: 0.85rem;
-  }
+  .revealed-bar { display: none; width: 100%; text-align: center; padding: 8px 0; color: var(--text-dim); font-size: 0.85rem; }
   .revealed-bar.active { display: block; }
-  .revealed-bar .stats {
-    font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
-    margin-bottom: 8px; line-height: 1.8;
-  }
+  .revealed-bar .stats { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; margin-bottom: 8px; line-height: 1.8; }
   .revealed-bar .stats span.g { color: var(--success); }
   .revealed-bar .stats span.r { color: var(--error); }
 
-  /* Loading */
-  .loading-overlay {
-    display: none; position: fixed; inset: 0; background: var(--bg);
-    z-index: 200; align-items: center; justify-content: center;
-    flex-direction: column; gap: 16px;
-  }
+  /* MODALS */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: var(--bg-surface); border: 1px solid var(--border-soft); border-radius: 20px; padding: 36px 28px; text-align: center; max-width: 380px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.5); animation: modalIn 0.3s ease; }
+  @keyframes modalIn { from { opacity: 0; transform: translateY(20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .modal h3 { font-family: 'DM Serif Display', serif; font-size: 1.7rem; margin-bottom: 10px; }
+  .modal p { color: var(--text-dim); font-size: 0.9rem; line-height: 1.6; margin-bottom: 6px; }
+  .modal .new-best { color: var(--pink); font-weight: 600; font-size: 0.85rem; margin-top: 4px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 22px; justify-content: center; flex-wrap: wrap; }
+  .modal-actions button { padding: 13px 28px; border-radius: 50px; border: none; font-family: 'Outfit', sans-serif; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s; letter-spacing: 0.04em; }
+  .modal-actions .btn-primary { background: linear-gradient(135deg,var(--pink),var(--blue)); color: #fff; box-shadow: 0 4px 20px rgba(244,114,182,0.2); }
+  .modal-actions .btn-primary:hover { transform: translateY(-1px); }
+  .modal-actions .btn-secondary { background: transparent; color: var(--text-dim); border: 1.5px solid var(--border-soft); }
+  .modal-actions .btn-secondary:hover { border-color: var(--text-dim); color: var(--text); }
+  .success-icon { font-size: 2.8rem; margin-bottom: 10px; }
+
+  .loading-overlay { display: none; position: fixed; inset: 0; background: var(--bg); z-index: 200; align-items: center; justify-content: center; flex-direction: column; gap: 16px; }
   .loading-overlay.active { display: flex; }
-  .loading-overlay p { color: var(--text-dim); font-size: 0.95rem; letter-spacing: 0.06em; }
-  .spinner {
-    width: 36px; height: 36px;
-    border: 3px solid var(--border-soft); border-top-color: var(--pink);
-    border-radius: 50%; animation: spin 0.8s linear infinite;
-  }
+  .loading-overlay p { color: var(--text-dim); font-size: 0.95rem; }
+  .spinner { width: 36px; height: 36px; border: 3px solid var(--border-soft); border-top-color: var(--pink); border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── TUTORIAL ── */
-  .tutorial-overlay {
-    display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
-    z-index: 150; align-items: center; justify-content: center; padding: 20px;
-  }
+  /* TUTORIAL */
+  .tutorial-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); z-index: 150; align-items: center; justify-content: center; padding: 16px; }
   .tutorial-overlay.active { display: flex; }
-
-  .tutorial-panel {
-    background: var(--bg-surface); border: 1px solid var(--border-soft);
-    border-radius: 20px; padding: 32px 24px;
-    max-width: 420px; width: 100%; max-height: 85vh; overflow-y: auto;
+  .tut-panel {
+    background: var(--bg-surface); border: 1px solid var(--border-soft); border-radius: 20px;
+    max-width: 400px; width: 100%; max-height: 88vh; overflow: hidden;
     box-shadow: 0 20px 60px rgba(0,0,0,0.5); animation: modalIn 0.3s ease;
+    display: flex; flex-direction: column;
   }
-  .tutorial-panel h2 {
-    font-family: 'DM Serif Display', serif;
-    font-size: 1.5rem; margin-bottom: 20px; text-align: center;
-  }
+  .tut-header { padding: 24px 24px 0; text-align: center; }
+  .tut-header h2 { font-family: 'DM Serif Display', serif; font-size: 1.4rem; margin-bottom: 4px; }
+  .tut-counter { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text-dim); }
 
-  .tut-step {
-    display: flex; gap: 14px; padding: 16px 0;
-    border-bottom: 1px solid var(--border-soft);
+  .tut-slide-area { flex: 1; overflow: hidden; position: relative; }
+  .tut-slide {
+    display: none; flex-direction: column; align-items: center;
+    padding: 20px 24px; gap: 16px; height: 100%; overflow-y: auto;
   }
-  .tut-step:last-child { border-bottom: none; }
+  .tut-slide.active { display: flex; }
+  .tut-visual {
+    width: 100%; display: flex; align-items: center; justify-content: center;
+    min-height: 160px; background: rgba(0,0,0,0.2); border-radius: 12px; padding: 16px;
+  }
+  .tut-text h4 { font-size: 1rem; font-weight: 600; margin-bottom: 6px; text-align: center; }
+  .tut-text p { font-size: 0.84rem; color: var(--text-dim); line-height: 1.6; font-weight: 300; text-align: center; }
 
-  .tut-num {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem; font-weight: 600;
-    color: var(--pink); min-width: 22px;
-    padding-top: 2px;
+  .tut-footer { padding: 16px 24px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .tut-dots { display: flex; gap: 6px; }
+  .tut-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border-soft); transition: background 0.2s; }
+  .tut-dot.active { background: var(--pink); }
+  .tut-nav-btn {
+    padding: 10px 22px; border-radius: 50px; border: none; font-family: 'Outfit', sans-serif;
+    font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s; letter-spacing: 0.03em;
   }
-  .tut-content h4 {
-    font-size: 0.95rem; font-weight: 600; margin-bottom: 4px;
-  }
-  .tut-content p {
-    font-size: 0.82rem; color: var(--text-dim);
-    line-height: 1.55; font-weight: 300;
-  }
+  .tut-btn-next { background: linear-gradient(135deg,var(--pink),var(--blue)); color: #fff; box-shadow: 0 3px 14px rgba(244,114,182,0.2); }
+  .tut-btn-next:hover { transform: translateY(-1px); }
+  .tut-btn-prev { background: transparent; color: var(--text-dim); border: 1.5px solid var(--border-soft); }
+  .tut-btn-prev:hover { border-color: var(--text-dim); color: var(--text); }
 
-  .tut-close {
-    display: block; margin: 20px auto 0; padding: 12px 36px;
-    border-radius: 50px; border: none;
-    background: linear-gradient(135deg, var(--pink), var(--blue));
-    color: #fff; font-family: 'Outfit', sans-serif;
-    font-size: 0.9rem; font-weight: 600; cursor: pointer;
-    letter-spacing: 0.04em; transition: all 0.2s;
-    box-shadow: 0 4px 20px rgba(244,114,182,0.2);
+  /* Mini grid for tutorials */
+  .tut-grid { display: grid; gap: 1px; }
+  .tut-grid.g9 { grid-template-columns: repeat(9,1fr); width: 180px; height: 180px; }
+  .tut-grid.g4 { grid-template-columns: repeat(4,1fr); width: 120px; height: 120px; }
+  .tg-cell {
+    background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; font-weight: 600; color: var(--text-dim);
+    border-radius: 2px; position: relative;
   }
-  .tut-close:hover { transform: translateY(-1px); }
+  .tg-cell.tg-clue { color: rgba(255,255,255,0.85); }
+  .tg-cell.tg-user { color: var(--blue); }
+  .tg-cell.tg-hl { background: rgba(190,220,255,0.15) !important; }
+  .tg-cell.tg-sel { background: var(--cell-selected) !important; box-shadow: inset 0 0 0 1.5px var(--pink); }
+  .tg-cell.tg-err { color: var(--pink) !important; }
+  .tg-cell.tg-bold { font-weight: 800; text-shadow: 0 0 4px currentColor; }
+  .tg-cell.tg-q { color: var(--pink); font-size: 0.7rem; font-weight: 700; }
+  /* Box border helpers for tutorial grids */
+  .tg-cell.tg-br { border-right: 1.5px solid rgba(96,165,250,0.3); }
+  .tg-cell.tg-bb { border-bottom: 1.5px solid rgba(96,165,250,0.3); }
 </style>
 </head>
 <body>
-
 <a href="/games/" class="back-link">← Games</a>
 
-<!-- LOADING -->
-<div class="loading-overlay" id="loading">
-  <div class="spinner"></div>
-  <p>Generating puzzle…</p>
-</div>
+<div class="loading-overlay" id="loading"><div class="spinner"></div><p>Generating puzzle…</p></div>
 
 <!-- TUTORIAL -->
 <div class="tutorial-overlay" id="tutorial">
-  <div class="tutorial-panel">
-    <h2>How to Play</h2>
-    <div class="tut-step">
-      <span class="tut-num">01</span>
-      <div class="tut-content">
-        <h4>The Grid</h4>
-        <p>Sudoku is a 9×9 grid divided into nine 3×3 boxes. Some cells are pre-filled with numbers — these are your clues.</p>
-      </div>
+  <div class="tut-panel">
+    <div class="tut-header">
+      <h2>How to Play</h2>
+      <div class="tut-counter" id="tutCounter">1 / 6</div>
     </div>
-    <div class="tut-step">
-      <span class="tut-num">02</span>
-      <div class="tut-content">
-        <h4>The Rule</h4>
-        <p>Fill every empty cell with a number from 1 to 9. Each number must appear exactly once in every row, every column, and every 3×3 box.</p>
+    <div class="tut-slide-area">
+
+      <!-- Slide 1: The Grid -->
+      <div class="tut-slide active" data-slide="0">
+        <div class="tut-visual" id="tutVis1"></div>
+        <div class="tut-text">
+          <h4>The 9×9 Grid</h4>
+          <p>The board is a 9×9 grid split into nine 3×3 boxes. Some numbers are already placed — these are your clues.</p>
+        </div>
       </div>
-    </div>
-    <div class="tut-step">
-      <span class="tut-num">03</span>
-      <div class="tut-content">
-        <h4>Start with What You Know</h4>
-        <p>Look for rows, columns, or boxes that are nearly complete. If eight of nine numbers are placed, the missing one is your answer.</p>
+
+      <!-- Slide 2: The Rule -->
+      <div class="tut-slide" data-slide="1">
+        <div class="tut-visual" id="tutVis2"></div>
+        <div class="tut-text">
+          <h4>One Simple Rule</h4>
+          <p>Every row, every column, and every 3×3 box must contain the numbers 1 through 9 exactly once. No repeats.</p>
+        </div>
       </div>
-    </div>
-    <div class="tut-step">
-      <span class="tut-num">04</span>
-      <div class="tut-content">
-        <h4>Use Elimination</h4>
-        <p>Tap a cell to see its constrained cells highlighted. Check which numbers already appear in the same row, column, and box — the remaining options narrow down quickly.</p>
+
+      <!-- Slide 3: Constraints -->
+      <div class="tut-slide" data-slide="2">
+        <div class="tut-visual" id="tutVis3"></div>
+        <div class="tut-text">
+          <h4>See the Constraints</h4>
+          <p>Tap any cell and its row, column, and box light up. This shows you which numbers are already taken in that zone.</p>
+        </div>
       </div>
-    </div>
-    <div class="tut-step">
-      <span class="tut-num">05</span>
-      <div class="tut-content">
-        <h4>Look for Singles</h4>
-        <p>If a number can only go in one cell within a row, column, or box, that's where it belongs — even if the cell has other possibilities.</p>
+
+      <!-- Slide 4: Elimination -->
+      <div class="tut-slide" data-slide="3">
+        <div class="tut-visual" id="tutVis4"></div>
+        <div class="tut-text">
+          <h4>Use Elimination</h4>
+          <p>If a row already has 1, 3, 4, 5, 6, 7, 8, 9 — the missing number must be 2. Start with nearly-complete groups.</p>
+        </div>
       </div>
-    </div>
-    <div class="tut-step">
-      <span class="tut-num">06</span>
-      <div class="tut-content">
-        <h4>Don't Guess</h4>
-        <p>Every puzzle here has one unique solution. If you're stuck, look harder — there's always a logical next step. Use undo if you make a mistake.</p>
+
+      <!-- Slide 5: Number Tracking -->
+      <div class="tut-slide" data-slide="4">
+        <div class="tut-visual" id="tutVis5"></div>
+        <div class="tut-text">
+          <h4>Track Numbers</h4>
+          <p>When you select a cell with a number, all cells with that same number glow. This helps you spot patterns and gaps.</p>
+        </div>
       </div>
+
+      <!-- Slide 6: Errors & Undo -->
+      <div class="tut-slide" data-slide="5">
+        <div class="tut-visual" id="tutVis6"></div>
+        <div class="tut-text">
+          <h4>Mistakes? No Problem</h4>
+          <p>Wrong answers turn pink when you check. Fix the mistake with the right number and submit it again!</p>
+        </div>
+      </div>
+
     </div>
-    <button class="tut-close" onclick="closeTutorial()">Got it</button>
+    <div class="tut-footer">
+      <button class="tut-nav-btn tut-btn-prev" id="tutPrev" onclick="tutNav(-1)">Back</button>
+      <div class="tut-dots" id="tutDots"></div>
+      <button class="tut-nav-btn tut-btn-next" id="tutNext" onclick="tutNav(1)">Next</button>
+    </div>
   </div>
 </div>
 
@@ -416,13 +325,10 @@
 <div id="home" class="screen active">
   <div class="home-actions">
     <button class="btn-icon info" onclick="openTutorial()" title="How to play">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      <span class="icon-bang" style="color:var(--text-dim);">!</span>
     </button>
   </div>
-  <div class="logo-cluster">
-    <h1>Sudoku</h1>
-    <p>A number puzzle</p>
-  </div>
+  <div class="logo-cluster"><h1>Sudoku</h1><p>A number puzzle</p></div>
   <div class="difficulty-select" id="diffSelect"></div>
 </div>
 
@@ -430,26 +336,21 @@
 <div id="game" class="screen">
   <div class="top-bar">
     <div style="display:flex;align-items:center;">
-      <h2>Sudoku</h2>
-      <span class="diff-tag" id="diffTag"></span>
+      <h2>Sudoku</h2><span class="diff-tag" id="diffTag"></span>
     </div>
     <div class="timer-group">
       <div class="timer" id="timer">00:00</div>
       <button class="btn-icon undo" id="btnUndo" onclick="undoMove()" title="Undo" disabled>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-        </svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
       </button>
       <button class="btn-icon restart" id="btnRestart" onclick="confirmRestart()" title="Restart">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
-        </svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
       </button>
       <button class="btn-icon" onclick="togglePause()" title="Pause" id="btnPause">
         <svg id="pauseIcon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
       </button>
       <button class="btn-icon info" id="btnInfo" onclick="openTutorial()" title="How to play">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span class="icon-bang" style="color:var(--text-dim);">!</span>
       </button>
       <button class="btn-icon give-up" onclick="confirmGiveUp()" title="Give Up" id="btnGiveUp">
         <svg viewBox="0 0 24 24" fill="none"><path d="M4 4l16 16M4 20L20 4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
@@ -458,522 +359,279 @@
   </div>
   <div class="grid-wrapper">
     <div class="grid" id="grid"></div>
-    <div class="pause-overlay" id="pauseOverlay">
-      <span>Paused</span>
-      <button class="btn-resume" onclick="togglePause()">Resume</button>
-    </div>
+    <div class="pause-overlay" id="pauseOverlay"><span>Paused</span><button class="btn-resume" onclick="togglePause()">Resume</button></div>
   </div>
   <div class="number-picker" id="picker">
-    <button class="num-btn" onclick="placeNumber(1)">1</button>
-    <button class="num-btn" onclick="placeNumber(2)">2</button>
-    <button class="num-btn" onclick="placeNumber(3)">3</button>
-    <button class="num-btn" onclick="placeNumber(4)">4</button>
-    <button class="num-btn" onclick="placeNumber(5)">5</button>
-    <button class="num-btn" onclick="placeNumber(6)">6</button>
-    <button class="num-btn" onclick="placeNumber(7)">7</button>
-    <button class="num-btn" onclick="placeNumber(8)">8</button>
-    <button class="num-btn" onclick="placeNumber(9)">9</button>
+    <button class="num-btn" onclick="placeNumber(1)">1</button><button class="num-btn" onclick="placeNumber(2)">2</button><button class="num-btn" onclick="placeNumber(3)">3</button>
+    <button class="num-btn" onclick="placeNumber(4)">4</button><button class="num-btn" onclick="placeNumber(5)">5</button><button class="num-btn" onclick="placeNumber(6)">6</button>
+    <button class="num-btn" onclick="placeNumber(7)">7</button><button class="num-btn" onclick="placeNumber(8)">8</button><button class="num-btn" onclick="placeNumber(9)">9</button>
     <button class="num-btn erase" onclick="placeNumber(0)">✕</button>
   </div>
-  <div class="revealed-bar" id="revealedBar">
-    <div class="stats" id="revealStats"></div>
-  </div>
+  <div class="revealed-bar" id="revealedBar"><div class="stats" id="revealStats"></div></div>
   <div class="actions">
     <button class="btn-home-bottom" onclick="confirmHome()">Home</button>
     <button class="btn-finish" id="btnFinish" onclick="checkSolution()">Finish</button>
   </div>
 </div>
 
-<!-- RESULT MODAL -->
-<div class="modal-overlay" id="modal">
-  <div class="modal">
-    <div id="modal-icon" class="success-icon"></div>
-    <h3 id="modal-title"></h3>
-    <p id="modal-text"></p>
-    <div id="modal-best" class="new-best" style="display:none;"></div>
-    <div class="modal-actions" id="modal-actions"></div>
-  </div>
-</div>
-
-<!-- CONFIRM LEAVE -->
-<div class="modal-overlay" id="confirmModal">
-  <div class="modal">
-    <div class="success-icon" style="font-size:2.2rem;color:var(--text-dim);margin-bottom:10px;">⚠</div>
-    <h3>Leave Game?</h3>
-    <p>Are you sure? You'll lose your current progress.</p>
-    <div class="modal-actions" style="margin-top:22px;">
-      <button class="btn-primary" onclick="doGoHome()">Leave</button>
-      <button class="btn-secondary" onclick="cancelAnyModal()">Stay</button>
-    </div>
-  </div>
-</div>
-
-<!-- CONFIRM GIVE UP -->
-<div class="modal-overlay" id="giveUpModal">
-  <div class="modal">
-    <div class="success-icon" style="font-size:2.2rem;color:var(--error);margin-bottom:10px;">⚑</div>
-    <h3>Give Up?</h3>
-    <p>This will reveal the solution. Your time won't be recorded.</p>
-    <div class="modal-actions" style="margin-top:22px;">
-      <button class="btn-primary" onclick="doGiveUp()">Reveal</button>
-      <button class="btn-secondary" onclick="cancelAnyModal()">Keep Trying</button>
-    </div>
-  </div>
-</div>
-
-<!-- CONFIRM RESTART -->
-<div class="modal-overlay" id="restartModal">
-  <div class="modal">
-    <div class="success-icon" style="font-size:2.2rem;color:var(--success);margin-bottom:10px;">↺</div>
-    <h3>Restart Puzzle?</h3>
-    <p>This will clear all your answers and reset the timer. The puzzle stays the same.</p>
-    <div class="modal-actions" style="margin-top:22px;">
-      <button class="btn-primary" onclick="doRestart()">Restart</button>
-      <button class="btn-secondary" onclick="cancelAnyModal()">Cancel</button>
-    </div>
-  </div>
-</div>
+<!-- MODALS -->
+<div class="modal-overlay" id="modal"><div class="modal"><div id="modal-icon" class="success-icon"></div><h3 id="modal-title"></h3><p id="modal-text"></p><div id="modal-best" class="new-best" style="display:none;"></div><div class="modal-actions" id="modal-actions"></div></div></div>
+<div class="modal-overlay" id="confirmModal"><div class="modal"><div class="success-icon" style="font-size:2.2rem;color:var(--text-dim);margin-bottom:10px;">⚠</div><h3>Leave Game?</h3><p>Are you sure? You'll lose your current progress.</p><div class="modal-actions" style="margin-top:22px;"><button class="btn-primary" onclick="doGoHome()">Leave</button><button class="btn-secondary" onclick="cancelAnyModal()">Stay</button></div></div></div>
+<div class="modal-overlay" id="giveUpModal"><div class="modal"><div class="success-icon" style="font-size:2.2rem;color:var(--error);margin-bottom:10px;">⚑</div><h3>Give Up?</h3><p>This will reveal the solution. Your time won't be recorded.</p><div class="modal-actions" style="margin-top:22px;"><button class="btn-primary" onclick="doGiveUp()">Reveal</button><button class="btn-secondary" onclick="cancelAnyModal()">Keep Trying</button></div></div></div>
+<div class="modal-overlay" id="restartModal"><div class="modal"><div class="success-icon" style="font-size:2.2rem;color:var(--success);margin-bottom:10px;">↺</div><h3>Restart Puzzle?</h3><p>This will clear all your answers and reset the timer.</p><div class="modal-actions" style="margin-top:22px;"><button class="btn-primary" onclick="doRestart()">Restart</button><button class="btn-secondary" onclick="cancelAnyModal()">Cancel</button></div></div></div>
 
 <script>
-const DIFFICULTIES = {
-  easy:   { label: 'Easy',   clues: 38, dot: 'easy' },
-  medium: { label: 'Medium', clues: 30, dot: 'medium' },
-  hard:   { label: 'Hard',   clues: 24, dot: 'hard' },
-};
+/* ═══ TUTORIAL ═══ */
+const TUT_TOTAL = 6;
+let tutSlide = 0, wasPausedBefore = false;
 
-let solution = [], puzzle = [], userGrid = [], clueMap = [];
-let selectedCell = null;
-let timerInterval = null, seconds = 0, paused = false;
-let currentDifficulty = 'easy';
-let revealed = false;
-let undoStack = [];
-let errorCells = new Set(); // track cells marked as errors "r,c"
-
-/* ── TUTORIAL ── */
-let wasPausedBeforeTutorial = false;
-function openTutorial() {
-  wasPausedBeforeTutorial = paused;
-  if (!paused && document.getElementById('game').classList.contains('active')) {
-    paused = true;
+function buildTutVisuals() {
+  // Slide 1: 9x9 grid with some clues and boxes outlined
+  const v1 = document.getElementById('tutVis1');
+  const sample = [
+    [5,3,0,0,7,0,0,0,0],[6,0,0,1,9,5,0,0,0],[0,9,8,0,0,0,0,6,0],
+    [8,0,0,0,6,0,0,0,3],[4,0,0,8,0,3,0,0,1],[7,0,0,0,2,0,0,0,6],
+    [0,6,0,0,0,0,2,8,0],[0,0,0,4,1,9,0,0,5],[0,0,0,0,8,0,0,7,9]
+  ];
+  let h = '<div class="tut-grid g9">';
+  for(let r=0;r<9;r++) for(let c=0;c<9;c++){
+    const v=sample[r][c];
+    let cls = v ? ' tg-clue' : '';
+    if(c===2||c===5) cls += ' tg-br';
+    if(r===2||r===5) cls += ' tg-bb';
+    h+=`<div class="tg-cell${cls}">${v||''}</div>`;
   }
+  v1.innerHTML = h+'</div>';
+
+  // Slide 2: Show a completed row, col, box
+  const v2 = document.getElementById('tutVis2');
+  let h2 = '<div style="display:flex;flex-direction:column;gap:12px;align-items:center;">';
+  h2 += '<div style="display:flex;gap:2px;">';
+  for(let i=1;i<=9;i++) h2+=`<div class="tg-cell tg-clue tg-hl" style="width:24px;height:24px;font-size:0.55rem;">${i}</div>`;
+  h2 += '</div><div style="font-size:0.65rem;color:var(--text-dim);">Each row = 1–9</div>';
+  h2 += '<div style="display:flex;flex-direction:column;gap:2px;">';
+  for(let i=1;i<=9;i++) h2+=`<div class="tg-cell tg-clue tg-hl" style="width:24px;height:24px;font-size:0.55rem;">${i}</div>`;
+  h2 += '</div><div style="font-size:0.65rem;color:var(--text-dim);">Each column = 1–9</div>';
+  h2 += '</div>';
+  v2.innerHTML = h2;
+
+  // Slide 3: Grid with selected cell + highlighted row/col/box
+  const v3 = document.getElementById('tutVis3');
+  const selR=4, selC=4;
+  const boxR=3, boxC=3;
+  let h3 = '<div class="tut-grid g9">';
+  for(let r=0;r<9;r++) for(let c=0;c<9;c++){
+    const v=sample[r][c];
+    const isSel = r===selR&&c===selC;
+    const isHl = !isSel && (r===selR||c===selC||(r>=boxR&&r<boxR+3&&c>=boxC&&c<boxC+3));
+    let cls = v ? ' tg-clue' : '';
+    if(isSel) cls += ' tg-sel';
+    if(isHl) cls += ' tg-hl';
+    if(c===2||c===5) cls += ' tg-br';
+    if(r===2||r===5) cls += ' tg-bb';
+    h3+=`<div class="tg-cell${cls}">${v||''}</div>`;
+  }
+  v3.innerHTML = h3+'</div>';
+
+  // Slide 4: Row with 8 numbers, 1 missing = ?
+  const v4 = document.getElementById('tutVis4');
+  const elimRow = [1,3,4,5,6,7,8,9,0];
+  let h4 = '<div style="display:flex;flex-direction:column;gap:10px;align-items:center;">';
+  h4 += '<div style="display:flex;gap:2px;">';
+  for(let i=0;i<9;i++){
+    const v = elimRow[i];
+    if(v) h4+=`<div class="tg-cell tg-clue tg-hl" style="width:28px;height:28px;font-size:0.6rem;">${v}</div>`;
+    else h4+=`<div class="tg-cell tg-q tg-sel" style="width:28px;height:28px;">?</div>`;
+  }
+  h4 += '</div><div style="display:flex;align-items:center;gap:6px;margin-top:4px;">';
+  h4 += '<span style="font-size:0.7rem;color:var(--text-dim);">Missing:</span>';
+  h4 += '<span style="font-family:JetBrains Mono;font-size:0.85rem;font-weight:700;color:var(--blue);">2</span>';
+  h4 += '</div></div>';
+  v4.innerHTML = h4;
+
+  // Slide 5: Grid where all 7s are bold/glowing
+  const v5 = document.getElementById('tutVis5');
+  let h5 = '<div class="tut-grid g9">';
+  for(let r=0;r<9;r++) for(let c=0;c<9;c++){
+    const v=sample[r][c];
+    const is7 = v===7;
+    let cls = v ? ' tg-clue' : '';
+    if(is7) cls += ' tg-bold';
+    if(c===2||c===5) cls += ' tg-br';
+    if(r===2||r===5) cls += ' tg-bb';
+    h5+=`<div class="tg-cell${cls}">${v||''}</div>`;
+  }
+  v5.innerHTML = h5+'</div>';
+
+  // Slide 6: A few cells with error colors and undo arrow
+  const v6 = document.getElementById('tutVis6');
+  let h6 = '<div style="display:flex;flex-direction:column;gap:12px;align-items:center;">';
+  h6 += '<div style="display:flex;gap:2px;">';
+  const errRow = [{v:5,c:'tg-clue'},{v:3,c:'tg-clue'},{v:4,c:'tg-user'},{v:6,c:'tg-user'},{v:7,c:'tg-clue'},{v:9,c:'tg-err'},{v:1,c:'tg-user'},{v:8,c:'tg-err'},{v:2,c:'tg-user'}];
+  for(const cell of errRow) h6+=`<div class="tg-cell ${cell.c}" style="width:28px;height:28px;font-size:0.6rem;">${cell.v}</div>`;
+  h6 += '</div>';
+  h6 += '<div style="display:flex;align-items:center;gap:8px;font-size:0.7rem;color:var(--text-dim);">';
+  h6 += '<span style="color:var(--pink);">● wrong</span>';
+  h6 += '<span style="color:var(--blue);">● filled</span>';
+  h6 += '<span style="color:rgba(255,255,255,0.85);">● clue</span>';
+  h6 += '</div></div>';
+  v6.innerHTML = h6;
+}
+
+function buildTutDots() {
+  const d = document.getElementById('tutDots'); d.innerHTML = '';
+  for(let i=0;i<TUT_TOTAL;i++) d.innerHTML += `<div class="tut-dot${i===0?' active':''}" data-i="${i}"></div>`;
+}
+
+function tutNav(dir) {
+  tutSlide += dir;
+  if (tutSlide >= TUT_TOTAL) { closeTutorial(); return; }
+  if (tutSlide < 0) tutSlide = 0;
+  updateTutSlide();
+}
+
+function updateTutSlide() {
+  document.querySelectorAll('.tut-slide').forEach((s,i) => s.classList.toggle('active', i===tutSlide));
+  document.querySelectorAll('.tut-dot').forEach((d,i) => d.classList.toggle('active', i===tutSlide));
+  document.getElementById('tutCounter').textContent = `${tutSlide+1} / ${TUT_TOTAL}`;
+  document.getElementById('tutPrev').style.visibility = tutSlide === 0 ? 'hidden' : 'visible';
+  document.getElementById('tutNext').textContent = tutSlide === TUT_TOTAL - 1 ? 'Got it' : 'Next';
+}
+
+function openTutorial() {
+  wasPausedBefore = paused;
+  if (!paused && document.getElementById('game').classList.contains('active')) paused = true;
+  tutSlide = 0; updateTutSlide();
   document.getElementById('tutorial').classList.add('active');
 }
 function closeTutorial() {
   document.getElementById('tutorial').classList.remove('active');
-  if (!wasPausedBeforeTutorial && document.getElementById('game').classList.contains('active')) {
-    paused = false;
-  }
+  if (!wasPausedBefore && document.getElementById('game').classList.contains('active')) paused = false;
 }
 
-/* ── STORAGE ── */
-function getBestTimes() {
-  try { return JSON.parse(localStorage.getItem('sudoku_best_times')) || {}; } catch { return {}; }
-}
-function setBestTime(diff, secs) {
-  const best = getBestTimes();
-  if (!best[diff] || secs < best[diff]) {
-    best[diff] = secs; localStorage.setItem('sudoku_best_times', JSON.stringify(best)); return true;
-  }
-  return false;
-}
-function fmt(s) {
-  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-}
+/* ═══ GAME LOGIC ═══ */
+const DIFFICULTIES = { easy:{label:'Easy',clues:38,dot:'easy'}, medium:{label:'Medium',clues:30,dot:'medium'}, hard:{label:'Hard',clues:24,dot:'hard'} };
+let solution=[],puzzle=[],userGrid=[],clueMap=[],selectedCell=null;
+let timerInterval=null,seconds=0,paused=false,currentDifficulty='easy',revealed=false;
+let undoStack=[],errorCells=new Set();
 
-/* ── HOME ── */
-function buildHome() {
-  const best = getBestTimes();
-  const el = document.getElementById('diffSelect');
-  el.innerHTML = '';
-  for (const [key, cfg] of Object.entries(DIFFICULTIES)) {
-    const btn = document.createElement('button');
-    btn.className = 'diff-btn';
-    const bStr = best[key] ? `<span class="best-badge">Best ${fmt(best[key])}</span>` : '';
-    btn.innerHTML = `
-      <div class="diff-label"><span class="diff-dot ${cfg.dot}"></span>${cfg.label}</div>
-      <div class="diff-meta">${bStr}</div>`;
-    btn.onclick = () => startGame(key);
-    el.appendChild(btn);
-  }
-}
+function getBestTimes(){try{return JSON.parse(localStorage.getItem('sudoku_best_times'))||{};}catch{return {};}}
+function setBestTime(d,s){const b=getBestTimes();if(!b[d]||s<b[d]){b[d]=s;localStorage.setItem('sudoku_best_times',JSON.stringify(b));return true;}return false;}
+function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
 
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-}
+function buildHome(){const b=getBestTimes();const el=document.getElementById('diffSelect');el.innerHTML='';for(const[k,cfg]of Object.entries(DIFFICULTIES)){const btn=document.createElement('button');btn.className='diff-btn';const bs=b[k]?`<span class="best-badge">Best ${fmt(b[k])}</span>`:'';btn.innerHTML=`<div class="diff-label"><span class="diff-dot ${cfg.dot}"></span>${cfg.label}</div><div class="diff-meta">${bs}</div>`;btn.onclick=()=>startGame(k);el.appendChild(btn);}}
+function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function cancelAnyModal(){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));paused=false;}
+function confirmHome(){if(revealed){doGoHome();return;}paused=true;document.getElementById('confirmModal').classList.add('active');}
+function doGoHome(){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));clearInterval(timerInterval);revealed=false;buildHome();showScreen('home');}
+function confirmGiveUp(){if(revealed)return;paused=true;document.getElementById('giveUpModal').classList.add('active');}
+function confirmRestart(){if(revealed)return;paused=true;document.getElementById('restartModal').classList.add('active');}
 
-/* ── MODALS ── */
-function cancelAnyModal() {
-  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-  paused = false;
-}
-function confirmHome() {
-  if (revealed) { doGoHome(); return; }
-  paused = true;
-  document.getElementById('confirmModal').classList.add('active');
-}
-function doGoHome() {
-  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-  clearInterval(timerInterval); revealed = false;
-  buildHome(); showScreen('home');
-}
-function confirmGiveUp() {
-  if (revealed) return;
-  paused = true;
-  document.getElementById('giveUpModal').classList.add('active');
-}
-function confirmRestart() {
-  if (revealed) return;
-  paused = true;
-  document.getElementById('restartModal').classList.add('active');
-}
+function doRestart(){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));userGrid=puzzle.map(r=>[...r]);undoStack=[];errorCells=new Set();selectedCell=null;revealed=false;document.getElementById('picker').classList.remove('visible');updateUndoBtn();buildGrid();clearInterval(timerInterval);startTimer();}
 
-/* ── RESTART ── */
-function doRestart() {
-  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-  userGrid = puzzle.map(r => [...r]);
-  undoStack = [];
-  errorCells = new Set();
-  selectedCell = null; revealed = false;
+function doGiveUp(){
+  document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));
+  clearInterval(timerInterval);revealed=true;paused=true;
   document.getElementById('picker').classList.remove('visible');
-  updateUndoBtn();
-  buildGrid();
-  clearInterval(timerInterval);
-  startTimer();
-}
-
-/* ── GIVE UP ── */
-function doGiveUp() {
-  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-  clearInterval(timerInterval);
-  revealed = true; paused = true;
-  document.getElementById('picker').classList.remove('visible');
-  document.getElementById('btnFinish').disabled = true;
-  document.getElementById('btnGiveUp').style.display = 'none';
-  document.getElementById('btnPause').style.display = 'none';
-  document.getElementById('btnRestart').style.display = 'none';
-  document.getElementById('btnUndo').style.display = 'none';
-  document.getElementById('btnInfo').style.display = 'none';
-  selectedCell = null;
-  document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected', 'constrained', 'same-number', 'error-cell'));
-
-  let correctCount = 0, wrongCount = 0, emptyCount = 0;
-  for (let r = 0; r < 9; r++) {
-    for (let c = 0; c < 9; c++) {
-      if (clueMap[r][c]) continue;
-      const el = getCellEl(r, c);
-      const uv = userGrid[r][c], sv = solution[r][c];
-      el.classList.remove('user-filled');
-      if (uv === 0) { el.textContent = sv; el.classList.add('reveal-filled'); emptyCount++; }
-      else if (uv === sv) { el.classList.add('reveal-correct'); correctCount++; }
-      else { el.textContent = sv; el.classList.add('reveal-wrong'); wrongCount++; }
-    }
-  }
-  const total = correctCount + wrongCount + emptyCount;
-  document.getElementById('revealStats').innerHTML =
-    `<span class="g">✓ ${correctCount} correct</span> · <span class="r">✕ ${wrongCount} wrong</span> · <span class="r">○ ${emptyCount} empty</span><br>out of ${total} cells to fill`;
+  document.getElementById('btnFinish').disabled=true;
+  ['btnGiveUp','btnPause','btnRestart','btnUndo','btnInfo'].forEach(id=>document.getElementById(id).style.display='none');
+  selectedCell=null;
+  document.querySelectorAll('.cell').forEach(c=>c.classList.remove('selected','constrained','same-number','error-cell'));
+  let cc=0,wc=0,ec=0;
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++){if(clueMap[r][c])continue;const el=getCellEl(r,c),uv=userGrid[r][c],sv=solution[r][c];el.classList.remove('user-filled');if(uv===0){el.textContent=sv;el.classList.add('reveal-filled');ec++;}else if(uv===sv){el.classList.add('reveal-correct');cc++;}else{el.textContent=sv;el.classList.add('reveal-wrong');wc++;}}
+  const t=cc+wc+ec;
+  document.getElementById('revealStats').innerHTML=`<span class="g">✓ ${cc} correct</span> · <span class="r">✕ ${wc} wrong</span> · <span class="r">○ ${ec} empty</span><br>out of ${t} cells to fill`;
   document.getElementById('revealedBar').classList.add('active');
 }
 
-/* ── TIMER ── */
-function startTimer() {
-  seconds = 0; paused = false;
-  clearInterval(timerInterval);
-  updateTimer();
-  timerInterval = setInterval(() => { if (!paused) { seconds++; updateTimer(); } }, 1000);
-}
-function updateTimer() { document.getElementById('timer').textContent = fmt(seconds); }
+function startTimer(){seconds=0;paused=false;clearInterval(timerInterval);updateTimer();timerInterval=setInterval(()=>{if(!paused){seconds++;updateTimer();}},1000);}
+function updateTimer(){document.getElementById('timer').textContent=fmt(seconds);}
 
-/* ── PAUSE ── */
-function togglePause() {
-  if (revealed) return;
-  paused = !paused;
-  document.getElementById('pauseOverlay').classList.toggle('active', paused);
-  document.querySelectorAll('.cell').forEach(c => c.classList.toggle('hidden-cell', paused));
-  const icon = document.getElementById('pauseIcon');
-  icon.innerHTML = paused
-    ? '<polygon points="6,4 20,12 6,20"/>'
-    : '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
-  if (paused) {
-    document.getElementById('picker').classList.remove('visible');
-    selectedCell = null;
-    document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected', 'constrained', 'same-number'));
-  }
-}
+function togglePause(){if(revealed)return;paused=!paused;document.getElementById('pauseOverlay').classList.toggle('active',paused);document.querySelectorAll('.cell').forEach(c=>c.classList.toggle('hidden-cell',paused));document.getElementById('pauseIcon').innerHTML=paused?'<polygon points="6,4 20,12 6,20"/>':'<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';if(paused){document.getElementById('picker').classList.remove('visible');selectedCell=null;document.querySelectorAll('.cell').forEach(c=>c.classList.remove('selected','constrained','same-number'));}}
 
-/* ── UNDO ── */
-function undoMove() {
-  if (undoStack.length === 0 || paused || revealed) return;
-  const move = undoStack.pop();
-  userGrid[move.row][move.col] = move.prevVal;
-  const el = getCellEl(move.row, move.col);
-  el.textContent = move.prevVal === 0 ? '' : move.prevVal;
-  el.classList.remove('user-filled', 'error-cell');
-  errorCells.delete(`${move.row},${move.col}`);
-  if (move.prevVal !== 0) el.classList.add('user-filled');
-  updateUndoBtn();
-  selectCell(move.row, move.col);
-}
-function updateUndoBtn() { document.getElementById('btnUndo').disabled = undoStack.length === 0; }
+function undoMove(){if(undoStack.length===0||paused||revealed)return;const m=undoStack.pop();userGrid[m.row][m.col]=m.prevVal;const el=getCellEl(m.row,m.col);el.textContent=m.prevVal===0?'':m.prevVal;el.classList.remove('user-filled','error-cell');errorCells.delete(`${m.row},${m.col}`);if(m.prevVal!==0)el.classList.add('user-filled');updateUndoBtn();selectCell(m.row,m.col);}
+function updateUndoBtn(){document.getElementById('btnUndo').disabled=undoStack.length===0;}
 
-/* ── GENERATOR ── */
-function shuffle(a) {
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-function isValid(b, r, c, n) {
-  for (let i = 0; i < 9; i++) if (b[r][i] === n || b[i][c] === n) return false;
-  const br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
-  for (let rr = br; rr < br + 3; rr++)
-    for (let cc = bc; cc < bc + 3; cc++)
-      if (b[rr][cc] === n) return false;
-  return true;
-}
-function generateSolution() {
-  const b = Array.from({ length: 9 }, () => Array(9).fill(0));
-  function solve(b) {
-    for (let r = 0; r < 9; r++)
-      for (let c = 0; c < 9; c++)
-        if (b[r][c] === 0) {
-          for (const n of shuffle([1,2,3,4,5,6,7,8,9])) {
-            if (isValid(b, r, c, n)) { b[r][c] = n; if (solve(b)) return true; b[r][c] = 0; }
-          }
-          return false;
-        }
-    return true;
-  }
-  solve(b);
-  return b;
-}
-function countSolutions(board, limit) {
-  let count = 0;
-  function solve(b) {
-    if (count >= limit) return;
-    for (let r = 0; r < 9; r++)
-      for (let c = 0; c < 9; c++)
-        if (b[r][c] === 0) {
-          for (let n = 1; n <= 9; n++) {
-            if (isValid(b, r, c, n)) {
-              b[r][c] = n; solve(b); b[r][c] = 0;
-              if (count >= limit) return;
-            }
-          }
-          return;
-        }
-    count++;
-  }
-  solve(board);
-  return count;
-}
-function generatePuzzle(sol, numClues) {
-  const puz = sol.map(r => [...r]);
-  const cells = shuffle([...Array(81).keys()]);
-  let removed = 0; const target = 81 - numClues;
-  for (const idx of cells) {
-    if (removed >= target) break;
-    const r = Math.floor(idx / 9), c = idx % 9;
-    const backup = puz[r][c];
-    puz[r][c] = 0;
-    const test = puz.map(row => [...row]);
-    if (countSolutions(test, 2) !== 1) { puz[r][c] = backup; }
-    else { removed++; }
-  }
-  return puz;
-}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function isValid(b,r,c,n){for(let i=0;i<9;i++)if(b[r][i]===n||b[i][c]===n)return false;const br=Math.floor(r/3)*3,bc=Math.floor(c/3)*3;for(let rr=br;rr<br+3;rr++)for(let cc=bc;cc<bc+3;cc++)if(b[rr][cc]===n)return false;return true;}
+function generateSolution(){const b=Array.from({length:9},()=>Array(9).fill(0));function solve(b){for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(b[r][c]===0){for(const n of shuffle([1,2,3,4,5,6,7,8,9]))if(isValid(b,r,c,n)){b[r][c]=n;if(solve(b))return true;b[r][c]=0;}return false;}return true;}solve(b);return b;}
+function countSolutions(board,limit){let count=0;function solve(b){if(count>=limit)return;for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(b[r][c]===0){for(let n=1;n<=9;n++)if(isValid(b,r,c,n)){b[r][c]=n;solve(b);b[r][c]=0;if(count>=limit)return;}return;}count++;}solve(board);return count;}
+function generatePuzzle(sol,numClues){const p=sol.map(r=>[...r]);const cells=shuffle([...Array(81).keys()]);let rem=0;const target=81-numClues;for(const idx of cells){if(rem>=target)break;const r=Math.floor(idx/9),c=idx%9;const bk=p[r][c];p[r][c]=0;if(countSolutions(p.map(r=>[...r]),2)!==1)p[r][c]=bk;else rem++;}return p;}
 
-/* ── START ── */
-function startGame(diff) {
-  currentDifficulty = diff;
-  revealed = false; undoStack = []; errorCells = new Set();
-  const cfg = DIFFICULTIES[diff];
+function startGame(diff){
+  currentDifficulty=diff;revealed=false;undoStack=[];errorCells=new Set();
   document.getElementById('loading').classList.add('active');
-  setTimeout(() => {
-    solution = generateSolution();
-    puzzle = generatePuzzle(solution, cfg.clues);
-    userGrid = puzzle.map(r => [...r]);
-    clueMap = puzzle.map(r => r.map(v => v !== 0));
-    selectedCell = null;
-    const tag = document.getElementById('diffTag');
-    tag.textContent = cfg.label; tag.className = 'diff-tag ' + diff;
-    document.getElementById('btnFinish').disabled = false;
-    ['btnGiveUp','btnPause','btnRestart','btnUndo','btnInfo'].forEach(id => document.getElementById(id).style.display = '');
+  setTimeout(()=>{
+    solution=generateSolution();puzzle=generatePuzzle(solution,DIFFICULTIES[diff].clues);
+    userGrid=puzzle.map(r=>[...r]);clueMap=puzzle.map(r=>r.map(v=>v!==0));selectedCell=null;
+    const tag=document.getElementById('diffTag');tag.textContent=DIFFICULTIES[diff].label;tag.className='diff-tag '+diff;
+    document.getElementById('btnFinish').disabled=false;
+    ['btnGiveUp','btnPause','btnRestart','btnUndo','btnInfo'].forEach(id=>document.getElementById(id).style.display='');
     document.getElementById('revealedBar').classList.remove('active');
-    updateUndoBtn();
-    buildGrid();
+    updateUndoBtn();buildGrid();
     document.getElementById('loading').classList.remove('active');
-    showScreen('game'); startTimer();
+    showScreen('game');startTimer();
     document.getElementById('picker').classList.remove('visible');
     document.getElementById('pauseOverlay').classList.remove('active');
-    document.getElementById('pauseIcon').innerHTML =
-      '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
-  }, 50);
+    document.getElementById('pauseIcon').innerHTML='<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+  },50);
 }
 
-/* ── GRID ── */
-function buildGrid() {
-  const g = document.getElementById('grid'); g.innerHTML = '';
-  for (let r = 0; r < 9; r++)
-    for (let c = 0; c < 9; c++) {
-      const d = document.createElement('div');
-      d.className = 'cell'; d.dataset.row = r; d.dataset.col = c;
-      if (clueMap[r][c]) { d.classList.add('clue'); d.textContent = puzzle[r][c]; }
-      d.addEventListener('click', () => selectCell(r, c));
-      g.appendChild(d);
-    }
+function buildGrid(){const g=document.getElementById('grid');g.innerHTML='';for(let r=0;r<9;r++)for(let c=0;c<9;c++){const d=document.createElement('div');d.className='cell';d.dataset.row=r;d.dataset.col=c;if(clueMap[r][c]){d.classList.add('clue');d.textContent=puzzle[r][c];}d.addEventListener('click',()=>selectCell(r,c));g.appendChild(d);}}
+
+function selectCell(row,col){
+  if(paused||revealed)return;
+  document.querySelectorAll('.cell').forEach(c=>c.classList.remove('selected','constrained','same-number'));
+  getCellEl(row,col).classList.add('selected');
+  const br=Math.floor(row/3)*3,bc=Math.floor(col/3)*3;
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++){if(r===row&&c===col)continue;if(r===row||c===col||(r>=br&&r<br+3&&c>=bc&&c<bc+3))getCellEl(r,c).classList.add('constrained');}
+  const val=userGrid[row][col];
+  if(val!==0)for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(userGrid[r][c]===val)getCellEl(r,c).classList.add('same-number');
+  if(clueMap[row][col]){selectedCell=null;document.getElementById('picker').classList.remove('visible');}
+  else{selectedCell={row,col};document.getElementById('picker').classList.add('visible');}
+}
+function getCellEl(r,c){return document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`);}
+
+function placeNumber(num){
+  if(!selectedCell||paused||revealed)return;
+  const{row,col}=selectedCell;if(clueMap[row][col])return;
+  const prev=userGrid[row][col];if(prev===num)return;
+  undoStack.push({row,col,prevVal:prev});updateUndoBtn();
+  userGrid[row][col]=num;const el=getCellEl(row,col);
+  el.textContent=num===0?'':num;
+  el.classList.remove('error-cell');errorCells.delete(`${row},${col}`);
+  el.classList.toggle('user-filled',num!==0);
+  document.querySelectorAll('.cell').forEach(c=>c.classList.remove('same-number'));
+  if(num!==0)for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(userGrid[r][c]===num)getCellEl(r,c).classList.add('same-number');
 }
 
-/* ── SELECT ── */
-function selectCell(row, col) {
-  if (paused || revealed) return;
-  document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected', 'constrained', 'same-number'));
-
-  getCellEl(row, col).classList.add('selected');
-
-  const br = Math.floor(row / 3) * 3, bc = Math.floor(col / 3) * 3;
-  for (let r = 0; r < 9; r++)
-    for (let c = 0; c < 9; c++) {
-      if (r === row && c === col) continue;
-      if (r === row || c === col || (r >= br && r < br + 3 && c >= bc && c < bc + 3))
-        getCellEl(r, c).classList.add('constrained');
-    }
-
-  const val = userGrid[row][col];
-  if (val !== 0) {
-    for (let r = 0; r < 9; r++)
-      for (let c = 0; c < 9; c++)
-        if (userGrid[r][c] === val)
-          getCellEl(r, c).classList.add('same-number');
-  }
-
-  if (clueMap[row][col]) {
-    selectedCell = null;
-    document.getElementById('picker').classList.remove('visible');
-  } else {
-    selectedCell = { row, col };
-    document.getElementById('picker').classList.add('visible');
-  }
+function checkSolution(){
+  if(paused||revealed)return;clearInterval(timerInterval);
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(userGrid[r][c]===0){showModal('incomplete');return;}
+  let hasErr=false;
+  errorCells.forEach(k=>{const[r,c]=k.split(',').map(Number);getCellEl(r,c).classList.remove('error-cell');});
+  errorCells=new Set();
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++){if(clueMap[r][c])continue;if(userGrid[r][c]!==solution[r][c]){hasErr=true;errorCells.add(`${r},${c}`);getCellEl(r,c).classList.add('error-cell');}}
+  showModal(hasErr?'errors':'success');
 }
 
-function getCellEl(r, c) { return document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`); }
-
-/* ── PLACE ── */
-function placeNumber(num) {
-  if (!selectedCell || paused || revealed) return;
-  const { row, col } = selectedCell;
-  if (clueMap[row][col]) return;
-  const prevVal = userGrid[row][col];
-  if (prevVal === num) return;
-
-  undoStack.push({ row, col, prevVal });
-  updateUndoBtn();
-
-  userGrid[row][col] = num;
-  const el = getCellEl(row, col);
-  el.textContent = num === 0 ? '' : num;
-
-  // Clear error state on this cell whenever value changes
-  el.classList.remove('error-cell');
-  errorCells.delete(`${row},${col}`);
-
-  el.classList.toggle('user-filled', num !== 0);
-
-  // Refresh same-number highlights
-  document.querySelectorAll('.cell').forEach(c => c.classList.remove('same-number'));
-  if (num !== 0) {
-    for (let r = 0; r < 9; r++)
-      for (let c = 0; c < 9; c++)
-        if (userGrid[r][c] === num)
-          getCellEl(r, c).classList.add('same-number');
-  }
-}
-
-/* ── CHECK ── */
-function checkSolution() {
-  if (paused || revealed) return;
-  clearInterval(timerInterval);
-
-  // Check empty
-  for (let r = 0; r < 9; r++)
-    for (let c = 0; c < 9; c++)
-      if (userGrid[r][c] === 0) { showModal('incomplete'); return; }
-
-  // Check against solution
-  let hasError = false;
-  // Clear old errors
-  errorCells.forEach(key => {
-    const [r, c] = key.split(',').map(Number);
-    getCellEl(r, c).classList.remove('error-cell');
-  });
-  errorCells = new Set();
-
-  for (let r = 0; r < 9; r++)
-    for (let c = 0; c < 9; c++) {
-      if (clueMap[r][c]) continue;
-      if (userGrid[r][c] !== solution[r][c]) {
-        hasError = true;
-        errorCells.add(`${r},${c}`);
-        getCellEl(r, c).classList.add('error-cell');
-      }
-    }
-
-  if (!hasError) {
-    showModal('success');
-  } else {
-    showModal('errors');
-  }
-}
-
-/* ── MODAL ── */
-function showModal(type) {
-  const modal = document.getElementById('modal');
-  const icon = document.getElementById('modal-icon');
-  const title = document.getElementById('modal-title');
-  const text = document.getElementById('modal-text');
-  const bestEl = document.getElementById('modal-best');
-  const actions = document.getElementById('modal-actions');
-  bestEl.style.display = 'none'; actions.innerHTML = '';
-
-  if (type === 'success') {
-    const isNew = setBestTime(currentDifficulty, seconds);
-    icon.textContent = '✦'; icon.style.color = 'var(--pink)';
-    title.textContent = 'Brilliant!';
-    text.textContent = `Solved in ${fmt(seconds)}.`;
-    if (isNew) { bestEl.style.display = 'block'; bestEl.textContent = '★ New best time!'; }
-    actions.innerHTML = `
-      <button class="btn-primary" onclick="closeModal(); startGame('${currentDifficulty}')">Play Again</button>
-      <button class="btn-secondary" onclick="closeModal(); doGoHome()">Home</button>`;
-  } else if (type === 'incomplete') {
-    icon.textContent = '○'; icon.style.color = 'var(--text-dim)';
-    title.textContent = 'Not Done Yet';
-    text.textContent = 'Some cells are still empty.';
-    actions.innerHTML = `<button class="btn-primary" onclick="closeModal(); resumeTimer()">Continue</button>`;
-  } else if (type === 'errors') {
-    icon.textContent = '✕'; icon.style.color = 'var(--error)';
-    title.textContent = 'Not Quite';
-    text.textContent = 'Some values are incorrect. The wrong cells are highlighted — try fixing them.';
-    actions.innerHTML = `<button class="btn-primary" onclick="closeModal(); resumeTimer()">Try Again</button>`;
-  }
-
+function showModal(type){
+  const modal=document.getElementById('modal'),icon=document.getElementById('modal-icon'),title=document.getElementById('modal-title'),text=document.getElementById('modal-text'),bestEl=document.getElementById('modal-best'),actions=document.getElementById('modal-actions');
+  bestEl.style.display='none';actions.innerHTML='';
+  if(type==='success'){const isNew=setBestTime(currentDifficulty,seconds);icon.textContent='✦';icon.style.color='var(--pink)';title.textContent='Brilliant!';text.textContent=`Solved in ${fmt(seconds)}.`;if(isNew){bestEl.style.display='block';bestEl.textContent='★ New best time!';}actions.innerHTML=`<button class="btn-primary" onclick="closeModal();startGame('${currentDifficulty}')">Play Again</button><button class="btn-secondary" onclick="closeModal();doGoHome()">Home</button>`;}
+  else if(type==='incomplete'){icon.textContent='○';icon.style.color='var(--text-dim)';title.textContent='Not Done Yet';text.textContent='Some cells are still empty.';actions.innerHTML=`<button class="btn-primary" onclick="closeModal();resumeTimer()">Continue</button>`;}
+  else if(type==='errors'){icon.textContent='✕';icon.style.color='var(--error)';title.textContent='Not Quite';text.textContent='Some values are incorrect. The wrong cells are highlighted.';actions.innerHTML=`<button class="btn-primary" onclick="closeModal();resumeTimer()">Try Again</button>`;}
   modal.classList.add('active');
 }
+function closeModal(){document.getElementById('modal').classList.remove('active');}
+function resumeTimer(){timerInterval=setInterval(()=>{if(!paused){seconds++;updateTimer();}},1000);}
 
-function closeModal() { document.getElementById('modal').classList.remove('active'); }
-function resumeTimer() { timerInterval = setInterval(() => { if (!paused) { seconds++; updateTimer(); } }, 1000); }
-
-/* ── KEYBOARD ── */
-document.addEventListener('keydown', (e) => {
-  if (paused || revealed) return;
-  if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoMove(); return; }
-  if (!selectedCell) return;
-  const n = parseInt(e.key);
-  if (n >= 1 && n <= 9) placeNumber(n);
-  if (e.key === 'Backspace' || e.key === 'Delete') placeNumber(0);
-});
+document.addEventListener('keydown',(e)=>{if(paused||revealed)return;if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undoMove();return;}if(!selectedCell)return;const n=parseInt(e.key);if(n>=1&&n<=9)placeNumber(n);if(e.key==='Backspace'||e.key==='Delete')placeNumber(0);});
 
 buildHome();
+buildTutDots();
+buildTutVisuals();
+updateTutSlide();
 </script>
 </body>
 </html>
