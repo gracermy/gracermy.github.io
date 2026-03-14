@@ -149,6 +149,7 @@
   .cell.selected { background: var(--cell-selected) !important; box-shadow: inset 0 0 0 2px var(--pink); z-index: 2; }
   .cell.constrained { background: rgba(190, 220, 255, 0.12) !important; }
   .cell.user-filled { color: var(--pink); }
+  .cell.same-number { font-weight: 800 !important; text-shadow: 0 0 8px currentColor; }
   .cell.error-cell { color: var(--error) !important; animation: shake 0.35s ease; }
   .cell.hidden-cell { color: transparent !important; }
   .cell.reveal-correct { color: var(--success) !important; background: rgba(52, 211, 153, 0.08) !important; }
@@ -756,7 +757,7 @@ function buildGrid() {
 /* ── SELECT ── */
 function selectCell(row, col) {
   if (paused || revealed) return;
-  document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected', 'constrained', 'error-cell'));
+  document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected', 'constrained', 'error-cell', 'same-number'));
 
   getCellEl(row, col).classList.add('selected');
 
@@ -767,6 +768,15 @@ function selectCell(row, col) {
       if (r === row || c === col || (r >= br && r < br + 3 && c >= bc && c < bc + 3))
         getCellEl(r, c).classList.add('constrained');
     }
+
+  // Highlight all cells with the same number
+  const val = userGrid[row][col];
+  if (val !== 0) {
+    for (let r = 0; r < 9; r++)
+      for (let c = 0; c < 9; c++)
+        if (userGrid[r][c] === val)
+          getCellEl(r, c).classList.add('same-number');
+  }
 
   if (clueMap[row][col]) {
     selectedCell = null;
@@ -795,6 +805,15 @@ function placeNumber(num) {
   const el = getCellEl(row, col);
   el.textContent = num === 0 ? '' : num;
   el.classList.toggle('user-filled', num !== 0);
+
+  // Refresh same-number highlights
+  document.querySelectorAll('.cell').forEach(c => c.classList.remove('same-number'));
+  if (num !== 0) {
+    for (let r = 0; r < 9; r++)
+      for (let c = 0; c < 9; c++)
+        if (userGrid[r][c] === num)
+          getCellEl(r, c).classList.add('same-number');
+  }
 }
 
 /* ── CHECK ── */
