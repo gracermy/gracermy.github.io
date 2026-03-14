@@ -19,46 +19,65 @@
     --radius: 14px;
   }
 
+  [data-theme="dark"] {
+    --bg: #111113;
+    --bg-card: #1a1a1e;
+    --text: #e4e4e7;
+    --text-secondary: #8b8b95;
+    --text-muted: #55555e;
+    --accent: #6dacf7;
+    --accent-soft: rgba(109, 172, 247, 0.08);
+    --border: #27272a;
+    --border-hover: #3f3f44;
+  }
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    background: var(--bg);
-    color: var(--text);
+    background: var(--bg); color: var(--text);
     font-family: 'Source Sans 3', sans-serif;
-    font-weight: 400;
-    line-height: 1.6;
+    font-weight: 400; line-height: 1.6;
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
+    transition: background 0.35s, color 0.35s;
   }
 
-  .container { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+  .container { max-width: 760px; margin: 0 auto; padding: 0 24px; }
 
   /* ── NAV ── */
-  nav { padding: 28px 0; border-bottom: 1px solid var(--border); }
+  nav { padding: 28px 0; border-bottom: 1px solid var(--border); transition: border-color 0.35s; }
   nav .container { display: flex; justify-content: space-between; align-items: center; }
+  .nav-left { display: flex; align-items: center; gap: 28px; }
   .nav-logo {
     font-family: 'JetBrains Mono', monospace; font-size: 0.95rem;
-    font-weight: 500; color: var(--text); text-decoration: none; letter-spacing: -0.02em;
+    font-weight: 500; color: var(--text); text-decoration: none;
+    letter-spacing: -0.02em; transition: color 0.35s;
   }
   .nav-links { display: flex; gap: 28px; }
   .nav-links a {
-    font-size: 0.9rem; color: var(--text-secondary);
-    text-decoration: none; transition: color 0.2s; font-weight: 400;
+    font-size: 0.9rem; color: var(--text-secondary); text-decoration: none;
+    transition: color 0.2s; font-weight: 400;
   }
   .nav-links a:hover { color: var(--text); }
   .nav-links a.active { color: var(--text); font-weight: 500; }
 
-  /* ── HEADER ── */
-  .page-header {
-    padding: 60px 0 16px;
+  .theme-toggle {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 1px solid var(--border); background: transparent;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.25s; color: var(--text-muted);
   }
+  .theme-toggle:hover { border-color: var(--border-hover); color: var(--text-secondary); }
+  .theme-toggle svg { width: 16px; height: 16px; transition: transform 0.3s; }
+  .theme-toggle:hover svg { transform: rotate(25deg); }
+
+  /* ── HEADER ── */
+  .page-header { padding: 60px 0 16px; }
   .page-header h1 {
     font-family: 'Instrument Serif', serif;
     font-size: clamp(2.2rem, 5vw, 3rem);
-    font-weight: 400;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
-    margin-bottom: 10px;
+    font-weight: 400; line-height: 1.1;
+    letter-spacing: -0.02em; margin-bottom: 10px;
   }
   .page-header p {
     font-size: 1.05rem; color: var(--text-secondary);
@@ -77,88 +96,70 @@
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    overflow: hidden;
-    text-decoration: none;
+    overflow: hidden; text-decoration: none;
     color: var(--text);
     transition: all 0.25s;
-    display: flex;
-    flex-direction: column;
+    display: flex; flex-direction: column;
   }
   .game-card:hover {
     border-color: var(--border-hover);
     box-shadow: 0 4px 20px rgba(0,0,0,0.05);
     transform: translateY(-2px);
   }
+  [data-theme="dark"] .game-card:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  }
 
   .game-thumb {
     height: 160px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
   }
   .game-thumb.sudoku-thumb {
     background: linear-gradient(135deg, #0d0f1a 0%, #141729 100%);
   }
 
-  /* Mini sudoku grid preview */
   .mini-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 3px;
-    width: 80px; height: 80px;
-    opacity: 0.7;
+    gap: 3px; width: 80px; height: 80px; opacity: 0.7;
   }
   .mini-cell {
     background: rgba(255,255,255,0.08);
     border-radius: 3px;
     display: flex; align-items: center; justify-content: center;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.6rem;
-    font-weight: 600;
+    font-size: 0.6rem; font-weight: 600;
   }
   .mini-cell.mc-blue { color: #60a5fa; }
   .mini-cell.mc-pink { color: #f472b6; }
 
   .game-body {
     padding: 18px 20px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    flex: 1;
+    display: flex; flex-direction: column; gap: 6px; flex: 1;
   }
   .game-body h3 {
-    font-family: 'Source Sans 3', sans-serif;
-    font-size: 1.1rem;
-    font-weight: 600;
+    font-size: 1.1rem; font-weight: 600;
   }
   .game-body p {
-    font-size: 0.88rem;
-    color: var(--text-secondary);
-    font-weight: 300;
-    line-height: 1.5;
+    font-size: 0.88rem; color: var(--text-secondary);
+    font-weight: 300; line-height: 1.5;
   }
-  .game-tags {
-    display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap;
-  }
+  .game-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
   .game-tag {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.65rem;
-    font-weight: 500;
-    padding: 3px 8px;
-    border-radius: 20px;
-    background: var(--accent-soft);
-    color: var(--accent);
+    font-size: 0.65rem; font-weight: 500;
+    padding: 3px 8px; border-radius: 20px;
+    background: var(--accent-soft); color: var(--accent);
     letter-spacing: 0.02em;
   }
 
-  .coming-soon {
-    opacity: 0.5;
-    pointer-events: none;
-  }
+  .coming-soon { opacity: 0.5; pointer-events: none; }
   .coming-soon .game-thumb {
     background: linear-gradient(135deg, #e8e8e4, #d8d8d4);
+  }
+  [data-theme="dark"] .coming-soon .game-thumb {
+    background: linear-gradient(135deg, #1e1e22, #27272b);
   }
   .coming-badge {
     font-family: 'JetBrains Mono', monospace;
@@ -167,22 +168,23 @@
   }
 
   /* ── FOOTER ── */
-  footer { padding: 40px 0; border-top: 1px solid var(--border); }
-  footer p { font-size: 0.8rem; color: var(--text-muted); text-align: center; font-weight: 300; }
+  footer { padding: 32px 0; border-top: 1px solid var(--border); transition: border-color 0.35s; }
+  footer p { font-size: 0.78rem; color: var(--text-muted); text-align: center; font-weight: 300; }
 
   /* ── ANIMATION ── */
   .fade-up {
     opacity: 0; transform: translateY(16px);
     animation: fadeUp 0.6s ease forwards;
   }
-  .fade-up:nth-child(1) { animation-delay: 0s; }
-  .fade-up:nth-child(2) { animation-delay: 0.08s; }
-  .fade-up:nth-child(3) { animation-delay: 0.16s; }
   @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+  .fd1 { animation-delay: 0s; }
+  .fd2 { animation-delay: 0.08s; }
+  .fd3 { animation-delay: 0.16s; }
 
   @media (max-width: 480px) {
     .page-header { padding: 40px 0 10px; }
     nav { padding: 20px 0; }
+    .nav-links { gap: 20px; }
   }
 </style>
 </head>
@@ -190,23 +192,38 @@
 
 <nav>
   <div class="container">
-    <a href="/" class="nav-logo">gracermy</a>
-    <div class="nav-links">
-      <a href="/">Home</a>
-      <a href="/games/" class="active">Games</a>
+    <div class="nav-left">
+      <a href="/" class="nav-logo">gracermy</a>
+      <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/games/" class="active">Games</a>
+      </div>
     </div>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle dark/light mode">
+      <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/>
+        <line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/>
+        <line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    </button>
   </div>
 </nav>
 
 <main>
   <div class="container">
-    <section class="page-header fade-up">
+    <section class="page-header fade-up fd1">
       <h1>Games</h1>
       <p>Browser-based puzzles and games — all free, no installs needed.</p>
     </section>
 
     <div class="games-grid">
-      <a href="/games/sudoku/" class="game-card fade-up">
+      <a href="/games/sudoku/" class="game-card fade-up fd2">
         <div class="game-thumb sudoku-thumb">
           <div class="mini-grid">
             <div class="mini-cell mc-blue">5</div>
@@ -238,7 +255,7 @@
         </div>
       </a>
 
-      <div class="game-card coming-soon fade-up">
+      <div class="game-card coming-soon fade-up fd3">
         <div class="game-thumb">
           <span class="coming-badge">Coming soon</span>
         </div>
@@ -253,9 +270,26 @@
 
 <footer>
   <div class="container">
-    <p>© 2026 gracermy · Built with curiosity</p>
+    <p>Built with love</p>
   </div>
 </footer>
+
+<script>
+  const sunIcon = `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`;
+  const moonIcon = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
+
+  function getTheme() { return localStorage.getItem('theme') || 'light'; }
+
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    document.getElementById('themeIcon').innerHTML = t === 'dark' ? moonIcon : sunIcon;
+    localStorage.setItem('theme', t);
+  }
+
+  function toggleTheme() { applyTheme(getTheme() === 'dark' ? 'light' : 'dark'); }
+
+  applyTheme(getTheme());
+</script>
 
 </body>
 </html>
