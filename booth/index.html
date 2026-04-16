@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Photobooth · gracermy</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Special+Elite&family=Source+Sans+3:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f0e6d4;
+    --bg-deep: #e8dcc4;
+    --paper: #fdf8eb;
+    --paper-edge: #e8dcc0;
+    --text: #2b2418;
+    --text-dim: #847861;
+    --text-soft: #5a5040;
+    --accent: #8b3a1e;
+    --accent-soft: rgba(139, 58, 30, 0.08);
+    --accent-hover: rgba(139, 58, 30, 0.15);
+    --border: #d4c8b0;
+    --border-strong: #b5a890;
+    --gold: #b88c4a;
+    --shadow: rgba(60, 40, 20, 0.12);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Source Sans 3', sans-serif;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    position: relative;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Paper texture background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 30%, rgba(184, 140, 74, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 70%, rgba(139, 58, 30, 0.06) 0%, transparent 50%);
+    pointer-events: none; z-index: 0;
+  }
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/></svg>");
+    opacity: 0.04;
+    pointer-events: none; z-index: 0;
+    mix-blend-mode: multiply;
+  }
+
+  /* Back link */
+  .back-link {
+    position: fixed; top: 16px; left: 18px; z-index: 50;
+    font-family: 'Source Sans 3', sans-serif; font-size: 0.78rem;
+    color: var(--text-dim); text-decoration: none;
+    opacity: 0.7; transition: opacity 0.2s;
+    letter-spacing: 0.02em;
+  }
+  .back-link:hover { opacity: 1; }
+
+  .screen { display: none; flex-direction: column; align-items: center; position: relative; z-index: 1; min-height: 100dvh; }
+  .screen.active { display: flex; }
+
+  /* ═══ WELCOME ═══ */
+  #welcome { justify-content: center; padding: 24px; gap: 32px; }
+
+  .home-actions { position: absolute; top: 16px; right: 16px; display: flex; gap: 8px; }
+  .btn-icon-vintage {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 1.5px solid var(--border-strong);
+    background: var(--paper);
+    color: var(--text-dim); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    box-shadow: 0 2px 6px var(--shadow);
+  }
+  .btn-icon-vintage:hover { color: var(--accent); border-color: var(--accent); }
+  .btn-icon-vintage .icon-bang {
+    font-family: 'Instrument Serif', serif;
+    font-size: 18px; font-weight: 700; line-height: 1;
+  }
+
+  .booth-title {
+    text-align: center;
+    position: relative;
+  }
+  .booth-title h1 {
+    font-family: 'Instrument Serif', serif;
+    font-size: clamp(3rem, 9vw, 5rem);
+    font-weight: 400;
+    color: var(--text);
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .booth-title .stars {
+    display: flex; justify-content: center; gap: 18px;
+    margin: 14px 0 8px;
+    color: var(--gold); font-size: 0.9rem;
+  }
+  .booth-title p {
+    font-family: 'Special Elite', monospace;
+    font-size: 0.78rem;
+    color: var(--text-soft);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* Sample photo strip preview */
+  .preview-strip {
+    width: 110px;
+    background: var(--paper);
+    padding: 8px 8px 18px;
+    border-radius: 4px;
+    box-shadow: 0 12px 30px var(--shadow), 0 2px 4px var(--shadow);
+    transform: rotate(-3deg);
+    margin: 4px auto 8px;
+  }
+  .preview-strip .ps-frame {
+    width: 100%; aspect-ratio: 1;
+    background: linear-gradient(135deg, #4a3828, #2a1f15);
+    margin-bottom: 6px;
+    border-radius: 1px;
+    position: relative;
+    overflow: hidden;
+  }
+  .preview-strip .ps-frame:last-of-type { margin-bottom: 0; }
+  .preview-strip .ps-frame::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center 40%, rgba(245, 220, 180, 0.4) 0%, transparent 60%);
+  }
+  .preview-strip .ps-footer {
+    text-align: center;
+    font-family: 'Special Elite', monospace;
+    font-size: 0.55rem;
+    color: var(--text-dim);
+    margin-top: 8px;
+    letter-spacing: 0.05em;
+  }
+
+  .start-btn {
+    background: var(--accent);
+    color: var(--paper);
+    border: none;
+    padding: 18px 48px;
+    border-radius: 4px;
+    font-family: 'Special Elite', monospace;
+    font-size: 0.95rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #6b2a14, 0 8px 18px var(--shadow);
+    transition: all 0.15s;
+    position: relative;
+  }
+  .start-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 0 #6b2a14, 0 12px 24px var(--shadow); }
+  .start-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #6b2a14, 0 4px 8px var(--shadow); }
+
+  .mode-info {
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    text-align: center;
+    font-weight: 300;
+    margin-top: -16px;
+  }
+
+  /* ═══ BOOTH (camera) ═══ */
+  #booth { padding: 14px; gap: 14px; justify-content: center; width: 100%; max-width: 520px; margin: 0 auto; }
+
+  .booth-bar {
+    display: flex; justify-content: space-between; align-items: center; width: 100%;
+    padding: 0 4px;
+  }
+  .booth-bar .booth-label {
+    font-family: 'Special Elite', monospace;
+    font-size: 0.78rem;
+    color: var(--text-soft);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .viewfinder {
+    width: 100%; aspect-ratio: 1;
+    background: #1a1410;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 28px var(--shadow), inset 0 0 0 6px var(--paper), inset 0 0 0 7px var(--border-strong);
+  }
+  .viewfinder video {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+    transform: scaleX(-1); /* mirror for selfie feel */
+  }
+  .viewfinder.no-mirror video { transform: none; }
+
+  .vf-overlay {
+    position: absolute; inset: 6px;
+    pointer-events: none; z-index: 2;
+  }
+
+  .countdown-display {
+    position: absolute; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 3;
+  }
+  .countdown-display.active { display: flex; }
+  .countdown-num {
+    font-family: 'Instrument Serif', serif;
+    font-size: clamp(6rem, 25vw, 10rem);
+    color: var(--paper);
+    text-shadow: 0 4px 30px rgba(0,0,0,0.8);
+    animation: countPulse 1s ease;
+  }
+  @keyframes countPulse {
+    0% { transform: scale(0.5); opacity: 0; }
+    20% { transform: scale(1.1); opacity: 1; }
+    80% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(1.3); opacity: 0; }
+  }
+
+  .photo-progress {
+    position: absolute; top: 16px; left: 0; right: 0;
+    text-align: center;
+    font-family: 'Special Elite', monospace;
+    font-size: 0.85rem;
+    color: var(--paper);
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+    z-index: 3;
+    display: none;
+  }
+  .photo-progress.active { display: block; }
+
+  .flash-overlay {
+    position: absolute; inset: 0; background: white;
+    z-index: 5; opacity: 0; pointer-events: none;
+  }
+  .flash-overlay.firing { animation: flashAnim 0.45s ease-out; }
+  @keyframes flashAnim {
+    0% { opacity: 0; }
+    15% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* Camera toggle */
+  .vf-controls {
+    position: absolute; bottom: 14px; right: 14px;
+    z-index: 4;
+    display: flex; gap: 8px;
+  }
+  .vf-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: none; background: rgba(253, 248, 235, 0.85);
+    color: var(--text); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(6px);
+    transition: all 0.2s;
+  }
+  .vf-btn:hover { background: var(--paper); }
+  .vf-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Filter strip */
+  .filter-row {
+    display: flex; gap: 8px; overflow-x: auto;
+    padding: 4px 0; width: 100%;
+    scrollbar-width: none;
+  }
+  .filter-row::-webkit-scrollbar { display: none; }
+
+  .filter-chip {
+    padding: 8px 14px; border-radius: 50px;
+    border: 1.5px solid var(--border-strong);
+    background: var(--paper);
+    color: var(--text-soft);
+    font-family: 'Special Elite', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .filter-chip:hover { color: var(--accent); }
+  .filter-chip.active {
+    background: var(--accent);
+    color: var(--paper);
+    border-color: var(--accent);
+    box-shadow: 0 2px 8px rgba(139, 58, 30, 0.3);
+  }
+
+  .shutter-row {
+    display: flex; align-items: center; justify-content: center; gap: 18px;
+    width: 100%; margin-top: 4px;
+  }
+
+  .shutter-btn {
+    width: 70px; height: 70px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 4px solid var(--paper);
+    box-shadow: 0 0 0 3px var(--accent), 0 6px 20px var(--shadow);
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .shutter-btn::before {
+    content: '';
+    position: absolute; inset: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 1.5px solid rgba(253,248,235,0.3);
+  }
+  .shutter-btn:hover:not(:disabled) {
+    animation: shutterPulse 1.4s ease infinite;
+  }
+  .shutter-btn:active:not(:disabled) { transform: scale(0.93); }
+  .shutter-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  @keyframes shutterPulse {
+    0%, 100% { box-shadow: 0 0 0 3px var(--accent), 0 6px 20px var(--shadow); }
+    50% { box-shadow: 0 0 0 3px var(--accent), 0 0 0 10px rgba(139,58,30,0.18), 0 6px 20px var(--shadow); }
+  }
+
+  .shutter-meta {
+    display: flex; flex-direction: column; gap: 2px;
+    font-family: 'Special Elite', monospace;
+    font-size: 0.7rem; color: var(--text-soft);
+    letter-spacing: 0.06em;
+  }
+  .shutter-meta strong { color: var(--text); font-weight: normal; font-size: 0.85rem; }
+
+  /* ═══ DEVELOPING ═══ */
+  #developing {
+    justify-content: center; align-items: center; padding: 40px;
+  }
+  .develop-wrap { text-align: center; }
+  .develop-icon {
+    width: 80px; height: 80px;
+    border: 3px solid var(--border-strong);
+    border-radius: 50%;
+    border-top-color: var(--accent);
+    animation: spin 1.2s linear infinite;
+    margin: 0 auto 24px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .develop-text {
+    font-family: 'Instrument Serif', serif;
+    font-size: 1.6rem; color: var(--text);
+    margin-bottom: 6px;
+  }
+  .develop-sub {
+    font-family: 'Special Elite', monospace;
+    font-size: 0.8rem; color: var(--text-soft);
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+
+  /* ═══ RESULT ═══ */
+  #result { padding: 30px 16px; gap: 24px; align-items: center; }
+
+  .strip-stage {
+    perspective: 1200px;
+    margin: 8px 0;
+  }
+  .photo-strip {
+    background: var(--paper);
+    padding: 10px 10px 20px;
+    border-radius: 3px;
+    box-shadow:
+      0 20px 50px var(--shadow),
+      0 6px 12px var(--shadow),
+      inset 0 0 0 1px rgba(184, 140, 74, 0.15);
+    transform: rotate(-1.5deg);
+    position: relative;
+    width: 220px;
+    animation: stripDrop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes stripDrop {
+    0% { transform: rotate(-12deg) translateY(-200px); opacity: 0; }
+    100% { transform: rotate(-1.5deg) translateY(0); opacity: 1; }
+  }
+  .photo-strip .strip-frame {
+    width: 100%; aspect-ratio: 1;
+    margin-bottom: 6px;
+    background: #1a1410;
+    overflow: hidden;
+    position: relative;
+  }
+  .photo-strip .strip-frame:last-of-type { margin-bottom: 0; }
+  .photo-strip .strip-frame canvas {
+    width: 100%; height: 100%; display: block;
+    object-fit: cover;
+  }
+  .photo-strip .strip-footer {
+    text-align: center;
+    font-family: 'Special Elite', monospace;
+    font-size: 0.65rem;
+    color: var(--text-soft);
+    margin-top: 12px;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+  }
+  .photo-strip .strip-footer .strip-brand {
+    color: var(--accent);
+    font-size: 0.7rem;
+  }
+  .photo-strip .strip-footer .strip-date {
+    font-size: 0.55rem;
+    color: var(--text-dim);
+    margin-top: 2px;
+    letter-spacing: 0.08em;
+  }
+
+  /* Result actions */
+  .result-actions {
+    display: flex; flex-direction: column; gap: 10px;
+    width: 100%; max-width: 280px;
+  }
+  .result-btn {
+    padding: 14px 24px;
+    border: 1.5px solid var(--border-strong);
+    background: var(--paper);
+    color: var(--text);
+    font-family: 'Special Elite', monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .result-btn:hover { background: var(--bg-deep); }
+  .result-btn.primary {
+    background: var(--accent);
+    color: var(--paper);
+    border-color: var(--accent);
+    box-shadow: 0 4px 0 #6b2a14, 0 6px 14px var(--shadow);
+  }
+  .result-btn.primary:hover { transform: translateY(-1px); box-shadow: 0 5px 0 #6b2a14, 0 8px 18px var(--shadow); }
+  .result-btn.primary:active { transform: translateY(3px); box-shadow: 0 1px 0 #6b2a14; }
+
+  /* Filter selector on result */
+  .result-filters {
+    display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+    max-width: 320px;
+  }
+
+  /* ═══ MODALS ═══ */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(43, 36, 24, 0.65);
+    backdrop-filter: blur(6px);
+    z-index: 100; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--paper); border: 1px solid var(--border-strong);
+    border-radius: 8px; padding: 32px 28px; text-align: center;
+    max-width: 380px; width: 100%;
+    box-shadow: 0 20px 60px rgba(60,40,20,0.3);
+    animation: modalIn 0.3s ease;
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .modal h3 { font-family: 'Instrument Serif', serif; font-size: 1.5rem; margin-bottom: 8px; }
+  .modal p { color: var(--text-soft); font-size: 0.88rem; line-height: 1.5; margin-bottom: 6px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 22px; justify-content: center; flex-wrap: wrap; }
+  .modal-actions button {
+    padding: 12px 24px; border-radius: 4px;
+    font-family: 'Special Elite', monospace;
+    font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase;
+    cursor: pointer; transition: all 0.2s; border: 1.5px solid var(--border-strong);
+  }
+  .modal-actions .btn-primary { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+  .modal-actions .btn-primary:hover { transform: translateY(-1px); }
+  .modal-actions .btn-secondary { background: transparent; color: var(--text-soft); }
+  .modal-actions .btn-secondary:hover { color: var(--text); border-color: var(--text-soft); }
+
+  /* Tutorial */
+  .tut-panel {
+    background: var(--paper); border: 1px solid var(--border-strong);
+    border-radius: 8px; max-width: 380px; width: 100%;
+    max-height: 85vh; overflow-y: auto;
+    padding: 28px 24px;
+    box-shadow: 0 20px 60px rgba(60,40,20,0.3);
+    animation: modalIn 0.3s ease;
+  }
+  .tut-panel h2 {
+    font-family: 'Instrument Serif', serif;
+    font-size: 1.5rem; text-align: center; margin-bottom: 4px;
+  }
+  .tut-panel .tut-subtitle {
+    font-family: 'Special Elite', monospace;
+    font-size: 0.72rem; color: var(--text-dim);
+    text-align: center; letter-spacing: 0.1em; text-transform: uppercase;
+    margin-bottom: 18px;
+  }
+  .tut-step {
+    display: flex; gap: 12px; padding: 12px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .tut-step:last-of-type { border-bottom: none; }
+  .tut-num {
+    font-family: 'Instrument Serif', serif;
+    font-size: 1.4rem; color: var(--accent);
+    min-width: 26px; line-height: 1; padding-top: 2px;
+  }
+  .tut-text h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 3px; }
+  .tut-text p { font-size: 0.8rem; color: var(--text-soft); line-height: 1.5; font-weight: 300; }
+  .tut-close {
+    display: block; margin: 18px auto 0;
+    padding: 11px 30px; border-radius: 4px;
+    background: var(--accent); color: var(--paper);
+    border: none; cursor: pointer;
+    font-family: 'Special Elite', monospace;
+    font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+
+  /* Permission/error message */
+  .error-msg {
+    text-align: center; padding: 30px 20px;
+    color: var(--text-soft); font-size: 0.9rem;
+    line-height: 1.5;
+  }
+  .error-msg strong { color: var(--text); display: block; font-size: 1.1rem; margin-bottom: 8px; font-family: 'Instrument Serif', serif; }
+</style>
+</head>
+<body>
+
+<a href="/" class="back-link">← Home</a>
+
+<!-- ═══ WELCOME ═══ -->
+<div id="welcome" class="screen active">
+  <div class="home-actions">
+    <button class="btn-icon-vintage" onclick="openTutorial()" title="How to use">
+      <span class="icon-bang">!</span>
+    </button>
+  </div>
+
+  <div class="booth-title">
+    <h1>Photobooth</h1>
+    <div class="stars">★ &nbsp;★ &nbsp;★</div>
+    <p>Strike a pose</p>
+  </div>
+
+  <div class="preview-strip">
+    <div class="ps-frame"></div>
+    <div class="ps-frame"></div>
+    <div class="ps-frame"></div>
+    <div class="ps-frame"></div>
+    <div class="ps-footer">★ gracermy ★</div>
+  </div>
+
+  <button class="start-btn" onclick="startBooth()">Enter Booth</button>
+  <p class="mode-info">4 photos · 3 second countdown each</p>
+</div>
+
+<!-- ═══ BOOTH ═══ -->
+<div id="booth" class="screen">
+  <div class="booth-bar">
+    <button class="btn-icon-vintage" onclick="exitBooth()" title="Exit"><span style="font-size:14px;">←</span></button>
+    <div class="booth-label" id="boothStatus">Get ready</div>
+    <button class="btn-icon-vintage" onclick="openTutorial()" title="Help"><span class="icon-bang">!</span></button>
+  </div>
+
+  <div class="viewfinder" id="viewfinder">
+    <video id="video" autoplay playsinline muted></video>
+    <div class="photo-progress" id="photoProgress">Photo 1 of 4</div>
+    <div class="countdown-display" id="countdown">
+      <div class="countdown-num" id="countdownNum">3</div>
+    </div>
+    <div class="flash-overlay" id="flash"></div>
+    <div class="vf-controls">
+      <button class="vf-btn" onclick="flipCamera()" title="Flip camera">
+        <svg viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="filter-row" id="filterRow"></div>
+
+  <div class="shutter-row">
+    <div class="shutter-meta">
+      <strong>4 frames</strong>
+      <span>3s × 4</span>
+    </div>
+    <button class="shutter-btn" id="shutterBtn" onclick="startCapture()" title="Start"></button>
+    <div class="shutter-meta" style="text-align:right;">
+      <strong id="filterLabel">Warm Film</strong>
+      <span>filter</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ DEVELOPING ═══ -->
+<div id="developing" class="screen">
+  <div class="develop-wrap">
+    <div class="develop-icon"></div>
+    <div class="develop-text">Developing…</div>
+    <div class="develop-sub">Just a moment</div>
+  </div>
+</div>
+
+<!-- ═══ RESULT ═══ -->
+<div id="result" class="screen">
+  <div class="strip-stage">
+    <div class="photo-strip" id="photoStripDisplay">
+      <div class="strip-frame"><canvas id="finalCanvas0"></canvas></div>
+      <div class="strip-frame"><canvas id="finalCanvas1"></canvas></div>
+      <div class="strip-frame"><canvas id="finalCanvas2"></canvas></div>
+      <div class="strip-frame"><canvas id="finalCanvas3"></canvas></div>
+      <div class="strip-footer">
+        <div class="strip-brand">★ gracermy ★</div>
+        <div class="strip-date" id="stripDate">2026 · 04 · 16</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="result-filters" id="resultFilters"></div>
+
+  <div class="result-actions">
+    <button class="result-btn primary" onclick="downloadStrip()">↓ Download Strip</button>
+    <button class="result-btn" onclick="retake()">↻ Retake</button>
+    <button class="result-btn" onclick="newSession()">New Session</button>
+  </div>
+</div>
+
+<!-- TUTORIAL -->
+<div class="modal-overlay" id="tutorial">
+  <div class="tut-panel">
+    <h2>How It Works</h2>
+    <div class="tut-subtitle">★ Photobooth Guide ★</div>
+    <div class="tut-step">
+      <span class="tut-num">1</span>
+      <div class="tut-text"><h4>Pick a filter</h4><p>Choose from 6 vintage looks — 3 color, 3 black & white. You can change it on the fly or after capture.</p></div>
+    </div>
+    <div class="tut-step">
+      <span class="tut-num">2</span>
+      <div class="tut-text"><h4>Hit the big red button</h4><p>The booth captures 4 photos in a row. You'll get a 3-second countdown before each one — strike a different pose!</p></div>
+    </div>
+    <div class="tut-step">
+      <span class="tut-num">3</span>
+      <div class="tut-text"><h4>Watch the flash</h4><p>A bright flash fires when each photo is taken. Hold still for the moment of capture.</p></div>
+    </div>
+    <div class="tut-step">
+      <span class="tut-num">4</span>
+      <div class="tut-text"><h4>Wait for it to develop</h4><p>Your photos go through the vintage filter pipeline. Takes a couple seconds.</p></div>
+    </div>
+    <div class="tut-step">
+      <span class="tut-num">5</span>
+      <div class="tut-text"><h4>Save your strip</h4><p>Download as a PNG, retake if you don't love it, or try a different filter on the same photos.</p></div>
+    </div>
+    <button class="tut-close" onclick="closeTutorial()">Got it</button>
+  </div>
+</div>
+
+<!-- EXIT CONFIRM -->
+<div class="modal-overlay" id="exitModal">
+  <div class="modal">
+    <h3>Leave the booth?</h3>
+    <p>Your session won't be saved.</p>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="doExit()">Leave</button>
+      <button class="btn-secondary" onclick="document.getElementById('exitModal').classList.remove('active')">Stay</button>
+    </div>
+  </div>
+</div>
+
+<!-- ERROR -->
+<div class="modal-overlay" id="errorModal">
+  <div class="modal">
+    <h3 id="errorTitle">Camera unavailable</h3>
+    <p id="errorMsg">Please grant camera access to use the photobooth.</p>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="document.getElementById('errorModal').classList.remove('active'); newSession();">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══ FILTERS ═══ */
+
+function sCurve(val, strength) {
+  const n = val / 255;
+  const c = n < 0.5 ? 0.5 * Math.pow(2 * n, 1 + strength) : 1 - 0.5 * Math.pow(2 * (1 - n), 1 + strength);
+  return c * 255;
+}
+function sc(v) { return Math.min(255, Math.max(0, v)); }
+
+function colorGrade(r, g, b, sh, mid, hi) {
+  const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+  const sw = Math.max(0, 1 - lum * 3);
+  const hw = Math.max(0, lum * 3 - 2);
+  const mw = 1 - sw - hw;
+  return [
+    sc(r + sh[0]*sw + mid[0]*mw + hi[0]*hw),
+    sc(g + sh[1]*sw + mid[1]*mw + hi[1]*hw),
+    sc(b + sh[2]*sw + mid[2]*mw + hi[2]*hw)
+  ];
+}
+
+function addGrain(ctx, w, h, intensity, size) {
+  const img = ctx.getImageData(0, 0, w, h); const d = img.data;
+  const s = size || 1;
+  for (let y = 0; y < h; y += s) {
+    for (let x = 0; x < w; x += s) {
+      const noise = (Math.random() - 0.5) * intensity;
+      for (let dy = 0; dy < s && y+dy < h; dy++)
+        for (let dx = 0; dx < s && x+dx < w; dx++) {
+          const i = ((y+dy)*w+(x+dx))*4;
+          d[i]+=noise; d[i+1]+=noise; d[i+2]+=noise;
+        }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+function addVignette(ctx, w, h, strength, squeeze) {
+  const cx=w/2, cy=h/2, max=Math.sqrt(cx*cx+cy*cy), inner=(squeeze||0.4)*max;
+  const g = ctx.createRadialGradient(cx,cy,inner,cx,cy,max);
+  g.addColorStop(0,'rgba(0,0,0,0)');
+  g.addColorStop(0.45,`rgba(0,0,0,${strength*0.25})`);
+  g.addColorStop(0.75,`rgba(0,0,0,${strength*0.6})`);
+  g.addColorStop(1,`rgba(0,0,0,${strength})`);
+  ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+}
+
+function addFlash(ctx, w, h, intensity, warmth) {
+  const cx=w/2, cy=h*0.4, max=Math.max(w,h)*0.7;
+  const wr=warmth||0;
+  const g=ctx.createRadialGradient(cx,cy,0,cx,cy,max);
+  g.addColorStop(0,`rgba(${255},${250-wr*12},${235-wr*25},${intensity})`);
+  g.addColorStop(0.18,`rgba(${255},${248-wr*10},${232-wr*22},${intensity*0.5})`);
+  g.addColorStop(0.45,`rgba(${255},${245-wr*8},${228-wr*18},${intensity*0.12})`);
+  g.addColorStop(0.7,'rgba(0,0,0,0)');
+  ctx.globalCompositeOperation='screen';
+  ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
+  ctx.globalCompositeOperation='source-over';
+}
+
+function addHalation(ctx, w, h, strength, tint) {
+  const tc=document.createElement('canvas'); tc.width=w; tc.height=h;
+  const t=tc.getContext('2d'); t.drawImage(ctx.canvas,0,0);
+  const img=t.getImageData(0,0,w,h); const d=img.data;
+  for(let i=0;i<d.length;i+=4){
+    const lum=d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114;
+    if(lum<170){d[i]=d[i+1]=d[i+2]=0;d[i+3]=0;}
+    else{d[i]=sc(d[i]+(tint?.[0]||0));d[i+1]=sc(d[i+1]+(tint?.[1]||0));d[i+2]=sc(d[i+2]+(tint?.[2]||0));}
+  }
+  t.putImageData(img,0,0);
+  ctx.globalCompositeOperation='screen'; ctx.globalAlpha=strength;
+  ctx.filter=`blur(${Math.max(10,w*0.025)}px)`;
+  ctx.drawImage(tc,0,0);
+  ctx.filter='none'; ctx.globalAlpha=1;
+  ctx.globalCompositeOperation='source-over';
+}
+
+function smoothHighlights(ctx, w, h, amount) {
+  const tc=document.createElement('canvas'); tc.width=w; tc.height=h;
+  const t=tc.getContext('2d');
+  t.filter=`blur(${Math.max(3, w*0.008)}px)`;
+  t.drawImage(ctx.canvas,0,0); t.filter='none';
+  const orig=ctx.getImageData(0,0,w,h);
+  const blur=t.getImageData(0,0,w,h);
+  const od=orig.data, bd=blur.data;
+  for(let i=0;i<od.length;i+=4){
+    const lum=(od[i]*0.299+od[i+1]*0.587+od[i+2]*0.114)/255;
+    const blend = lum > 0.25 ? amount * Math.min(1, (lum-0.25)*2) : 0;
+    od[i]=od[i]*(1-blend)+bd[i]*blend;
+    od[i+1]=od[i+1]*(1-blend)+bd[i+1]*blend;
+    od[i+2]=od[i+2]*(1-blend)+bd[i+2]*blend;
+  }
+  ctx.putImageData(orig,0,0);
+}
+
+const FILTERS = {
+  warm_film: {
+    name: 'Warm Film',
+    cssPreview: 'sepia(0.25) saturate(1.05) contrast(1.05) brightness(1.02)',
+    apply: (ctx, w, h) => {
+      const img=ctx.getImageData(0,0,w,h); const d=img.data;
+      for(let i=0;i<d.length;i+=4){
+        let r=sCurve(d[i],0.4), g=sCurve(d[i+1],0.3), b=sCurve(d[i+2],0.3);
+        [r,g,b]=colorGrade(r,g,b,[12,4,-8],[6,2,-4],[10,6,-12]);
+        const avg=(r+g+b)/3;
+        d[i]=sc(r*0.88+avg*0.12); d[i+1]=sc(g*0.88+avg*0.12); d[i+2]=sc(b*0.88+avg*0.12);
+      }
+      ctx.putImageData(img,0,0);
+      smoothHighlights(ctx,w,h,0.15);
+      addHalation(ctx,w,h,0.12,[20,8,0]);
+      addFlash(ctx,w,h,0.15,1);
+      addGrain(ctx,w,h,16,1);
+      addVignette(ctx,w,h,0.45,0.35);
+    }
+  },
+  cinematic_cool: {
+    name: 'Cool',
+    cssPreview: 'saturate(0.7) contrast(1.05) brightness(0.95) hue-rotate(-5deg)',
+    apply: (ctx, w, h) => {
+      const img=ctx.getImageData(0,0,w,h); const d=img.data;
+      for(let i=0;i<d.length;i+=4){
+        let r=sCurve(d[i],0.3), g=sCurve(d[i+1],0.3), b=sCurve(d[i+2],0.35);
+        [r,g,b]=colorGrade(r,g,b,[-6,2,14],[-2,0,4],[6,2,-4]);
+        const avg=(r+g+b)/3;
+        d[i]=sc(r*0.75+avg*0.25); d[i+1]=sc(g*0.78+avg*0.22); d[i+2]=sc(b*0.8+avg*0.2);
+        d[i]=d[i]*0.9+22; d[i+1]=d[i+1]*0.9+24; d[i+2]=d[i+2]*0.9+28;
+      }
+      ctx.putImageData(img,0,0);
+      smoothHighlights(ctx,w,h,0.12);
+      addHalation(ctx,w,h,0.06,[0,4,12]);
+      addGrain(ctx,w,h,12,1);
+      addVignette(ctx,w,h,0.35,0.4);
+    }
+  },
+  warm_noir: {
+    name: 'Warm Noir',
+    cssPreview: 'sepia(0.45) saturate(0.9) contrast(1.15) brightness(0.92)',
+    apply: (ctx, w, h) => {
+      const img=ctx.getImageData(0,0,w,h); const d=img.data;
+      for(let i=0;i<d.length;i+=4){
+        let r=sCurve(d[i],0.55), g=sCurve(d[i+1],0.5), b=sCurve(d[i+2],0.45);
+        [r,g,b]=colorGrade(r,g,b,[6,-2,-16],[12,6,-8],[18,10,-10]);
+        const avg=(r+g+b)/3;
+        d[i]=sc(r*0.9+avg*0.1); d[i+1]=sc(g*0.9+avg*0.1); d[i+2]=sc(b*0.85+avg*0.15);
+      }
+      ctx.putImageData(img,0,0);
+      smoothHighlights(ctx,w,h,0.18);
+      addHalation(ctx,w,h,0.16,[22,12,0]);
+      addFlash(ctx,w,h,0.1,2);
+      addGrain(ctx,w,h,14,1);
+      addVignette(ctx,w,h,0.55,0.3);
+    }
+  },
+  flash_booth: {
+    name: 'Flash Booth',
+    cssPreview: 'grayscale(1) contrast(1.15) brightness(1.05) sepia(0.15)',
+    apply: (ctx, w, h) => {
+      const img=ctx.getImageData(0,0,w,h); const d=img.data;
+      for(let i=0;i<d.length;i+=4){
+        let gray = d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114;
+        gray = sCurve(gray, 0.5);
+        gray = gray * 0.84 + 34;
+        d[i]=sc(gray+10); d[i+1]=sc(gray+5); d[i+2]=sc(gray-6);
+      }
+      ctx.putImageData(img,0,0);
+      smoothHighlights(ctx,w,h,0.2);
+      addHalation(ctx,w,h,0.2,[20,10,0]);
+      addFlash(ctx,w,h,0.28,1.5);
+      addGrain(ctx,w,h,28,2);
+      addVignette(ctx,w,h,0.65,0.25);
+    }
+  },
+  sepia_booth: {
+    name: 'Sepia Booth',
+    cssPreview: 'grayscale(1) sepia(0.45) contrast(1.05) brightness(1.05)',
+    apply: (ctx, w, h) => {
+      const img=ctx.getImageData(0,0,w,h); const d=img.data;
+      for(let i=0;i<d.length;i+=4){
+        let gray = d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114;
+        gray = sCurve(gray, 0.35);
+        gray = gray * 0.76 + 52;
+        const lumN = gray / 255;
+        d[i]   = sc(gray + 18 + lumN * 8);
+        d[i+1] = sc(gray + 8 + lumN * 2);
+        d[i+2] = sc(gray - 16 - (1-lumN) * 12);
+      }
+      ctx.putImageData(img,0,0);
+      smoothHighlights(ctx,w,h,0.28);
+      addHalation(ctx,w,h,0.18,[18,8,-4]);
+      addFlash(ctx,w,h,0.24,2);
+      addGrain(ctx,w,h,22,1);
+      addVignette(ctx,w,h,0.55,0.28);
+    }
+  },
+  silver_booth: {
+    name: 'Silver Booth',
+    cssPreview: 'grayscale(1) contrast(1.05) brightness(1.05)',
+    apply: (ctx, w, h) => {
+      const img=ctx.getImageData(0,0,w,h); const d=img.data;
+      for(let i=0;i<d.length;i+=4){
+        let gray = d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114;
+        gray = sCurve(gray, 0.3);
+        gray = gray * 0.8 + 42;
+        const lumN = gray / 255;
+        d[i]=sc(gray + 2 + lumN*4);
+        d[i+1]=sc(gray + 3 + lumN*2);
+        d[i+2]=sc(gray + 6 - lumN*2);
+      }
+      ctx.putImageData(img,0,0);
+      smoothHighlights(ctx,w,h,0.25);
+      addHalation(ctx,w,h,0.12,[4,4,6]);
+      addFlash(ctx,w,h,0.18,0.3);
+      addGrain(ctx,w,h,18,1);
+      addVignette(ctx,w,h,0.5,0.3);
+    }
+  }
+};
+
+const FILTER_KEYS = ['warm_film', 'cinematic_cool', 'warm_noir', 'flash_booth', 'sepia_booth', 'silver_booth'];
+
+/* ═══ STATE ═══ */
+let stream = null;
+let facing = 'user';
+let currentFilter = 'warm_film';
+let capturedPhotos = []; // raw video frames as canvas
+let isCapturing = false;
+
+/* ═══ NAV ═══ */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* ═══ TUTORIAL ═══ */
+function openTutorial() { document.getElementById('tutorial').classList.add('active'); }
+function closeTutorial() { document.getElementById('tutorial').classList.remove('active'); }
+
+/* ═══ START BOOTH ═══ */
+async function startBooth() {
+  showScreen('booth');
+  buildFilterRow();
+  await initCamera();
+}
+
+async function initCamera() {
+  try {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 1280 } },
+      audio: false
+    });
+    const video = document.getElementById('video');
+    video.srcObject = stream;
+
+    // Don't mirror back camera
+    document.getElementById('viewfinder').classList.toggle('no-mirror', facing === 'environment');
+  } catch (err) {
+    showError('Camera unavailable', 'Please grant camera permission and reload. On iPhone, use Safari.');
+  }
+}
+
+function flipCamera() {
+  facing = facing === 'user' ? 'environment' : 'user';
+  initCamera();
+}
+
+function showError(title, msg) {
+  document.getElementById('errorTitle').textContent = title;
+  document.getElementById('errorMsg').textContent = msg;
+  document.getElementById('errorModal').classList.add('active');
+}
+
+/* ═══ FILTER UI ═══ */
+function buildFilterRow() {
+  const row = document.getElementById('filterRow');
+  row.innerHTML = '';
+  FILTER_KEYS.forEach(key => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-chip' + (key === currentFilter ? ' active' : '');
+    btn.textContent = FILTERS[key].name;
+    btn.onclick = () => selectFilter(key);
+    row.appendChild(btn);
+  });
+}
+
+function selectFilter(key) {
+  currentFilter = key;
+  document.querySelectorAll('.filter-chip').forEach((c, i) => {
+    c.classList.toggle('active', FILTER_KEYS[i] === key);
+  });
+  document.getElementById('filterLabel').textContent = FILTERS[key].name;
+
+  // Live CSS preview on viewfinder
+  const video = document.getElementById('video');
+  video.style.filter = FILTERS[key].cssPreview;
+}
+
+function buildResultFilters() {
+  const row = document.getElementById('resultFilters');
+  row.innerHTML = '';
+  FILTER_KEYS.forEach(key => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-chip' + (key === currentFilter ? ' active' : '');
+    btn.textContent = FILTERS[key].name;
+    btn.onclick = () => switchResultFilter(key);
+    row.appendChild(btn);
+  });
+}
+
+async function switchResultFilter(key) {
+  currentFilter = key;
+  document.querySelectorAll('#resultFilters .filter-chip').forEach((c, i) => {
+    c.classList.toggle('active', FILTER_KEYS[i] === key);
+  });
+  // Re-apply filter to all 4 photos
+  for (let i = 0; i < 4; i++) {
+    const final = document.getElementById('finalCanvas' + i);
+    const ctx = final.getContext('2d');
+    ctx.drawImage(capturedPhotos[i], 0, 0, final.width, final.height);
+    FILTERS[key].apply(ctx, final.width, final.height);
+  }
+}
+
+/* ═══ EXIT ═══ */
+function exitBooth() {
+  document.getElementById('exitModal').classList.add('active');
+}
+function doExit() {
+  document.getElementById('exitModal').classList.remove('active');
+  stopCamera();
+  showScreen('welcome');
+}
+function newSession() {
+  stopCamera();
+  capturedPhotos = [];
+  showScreen('welcome');
+}
+function stopCamera() {
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
+}
+
+/* ═══ CAPTURE ═══ */
+async function startCapture() {
+  if (isCapturing) return;
+  isCapturing = true;
+  capturedPhotos = [];
+  document.getElementById('shutterBtn').disabled = true;
+  document.getElementById('boothStatus').textContent = 'Capturing…';
+  document.getElementById('photoProgress').classList.add('active');
+
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('photoProgress').textContent = `Photo ${i+1} of 4`;
+    await countdown(3);
+    capturePhoto();
+    await wait(800);
+  }
+
+  document.getElementById('photoProgress').classList.remove('active');
+  document.getElementById('boothStatus').textContent = 'Get ready';
+  isCapturing = false;
+  document.getElementById('shutterBtn').disabled = false;
+
+  // Move to developing
+  showScreen('developing');
+  await wait(800);
+  await processPhotos();
+  showResult();
+}
+
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function countdown(seconds) {
+  const display = document.getElementById('countdown');
+  const num = document.getElementById('countdownNum');
+  display.classList.add('active');
+  for (let s = seconds; s > 0; s--) {
+    num.textContent = s;
+    // Restart animation
+    num.style.animation = 'none';
+    void num.offsetWidth;
+    num.style.animation = '';
+    await wait(1000);
+  }
+  display.classList.remove('active');
+}
+
+function capturePhoto() {
+  // Flash effect
+  const flash = document.getElementById('flash');
+  flash.classList.remove('firing');
+  void flash.offsetWidth;
+  flash.classList.add('firing');
+
+  // Capture from video
+  const video = document.getElementById('video');
+  const SIZE = 600;
+  const c = document.createElement('canvas');
+  c.width = SIZE; c.height = SIZE;
+  const ctx = c.getContext('2d');
+
+  // Compute square crop from video
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const minDim = Math.min(vw, vh);
+  const sx = (vw - minDim) / 2, sy = (vh - minDim) / 2;
+
+  // Mirror if front camera
+  if (facing === 'user') {
+    ctx.translate(SIZE, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, SIZE, SIZE);
+
+  capturedPhotos.push(c);
+}
+
+/* ═══ PROCESS ═══ */
+async function processPhotos() {
+  const filter = FILTERS[currentFilter];
+  for (let i = 0; i < 4; i++) {
+    const final = document.getElementById('finalCanvas' + i);
+    final.width = capturedPhotos[i].width;
+    final.height = capturedPhotos[i].height;
+    const ctx = final.getContext('2d');
+    ctx.drawImage(capturedPhotos[i], 0, 0);
+    filter.apply(ctx, final.width, final.height);
+    await wait(50); // yield to UI
+  }
+}
+
+/* ═══ SHOW RESULT ═══ */
+function showResult() {
+  buildResultFilters();
+  // Set date
+  const now = new Date();
+  const date = `${now.getFullYear()} · ${String(now.getMonth()+1).padStart(2,'0')} · ${String(now.getDate()).padStart(2,'0')}`;
+  document.getElementById('stripDate').textContent = date;
+  showScreen('result');
+  stopCamera();
+}
+
+/* ═══ DOWNLOAD ═══ */
+function downloadStrip() {
+  // Compose final strip canvas
+  const FRAME_SIZE = 600;
+  const PADDING = 30;
+  const FRAME_GAP = 18;
+  const FOOTER_HEIGHT = 130;
+  const stripW = FRAME_SIZE + PADDING * 2;
+  const stripH = PADDING + (FRAME_SIZE + FRAME_GAP) * 4 - FRAME_GAP + FOOTER_HEIGHT;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = stripW; canvas.height = stripH;
+  const ctx = canvas.getContext('2d');
+
+  // Paper background
+  ctx.fillStyle = '#fdf8eb';
+  ctx.fillRect(0, 0, stripW, stripH);
+
+  // Subtle paper texture
+  for (let i = 0; i < 800; i++) {
+    ctx.fillStyle = `rgba(184, 140, 74, ${Math.random() * 0.04})`;
+    ctx.fillRect(Math.random() * stripW, Math.random() * stripH, 1, 1);
+  }
+
+  // Frames
+  for (let i = 0; i < 4; i++) {
+    const y = PADDING + i * (FRAME_SIZE + FRAME_GAP);
+    ctx.drawImage(document.getElementById('finalCanvas' + i), PADDING, y, FRAME_SIZE, FRAME_SIZE);
+  }
+
+  // Footer
+  const footerY = PADDING + (FRAME_SIZE + FRAME_GAP) * 4 - FRAME_GAP + 40;
+  ctx.fillStyle = '#8b3a1e';
+  ctx.font = 'bold 26px "Courier New", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('★ gracermy ★', stripW / 2, footerY);
+
+  ctx.fillStyle = '#847861';
+  ctx.font = '16px "Courier New", monospace';
+  const now = new Date();
+  const date = `${now.getFullYear()} · ${String(now.getMonth()+1).padStart(2,'0')} · ${String(now.getDate()).padStart(2,'0')}`;
+  ctx.fillText(date, stripW / 2, footerY + 28);
+
+  // Download
+  canvas.toBlob((blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `photobooth_${Date.now()}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, 'image/png');
+}
+
+/* ═══ RETAKE ═══ */
+async function retake() {
+  showScreen('booth');
+  buildFilterRow();
+  selectFilter(currentFilter);
+  await initCamera();
+}
+</script>
+</body>
+</html>
