@@ -15,49 +15,49 @@
     --text-dim: #847861;
     --text-soft: #5a5040;
     --accent: #8b3a1e;
+    --accent-dark: #6b2a14;
     --accent-soft: rgba(139, 58, 30, 0.08);
-    --accent-hover: rgba(139, 58, 30, 0.15);
     --border: #d4c8b0;
     --border-strong: #b5a890;
     --gold: #b88c4a;
     --shadow: rgba(60, 40, 20, 0.12);
+
+    /* Booth illustration colors */
+    --booth-wood: #8a5c38;
+    --booth-wood-dark: #5e3d23;
+    --booth-wood-light: #a67548;
+    --booth-cream: #f4e8cf;
+    --booth-curtain: #9a3f24;
+    --booth-curtain-dark: #6e2b14;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
   body {
-    background: var(--bg);
-    color: var(--text);
+    background: var(--bg); color: var(--text);
     font-family: 'Source Sans 3', sans-serif;
     min-height: 100dvh;
     overflow-x: hidden;
     position: relative;
     -webkit-font-smoothing: antialiased;
   }
-  /* Paper texture background */
   body::before {
-    content: '';
-    position: fixed; inset: 0;
+    content: ''; position: fixed; inset: 0;
     background:
       radial-gradient(ellipse at 20% 30%, rgba(184, 140, 74, 0.08) 0%, transparent 50%),
       radial-gradient(ellipse at 80% 70%, rgba(139, 58, 30, 0.06) 0%, transparent 50%);
     pointer-events: none; z-index: 0;
   }
   body::after {
-    content: '';
-    position: fixed; inset: 0;
+    content: ''; position: fixed; inset: 0;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/></svg>");
-    opacity: 0.04;
-    pointer-events: none; z-index: 0;
-    mix-blend-mode: multiply;
+    opacity: 0.04; pointer-events: none; z-index: 0; mix-blend-mode: multiply;
   }
 
-  /* Back link */
   .back-link {
     position: fixed; top: 16px; left: 18px; z-index: 50;
     font-family: 'Source Sans 3', sans-serif; font-size: 0.78rem;
     color: var(--text-dim); text-decoration: none;
-    opacity: 0.7; transition: opacity 0.2s;
-    letter-spacing: 0.02em;
+    opacity: 0.7; transition: opacity 0.2s; letter-spacing: 0.02em;
   }
   .back-link:hover { opacity: 1; }
 
@@ -65,14 +65,13 @@
   .screen.active { display: flex; }
 
   /* ═══ WELCOME ═══ */
-  #welcome { justify-content: center; padding: 24px; gap: 32px; }
+  #welcome { justify-content: center; padding: 24px; gap: 14px; }
 
   .home-actions { position: absolute; top: 16px; right: 16px; display: flex; gap: 8px; }
   .btn-icon-vintage {
     width: 34px; height: 34px; border-radius: 50%;
     border: 1.5px solid var(--border-strong);
-    background: var(--paper);
-    color: var(--text-dim); cursor: pointer;
+    background: var(--paper); color: var(--text-dim); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: all 0.2s;
     box-shadow: 0 2px 6px var(--shadow);
@@ -83,133 +82,106 @@
     font-size: 18px; font-weight: 700; line-height: 1;
   }
 
-  .booth-title {
-    text-align: center;
-    position: relative;
-  }
+  .booth-title { text-align: center; position: relative; }
   .booth-title h1 {
     font-family: 'Instrument Serif', serif;
-    font-size: clamp(3rem, 9vw, 5rem);
-    font-weight: 400;
-    color: var(--text);
-    line-height: 1;
-    letter-spacing: -0.02em;
+    font-size: clamp(2.4rem, 7vw, 3.6rem);
+    font-weight: 400; color: var(--text);
+    line-height: 1; letter-spacing: -0.02em;
   }
   .booth-title .stars {
     display: flex; justify-content: center; gap: 18px;
-    margin: 14px 0 8px;
-    color: var(--gold); font-size: 0.9rem;
+    margin: 10px 0 4px;
+    color: var(--gold); font-size: 0.85rem;
   }
   .booth-title p {
     font-family: 'Special Elite', monospace;
-    font-size: 0.78rem;
+    font-size: 0.74rem;
     color: var(--text-soft);
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    margin-top: 4px;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    margin-top: 2px;
   }
 
-  /* Sample photo strip preview */
-  .preview-strip {
-    width: 110px;
-    background: var(--paper);
-    padding: 8px 8px 18px;
-    border-radius: 4px;
-    box-shadow: 0 12px 30px var(--shadow), 0 2px 4px var(--shadow);
-    transform: rotate(-3deg);
-    margin: 4px auto 8px;
-  }
-  .preview-strip .ps-frame {
-    width: 100%; aspect-ratio: 1;
-    background: linear-gradient(135deg, #4a3828, #2a1f15);
-    margin-bottom: 6px;
-    border-radius: 1px;
+  /* Vintage photobooth SVG wrapper */
+  .booth-illustration {
+    width: 260px; max-width: 75vw;
     position: relative;
-    overflow: hidden;
+    margin: 6px auto 0;
+    filter: drop-shadow(0 12px 24px var(--shadow));
   }
-  .preview-strip .ps-frame:last-of-type { margin-bottom: 0; }
-  .preview-strip .ps-frame::after {
-    content: '';
-    position: absolute; inset: 0;
-    background: radial-gradient(ellipse at center 40%, rgba(245, 220, 180, 0.4) 0%, transparent 60%);
-  }
-  .preview-strip .ps-footer {
-    text-align: center;
-    font-family: 'Special Elite', monospace;
-    font-size: 0.55rem;
-    color: var(--text-dim);
-    margin-top: 8px;
-    letter-spacing: 0.05em;
+  .booth-illustration svg {
+    width: 100%; height: auto; display: block;
   }
 
+  /* Enter button positioned on the door */
+  .enter-btn-wrap {
+    position: absolute;
+    left: 50%;
+    top: 52%;
+    transform: translate(-50%, -50%);
+    width: 70%;
+  }
   .start-btn {
+    width: 100%;
     background: var(--accent);
     color: var(--paper);
-    border: none;
-    padding: 18px 48px;
-    border-radius: 4px;
+    border: 2px solid var(--accent-dark);
+    padding: 14px 10px;
+    border-radius: 3px;
     font-family: 'Special Elite', monospace;
-    font-size: 0.95rem;
-    letter-spacing: 0.12em;
+    font-size: 0.85rem;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     cursor: pointer;
-    box-shadow: 0 6px 0 #6b2a14, 0 8px 18px var(--shadow);
+    box-shadow: 0 4px 0 var(--accent-dark), 0 6px 14px rgba(0,0,0,0.25);
     transition: all 0.15s;
-    position: relative;
   }
-  .start-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 0 #6b2a14, 0 12px 24px var(--shadow); }
-  .start-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #6b2a14, 0 4px 8px var(--shadow); }
+  .start-btn:hover { transform: translate(-50%, -50%) translateY(-2px); }
+  .start-btn:hover {
+    box-shadow: 0 6px 0 var(--accent-dark), 0 10px 20px rgba(0,0,0,0.3);
+  }
+  .start-btn:active {
+    transform: translate(-50%, -50%) translateY(3px);
+    box-shadow: 0 1px 0 var(--accent-dark), 0 2px 6px rgba(0,0,0,0.2);
+  }
 
-  .mode-info {
-    font-family: 'Source Sans 3', sans-serif;
-    font-size: 0.82rem;
+  .tagline {
+    font-family: 'Special Elite', monospace;
+    font-size: 0.78rem;
     color: var(--text-dim);
     text-align: center;
-    font-weight: 300;
-    margin-top: -16px;
+    letter-spacing: 0.05em;
+    margin-top: 8px;
   }
 
-  /* ═══ BOOTH (camera) ═══ */
+  /* ═══ BOOTH ═══ */
   #booth { padding: 14px; gap: 14px; justify-content: center; width: 100%; max-width: 520px; margin: 0 auto; }
 
   .booth-bar {
-    display: flex; justify-content: space-between; align-items: center; width: 100%;
-    padding: 0 4px;
+    display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0 4px;
   }
   .booth-bar .booth-label {
     font-family: 'Special Elite', monospace;
-    font-size: 0.78rem;
-    color: var(--text-soft);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    font-size: 0.78rem; color: var(--text-soft);
+    letter-spacing: 0.1em; text-transform: uppercase;
   }
 
   .viewfinder {
     width: 100%; aspect-ratio: 1;
-    background: #1a1410;
-    border-radius: 8px;
-    position: relative;
-    overflow: hidden;
+    background: #1a1410; border-radius: 8px;
+    position: relative; overflow: hidden;
     box-shadow: 0 8px 28px var(--shadow), inset 0 0 0 6px var(--paper), inset 0 0 0 7px var(--border-strong);
   }
   .viewfinder video {
     width: 100%; height: 100%;
-    object-fit: cover;
-    display: block;
-    transform: scaleX(-1); /* mirror for selfie feel */
+    object-fit: cover; display: block;
+    transform: scaleX(-1);
   }
   .viewfinder.no-mirror video { transform: none; }
 
-  .vf-overlay {
-    position: absolute; inset: 6px;
-    pointer-events: none; z-index: 2;
-  }
-
   .countdown-display {
-    position: absolute; inset: 0;
-    display: none;
-    align-items: center; justify-content: center;
-    z-index: 3;
+    position: absolute; inset: 0; display: none;
+    align-items: center; justify-content: center; z-index: 3;
   }
   .countdown-display.active { display: flex; }
   .countdown-num {
@@ -230,11 +202,9 @@
     position: absolute; top: 16px; left: 0; right: 0;
     text-align: center;
     font-family: 'Special Elite', monospace;
-    font-size: 0.85rem;
-    color: var(--paper);
+    font-size: 0.85rem; color: var(--paper);
     text-shadow: 0 1px 4px rgba(0,0,0,0.8);
-    z-index: 3;
-    display: none;
+    z-index: 3; display: none;
   }
   .photo-progress.active { display: block; }
 
@@ -249,27 +219,37 @@
     100% { opacity: 0; }
   }
 
-  /* Camera toggle */
   .vf-controls {
     position: absolute; bottom: 14px; right: 14px;
-    z-index: 4;
-    display: flex; gap: 8px;
+    z-index: 4; display: flex; gap: 8px;
   }
   .vf-btn {
-    width: 36px; height: 36px; border-radius: 50%;
-    border: none; background: rgba(253, 248, 235, 0.85);
+    width: 36px; height: 36px; border-radius: 50%; border: none;
+    background: rgba(253, 248, 235, 0.85);
     color: var(--text); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    backdrop-filter: blur(6px);
-    transition: all 0.2s;
+    backdrop-filter: blur(6px); transition: all 0.2s;
   }
   .vf-btn:hover { background: var(--paper); }
   .vf-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-  /* Filter strip */
+  /* Section labels for pickers */
+  .picker-section {
+    width: 100%;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .picker-label {
+    font-family: 'Special Elite', monospace;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding-left: 2px;
+  }
+
   .filter-row {
     display: flex; gap: 8px; overflow-x: auto;
-    padding: 4px 0; width: 100%;
+    padding: 2px 0; width: 100%;
     scrollbar-width: none;
   }
   .filter-row::-webkit-scrollbar { display: none; }
@@ -277,50 +257,69 @@
   .filter-chip {
     padding: 8px 14px; border-radius: 50px;
     border: 1.5px solid var(--border-strong);
-    background: var(--paper);
-    color: var(--text-soft);
+    background: var(--paper); color: var(--text-soft);
     font-family: 'Special Elite', monospace;
     font-size: 0.7rem;
     letter-spacing: 0.05em;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all 0.2s;
-    flex-shrink: 0;
+    cursor: pointer; white-space: nowrap;
+    transition: all 0.2s; flex-shrink: 0;
   }
   .filter-chip:hover { color: var(--accent); }
   .filter-chip.active {
-    background: var(--accent);
-    color: var(--paper);
+    background: var(--accent); color: var(--paper);
     border-color: var(--accent);
     box-shadow: 0 2px 8px rgba(139, 58, 30, 0.3);
   }
 
+  /* Frame color swatches */
+  .color-row {
+    display: flex; gap: 10px; padding: 2px 0;
+  }
+  .color-chip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px;
+    border-radius: 50px;
+    border: 1.5px solid var(--border-strong);
+    background: var(--paper);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Special Elite', monospace;
+    font-size: 0.7rem;
+    color: var(--text-soft);
+    letter-spacing: 0.05em;
+  }
+  .color-chip:hover { color: var(--accent); }
+  .color-chip.active {
+    border-color: var(--accent);
+    box-shadow: 0 2px 8px rgba(139, 58, 30, 0.2);
+  }
+  .color-swatch {
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.15);
+  }
+  .color-swatch.white { background: #fdf8eb; }
+  .color-swatch.black { background: #1a1410; }
+
   .shutter-row {
     display: flex; align-items: center; justify-content: center; gap: 18px;
-    width: 100%; margin-top: 4px;
+    width: 100%; margin-top: 8px;
   }
 
   .shutter-btn {
-    width: 70px; height: 70px;
-    border-radius: 50%;
+    width: 70px; height: 70px; border-radius: 50%;
     background: var(--accent);
     border: 4px solid var(--paper);
     box-shadow: 0 0 0 3px var(--accent), 0 6px 20px var(--shadow);
-    cursor: pointer;
-    transition: all 0.2s;
+    cursor: pointer; transition: all 0.2s;
     position: relative;
     display: flex; align-items: center; justify-content: center;
   }
   .shutter-btn::before {
-    content: '';
-    position: absolute; inset: 8px;
-    border-radius: 50%;
-    background: var(--accent);
+    content: ''; position: absolute; inset: 8px;
+    border-radius: 50%; background: var(--accent);
     border: 1.5px solid rgba(253,248,235,0.3);
   }
-  .shutter-btn:hover:not(:disabled) {
-    animation: shutterPulse 1.4s ease infinite;
-  }
+  .shutter-btn:hover:not(:disabled) { animation: shutterPulse 1.4s ease infinite; }
   .shutter-btn:active:not(:disabled) { transform: scale(0.93); }
   .shutter-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   @keyframes shutterPulse {
@@ -329,17 +328,19 @@
   }
 
   .shutter-meta {
-    display: flex; flex-direction: column; gap: 2px;
     font-family: 'Special Elite', monospace;
-    font-size: 0.7rem; color: var(--text-soft);
-    letter-spacing: 0.06em;
+    font-size: 0.72rem;
+    color: var(--text-soft);
+    letter-spacing: 0.04em;
+    text-align: center;
+    line-height: 1.4;
   }
-  .shutter-meta strong { color: var(--text); font-weight: normal; font-size: 0.85rem; }
+  .shutter-meta strong {
+    color: var(--text); font-weight: normal; font-size: 0.85rem; display: block;
+  }
 
   /* ═══ DEVELOPING ═══ */
-  #developing {
-    justify-content: center; align-items: center; padding: 40px;
-  }
+  #developing { justify-content: center; align-items: center; padding: 40px; }
   .develop-wrap { text-align: center; }
   .develop-icon {
     width: 80px; height: 80px;
@@ -352,8 +353,7 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .develop-text {
     font-family: 'Instrument Serif', serif;
-    font-size: 1.6rem; color: var(--text);
-    margin-bottom: 6px;
+    font-size: 1.6rem; color: var(--text); margin-bottom: 6px;
   }
   .develop-sub {
     font-family: 'Special Elite', monospace;
@@ -364,13 +364,9 @@
   /* ═══ RESULT ═══ */
   #result { padding: 30px 16px; gap: 24px; align-items: center; }
 
-  .strip-stage {
-    perspective: 1200px;
-    margin: 8px 0;
-  }
+  .strip-stage { perspective: 1200px; margin: 8px 0; }
   .photo-strip {
-    background: var(--paper);
-    padding: 10px 10px 20px;
+    padding: 10px 10px 18px;
     border-radius: 3px;
     box-shadow:
       0 20px 50px var(--shadow),
@@ -381,6 +377,8 @@
     width: 220px;
     animation: stripDrop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
+  .photo-strip.frame-white { background: var(--paper); color: var(--text-soft); }
+  .photo-strip.frame-black { background: #1a1410; color: #c8bea8; }
   @keyframes stripDrop {
     0% { transform: rotate(-12deg) translateY(-200px); opacity: 0; }
     100% { transform: rotate(-1.5deg) translateY(0); opacity: 1; }
@@ -388,33 +386,42 @@
   .photo-strip .strip-frame {
     width: 100%; aspect-ratio: 1;
     margin-bottom: 6px;
-    background: #1a1410;
-    overflow: hidden;
+    background: #1a1410; overflow: hidden;
     position: relative;
   }
   .photo-strip .strip-frame:last-of-type { margin-bottom: 0; }
   .photo-strip .strip-frame canvas {
-    width: 100%; height: 100%; display: block;
-    object-fit: cover;
+    width: 100%; height: 100%; display: block; object-fit: cover;
   }
+
   .photo-strip .strip-footer {
-    text-align: center;
-    font-family: 'Special Elite', monospace;
-    font-size: 0.65rem;
-    color: var(--text-soft);
     margin-top: 12px;
-    letter-spacing: 0.04em;
-    line-height: 1.4;
+    position: relative;
+    padding: 0 4px 2px;
+    min-height: 48px;
   }
-  .photo-strip .strip-footer .strip-brand {
-    color: var(--accent);
-    font-size: 0.7rem;
+  .photo-strip .strip-footer .strip-quote {
+    font-family: 'Instrument Serif', serif;
+    font-size: 0.85rem;
+    font-style: italic;
+    text-align: center;
+    line-height: 1.25;
+    margin-bottom: 3px;
   }
   .photo-strip .strip-footer .strip-date {
-    font-size: 0.55rem;
-    color: var(--text-dim);
-    margin-top: 2px;
-    letter-spacing: 0.08em;
+    font-family: 'Special Elite', monospace;
+    font-size: 0.58rem;
+    text-align: center;
+    letter-spacing: 0.1em;
+    opacity: 0.75;
+  }
+  .photo-strip .strip-footer .strip-brand {
+    position: absolute;
+    bottom: 0; right: 2px;
+    font-family: 'Special Elite', monospace;
+    font-size: 0.5rem;
+    opacity: 0.55;
+    letter-spacing: 0.05em;
   }
 
   /* Result actions */
@@ -425,32 +432,19 @@
   .result-btn {
     padding: 14px 24px;
     border: 1.5px solid var(--border-strong);
-    background: var(--paper);
-    color: var(--text);
+    background: var(--paper); color: var(--text);
     font-family: 'Special Elite', monospace;
-    font-size: 0.78rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: all 0.2s;
+    font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase;
+    cursor: pointer; border-radius: 4px; transition: all 0.2s;
     display: flex; align-items: center; justify-content: center; gap: 8px;
   }
   .result-btn:hover { background: var(--bg-deep); }
   .result-btn.primary {
-    background: var(--accent);
-    color: var(--paper);
-    border-color: var(--accent);
-    box-shadow: 0 4px 0 #6b2a14, 0 6px 14px var(--shadow);
+    background: var(--accent); color: var(--paper); border-color: var(--accent);
+    box-shadow: 0 4px 0 var(--accent-dark), 0 6px 14px var(--shadow);
   }
-  .result-btn.primary:hover { transform: translateY(-1px); box-shadow: 0 5px 0 #6b2a14, 0 8px 18px var(--shadow); }
-  .result-btn.primary:active { transform: translateY(3px); box-shadow: 0 1px 0 #6b2a14; }
-
-  /* Filter selector on result */
-  .result-filters {
-    display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
-    max-width: 320px;
-  }
+  .result-btn.primary:hover { transform: translateY(-1px); box-shadow: 0 5px 0 var(--accent-dark), 0 8px 18px var(--shadow); }
+  .result-btn.primary:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--accent-dark); }
 
   /* ═══ MODALS ═══ */
   .modal-overlay {
@@ -524,14 +518,6 @@
     font-family: 'Special Elite', monospace;
     font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase;
   }
-
-  /* Permission/error message */
-  .error-msg {
-    text-align: center; padding: 30px 20px;
-    color: var(--text-soft); font-size: 0.9rem;
-    line-height: 1.5;
-  }
-  .error-msg strong { color: var(--text); display: block; font-size: 1.1rem; margin-bottom: 8px; font-family: 'Instrument Serif', serif; }
 </style>
 </head>
 <body>
@@ -547,21 +533,107 @@
   </div>
 
   <div class="booth-title">
-    <h1>Photobooth</h1>
+    <h1>Vintage Photobooth</h1>
     <div class="stars">★ &nbsp;★ &nbsp;★</div>
     <p>Strike a pose</p>
   </div>
 
-  <div class="preview-strip">
-    <div class="ps-frame"></div>
-    <div class="ps-frame"></div>
-    <div class="ps-frame"></div>
-    <div class="ps-frame"></div>
-    <div class="ps-footer">★ gracermy ★</div>
+  <!-- Vintage Photobooth SVG Illustration -->
+  <div class="booth-illustration">
+    <svg viewBox="0 0 220 300" xmlns="http://www.w3.org/2000/svg">
+      <!-- Ground shadow -->
+      <ellipse cx="110" cy="290" rx="95" ry="6" fill="#5a4028" opacity="0.15"/>
+
+      <!-- Booth back base (floor/footing) -->
+      <rect x="14" y="270" width="192" height="16" fill="var(--booth-wood-dark)" rx="1"/>
+      <rect x="14" y="270" width="192" height="3" fill="#3e2715"/>
+
+      <!-- Main booth body -->
+      <rect x="20" y="40" width="180" height="235" fill="var(--booth-wood)" rx="3"/>
+
+      <!-- Wood grain lines -->
+      <line x1="30" y1="50" x2="30" y2="270" stroke="var(--booth-wood-dark)" stroke-width="0.8" opacity="0.4"/>
+      <line x1="45" y1="50" x2="45" y2="270" stroke="var(--booth-wood-dark)" stroke-width="0.5" opacity="0.3"/>
+      <line x1="175" y1="50" x2="175" y2="270" stroke="var(--booth-wood-dark)" stroke-width="0.8" opacity="0.4"/>
+      <line x1="190" y1="50" x2="190" y2="270" stroke="var(--booth-wood-dark)" stroke-width="0.5" opacity="0.3"/>
+
+      <!-- Left column detail (trim) -->
+      <rect x="22" y="42" width="3" height="231" fill="var(--booth-wood-light)" opacity="0.6"/>
+      <rect x="195" y="42" width="3" height="231" fill="var(--booth-wood-dark)" opacity="0.4"/>
+
+      <!-- Top roof/cornice -->
+      <rect x="12" y="34" width="196" height="14" fill="var(--booth-wood-dark)" rx="1"/>
+      <rect x="12" y="34" width="196" height="3" fill="#3e2715"/>
+      <rect x="12" y="45" width="196" height="3" fill="#3e2715"/>
+
+      <!-- Pediment / top sign -->
+      <rect x="40" y="8" width="140" height="32" fill="var(--booth-wood)" rx="2"/>
+      <rect x="40" y="8" width="140" height="4" fill="var(--booth-wood-dark)"/>
+      <rect x="40" y="36" width="140" height="4" fill="var(--booth-wood-dark)"/>
+
+      <!-- Sign cream panel -->
+      <rect x="48" y="14" width="124" height="20" fill="var(--booth-cream)" rx="1"/>
+      <text x="110" y="27" text-anchor="middle" font-family="Instrument Serif, serif" font-size="11" fill="var(--booth-curtain-dark)" font-style="italic">Photobooth</text>
+
+      <!-- Small bulbs on sign -->
+      <circle cx="46" cy="24" r="2.5" fill="#f4d060"/>
+      <circle cx="46" cy="24" r="1" fill="#fff5c4"/>
+      <circle cx="174" cy="24" r="2.5" fill="#f4d060"/>
+      <circle cx="174" cy="24" r="1" fill="#fff5c4"/>
+
+      <!-- Cream curtains above door -->
+      <path d="M 35 48 L 35 90 Q 55 80 75 90 Q 95 80 115 90 Q 135 80 155 90 Q 175 80 185 90 L 185 48 Z"
+            fill="var(--booth-curtain)"/>
+      <!-- Curtain folds -->
+      <path d="M 50 48 Q 52 70 50 88" stroke="var(--booth-curtain-dark)" stroke-width="1" fill="none" opacity="0.5"/>
+      <path d="M 75 48 Q 77 75 75 90" stroke="var(--booth-curtain-dark)" stroke-width="1" fill="none" opacity="0.5"/>
+      <path d="M 100 48 Q 102 70 100 88" stroke="var(--booth-curtain-dark)" stroke-width="1" fill="none" opacity="0.5"/>
+      <path d="M 125 48 Q 127 75 125 90" stroke="var(--booth-curtain-dark)" stroke-width="1" fill="none" opacity="0.5"/>
+      <path d="M 150 48 Q 152 70 150 88" stroke="var(--booth-curtain-dark)" stroke-width="1" fill="none" opacity="0.5"/>
+      <path d="M 170 48 Q 172 75 170 90" stroke="var(--booth-curtain-dark)" stroke-width="1" fill="none" opacity="0.5"/>
+
+      <!-- Curtain rod -->
+      <rect x="28" y="44" width="164" height="4" fill="#5a3820"/>
+      <circle cx="30" cy="46" r="3" fill="#3e2715"/>
+      <circle cx="190" cy="46" r="3" fill="#3e2715"/>
+
+      <!-- Door/entrance area (cream inside) -->
+      <rect x="40" y="95" width="140" height="170" fill="var(--booth-cream)" rx="2"/>
+      <!-- Inner dark frame around door -->
+      <rect x="40" y="95" width="140" height="170" fill="none" stroke="var(--booth-wood-dark)" stroke-width="2" rx="2"/>
+      <!-- Interior shadow -->
+      <rect x="44" y="99" width="132" height="162" fill="none" stroke="#c9b590" stroke-width="1" opacity="0.5" rx="1"/>
+
+      <!-- Subtle curtain back inside the door -->
+      <rect x="44" y="99" width="132" height="162" fill="#e8d3a8" opacity="0.5"/>
+      <line x1="60" y1="99" x2="60" y2="261" stroke="#c9b590" stroke-width="0.8" opacity="0.5"/>
+      <line x1="80" y1="99" x2="80" y2="261" stroke="#c9b590" stroke-width="0.8" opacity="0.5"/>
+      <line x1="100" y1="99" x2="100" y2="261" stroke="#c9b590" stroke-width="0.8" opacity="0.5"/>
+      <line x1="120" y1="99" x2="120" y2="261" stroke="#c9b590" stroke-width="0.8" opacity="0.5"/>
+      <line x1="140" y1="99" x2="140" y2="261" stroke="#c9b590" stroke-width="0.8" opacity="0.5"/>
+      <line x1="160" y1="99" x2="160" y2="261" stroke="#c9b590" stroke-width="0.8" opacity="0.5"/>
+
+      <!-- Bottom step -->
+      <rect x="32" y="262" width="156" height="10" fill="var(--booth-wood-dark)"/>
+      <rect x="32" y="262" width="156" height="2" fill="#3e2715"/>
+
+      <!-- Side bulb decorations -->
+      <circle cx="28" cy="58" r="3" fill="#f4d060"/>
+      <circle cx="28" cy="58" r="1.2" fill="#fff5c4"/>
+      <circle cx="28" cy="85" r="3" fill="#f4d060"/>
+      <circle cx="28" cy="85" r="1.2" fill="#fff5c4"/>
+      <circle cx="192" cy="58" r="3" fill="#f4d060"/>
+      <circle cx="192" cy="58" r="1.2" fill="#fff5c4"/>
+      <circle cx="192" cy="85" r="3" fill="#f4d060"/>
+      <circle cx="192" cy="85" r="1.2" fill="#fff5c4"/>
+    </svg>
+
+    <div class="enter-btn-wrap">
+      <button class="start-btn" onclick="startBooth()">Enter Booth</button>
+    </div>
   </div>
 
-  <button class="start-btn" onclick="startBooth()">Enter Booth</button>
-  <p class="mode-info">4 photos · 3 second countdown each</p>
+  <div class="tagline">made with love by @gracermy</div>
 </div>
 
 <!-- ═══ BOOTH ═══ -->
@@ -586,18 +658,29 @@
     </div>
   </div>
 
-  <div class="filter-row" id="filterRow"></div>
+  <div class="picker-section">
+    <div class="picker-label">Filter</div>
+    <div class="filter-row" id="filterRow"></div>
+  </div>
+
+  <div class="picker-section">
+    <div class="picker-label">Frame Color</div>
+    <div class="color-row" id="colorRow">
+      <button class="color-chip active" data-color="white" onclick="selectFrameColor('white')">
+        <span class="color-swatch white"></span>White
+      </button>
+      <button class="color-chip" data-color="black" onclick="selectFrameColor('black')">
+        <span class="color-swatch black"></span>Black
+      </button>
+    </div>
+  </div>
 
   <div class="shutter-row">
-    <div class="shutter-meta">
-      <strong>4 frames</strong>
-      <span>3s × 4</span>
-    </div>
     <button class="shutter-btn" id="shutterBtn" onclick="startCapture()" title="Start"></button>
-    <div class="shutter-meta" style="text-align:right;">
-      <strong id="filterLabel">Warm Film</strong>
-      <span>filter</span>
-    </div>
+  </div>
+
+  <div class="shutter-meta">
+    <strong>4 frames, 3 seconds countdown</strong>
   </div>
 </div>
 
@@ -613,19 +696,18 @@
 <!-- ═══ RESULT ═══ -->
 <div id="result" class="screen">
   <div class="strip-stage">
-    <div class="photo-strip" id="photoStripDisplay">
+    <div class="photo-strip frame-white" id="photoStripDisplay">
       <div class="strip-frame"><canvas id="finalCanvas0"></canvas></div>
       <div class="strip-frame"><canvas id="finalCanvas1"></canvas></div>
       <div class="strip-frame"><canvas id="finalCanvas2"></canvas></div>
       <div class="strip-frame"><canvas id="finalCanvas3"></canvas></div>
       <div class="strip-footer">
-        <div class="strip-brand">★ gracermy ★</div>
+        <div class="strip-quote" id="stripQuote">Little forever</div>
         <div class="strip-date" id="stripDate">2026 · 04 · 16</div>
+        <div class="strip-brand">@gracermy</div>
       </div>
     </div>
   </div>
-
-  <div class="result-filters" id="resultFilters"></div>
 
   <div class="result-actions">
     <button class="result-btn primary" onclick="downloadStrip()">↓ Download Strip</button>
@@ -641,7 +723,7 @@
     <div class="tut-subtitle">★ Photobooth Guide ★</div>
     <div class="tut-step">
       <span class="tut-num">1</span>
-      <div class="tut-text"><h4>Pick a filter</h4><p>Choose from 6 vintage looks — 3 color, 3 black & white. You can change it on the fly or after capture.</p></div>
+      <div class="tut-text"><h4>Pick your look</h4><p>Choose a filter (6 vintage styles) and a frame color (black or white). Your choices lock in before capture.</p></div>
     </div>
     <div class="tut-step">
       <span class="tut-num">2</span>
@@ -657,7 +739,7 @@
     </div>
     <div class="tut-step">
       <span class="tut-num">5</span>
-      <div class="tut-text"><h4>Save your strip</h4><p>Download as a PNG, retake if you don't love it, or try a different filter on the same photos.</p></div>
+      <div class="tut-text"><h4>Save your strip</h4><p>Download as a PNG, retake if you don't love it, or start a new session.</p></div>
     </div>
     <button class="tut-close" onclick="closeTutorial()">Got it</button>
   </div>
@@ -688,7 +770,6 @@
 
 <script>
 /* ═══ FILTERS ═══ */
-
 function sCurve(val, strength) {
   const n = val / 255;
   const c = n < 0.5 ? 0.5 * Math.pow(2 * n, 1 + strength) : 1 - 0.5 * Math.pow(2 * (1 - n), 1 + strength);
@@ -785,6 +866,7 @@ function smoothHighlights(ctx, w, h, amount) {
 const FILTERS = {
   warm_film: {
     name: 'Warm Film',
+    quote: 'Little forever',
     cssPreview: 'sepia(0.25) saturate(1.05) contrast(1.05) brightness(1.02)',
     apply: (ctx, w, h) => {
       const img=ctx.getImageData(0,0,w,h); const d=img.data;
@@ -804,6 +886,7 @@ const FILTERS = {
   },
   cinematic_cool: {
     name: 'Cool',
+    quote: 'Time passes. This stays.',
     cssPreview: 'saturate(0.7) contrast(1.05) brightness(0.95) hue-rotate(-5deg)',
     apply: (ctx, w, h) => {
       const img=ctx.getImageData(0,0,w,h); const d=img.data;
@@ -823,6 +906,7 @@ const FILTERS = {
   },
   warm_noir: {
     name: 'Warm Noir',
+    quote: 'Between takes',
     cssPreview: 'sepia(0.45) saturate(0.9) contrast(1.15) brightness(0.92)',
     apply: (ctx, w, h) => {
       const img=ctx.getImageData(0,0,w,h); const d=img.data;
@@ -842,6 +926,7 @@ const FILTERS = {
   },
   flash_booth: {
     name: 'Flash Booth',
+    quote: 'Analog hearts, digital times',
     cssPreview: 'grayscale(1) contrast(1.15) brightness(1.05) sepia(0.15)',
     apply: (ctx, w, h) => {
       const img=ctx.getImageData(0,0,w,h); const d=img.data;
@@ -861,6 +946,7 @@ const FILTERS = {
   },
   sepia_booth: {
     name: 'Sepia Booth',
+    quote: 'A memory in progress',
     cssPreview: 'grayscale(1) sepia(0.45) contrast(1.05) brightness(1.05)',
     apply: (ctx, w, h) => {
       const img=ctx.getImageData(0,0,w,h); const d=img.data;
@@ -883,6 +969,7 @@ const FILTERS = {
   },
   silver_booth: {
     name: 'Silver Booth',
+    quote: 'Proof we were here',
     cssPreview: 'grayscale(1) contrast(1.05) brightness(1.05)',
     apply: (ctx, w, h) => {
       const img=ctx.getImageData(0,0,w,h); const d=img.data;
@@ -911,20 +998,18 @@ const FILTER_KEYS = ['warm_film', 'cinematic_cool', 'warm_noir', 'flash_booth', 
 let stream = null;
 let facing = 'user';
 let currentFilter = 'warm_film';
-let capturedPhotos = []; // raw video frames as canvas
+let currentFrameColor = 'white';
+let capturedPhotos = [];
 let isCapturing = false;
 
-/* ═══ NAV ═══ */
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 }
 
-/* ═══ TUTORIAL ═══ */
 function openTutorial() { document.getElementById('tutorial').classList.add('active'); }
 function closeTutorial() { document.getElementById('tutorial').classList.remove('active'); }
 
-/* ═══ START BOOTH ═══ */
 async function startBooth() {
   showScreen('booth');
   buildFilterRow();
@@ -938,10 +1023,7 @@ async function initCamera() {
       video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 1280 } },
       audio: false
     });
-    const video = document.getElementById('video');
-    video.srcObject = stream;
-
-    // Don't mirror back camera
+    document.getElementById('video').srcObject = stream;
     document.getElementById('viewfinder').classList.toggle('no-mirror', facing === 'environment');
   } catch (err) {
     showError('Camera unavailable', 'Please grant camera permission and reload. On iPhone, use Safari.');
@@ -959,7 +1041,6 @@ function showError(title, msg) {
   document.getElementById('errorModal').classList.add('active');
 }
 
-/* ═══ FILTER UI ═══ */
 function buildFilterRow() {
   const row = document.getElementById('filterRow');
   row.innerHTML = '';
@@ -977,43 +1058,18 @@ function selectFilter(key) {
   document.querySelectorAll('.filter-chip').forEach((c, i) => {
     c.classList.toggle('active', FILTER_KEYS[i] === key);
   });
-  document.getElementById('filterLabel').textContent = FILTERS[key].name;
-
   // Live CSS preview on viewfinder
-  const video = document.getElementById('video');
-  video.style.filter = FILTERS[key].cssPreview;
+  document.getElementById('video').style.filter = FILTERS[key].cssPreview;
 }
 
-function buildResultFilters() {
-  const row = document.getElementById('resultFilters');
-  row.innerHTML = '';
-  FILTER_KEYS.forEach(key => {
-    const btn = document.createElement('button');
-    btn.className = 'filter-chip' + (key === currentFilter ? ' active' : '');
-    btn.textContent = FILTERS[key].name;
-    btn.onclick = () => switchResultFilter(key);
-    row.appendChild(btn);
+function selectFrameColor(color) {
+  currentFrameColor = color;
+  document.querySelectorAll('.color-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.color === color);
   });
 }
 
-async function switchResultFilter(key) {
-  currentFilter = key;
-  document.querySelectorAll('#resultFilters .filter-chip').forEach((c, i) => {
-    c.classList.toggle('active', FILTER_KEYS[i] === key);
-  });
-  // Re-apply filter to all 4 photos
-  for (let i = 0; i < 4; i++) {
-    const final = document.getElementById('finalCanvas' + i);
-    const ctx = final.getContext('2d');
-    ctx.drawImage(capturedPhotos[i], 0, 0, final.width, final.height);
-    FILTERS[key].apply(ctx, final.width, final.height);
-  }
-}
-
-/* ═══ EXIT ═══ */
-function exitBooth() {
-  document.getElementById('exitModal').classList.add('active');
-}
+function exitBooth() { document.getElementById('exitModal').classList.add('active'); }
 function doExit() {
   document.getElementById('exitModal').classList.remove('active');
   stopCamera();
@@ -1025,13 +1081,9 @@ function newSession() {
   showScreen('welcome');
 }
 function stopCamera() {
-  if (stream) {
-    stream.getTracks().forEach(t => t.stop());
-    stream = null;
-  }
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
 }
 
-/* ═══ CAPTURE ═══ */
 async function startCapture() {
   if (isCapturing) return;
   isCapturing = true;
@@ -1052,7 +1104,6 @@ async function startCapture() {
   isCapturing = false;
   document.getElementById('shutterBtn').disabled = false;
 
-  // Move to developing
   showScreen('developing');
   await wait(800);
   await processPhotos();
@@ -1067,7 +1118,6 @@ async function countdown(seconds) {
   display.classList.add('active');
   for (let s = seconds; s > 0; s--) {
     num.textContent = s;
-    // Restart animation
     num.style.animation = 'none';
     void num.offsetWidth;
     num.style.animation = '';
@@ -1077,25 +1127,21 @@ async function countdown(seconds) {
 }
 
 function capturePhoto() {
-  // Flash effect
   const flash = document.getElementById('flash');
   flash.classList.remove('firing');
   void flash.offsetWidth;
   flash.classList.add('firing');
 
-  // Capture from video
   const video = document.getElementById('video');
   const SIZE = 600;
   const c = document.createElement('canvas');
   c.width = SIZE; c.height = SIZE;
   const ctx = c.getContext('2d');
 
-  // Compute square crop from video
   const vw = video.videoWidth, vh = video.videoHeight;
   const minDim = Math.min(vw, vh);
   const sx = (vw - minDim) / 2, sy = (vh - minDim) / 2;
 
-  // Mirror if front camera
   if (facing === 'user') {
     ctx.translate(SIZE, 0);
     ctx.scale(-1, 1);
@@ -1105,7 +1151,6 @@ function capturePhoto() {
   capturedPhotos.push(c);
 }
 
-/* ═══ PROCESS ═══ */
 async function processPhotos() {
   const filter = FILTERS[currentFilter];
   for (let i = 0; i < 4; i++) {
@@ -1115,24 +1160,29 @@ async function processPhotos() {
     const ctx = final.getContext('2d');
     ctx.drawImage(capturedPhotos[i], 0, 0);
     filter.apply(ctx, final.width, final.height);
-    await wait(50); // yield to UI
+    await wait(50);
   }
 }
 
-/* ═══ SHOW RESULT ═══ */
 function showResult() {
-  buildResultFilters();
+  // Apply frame color to strip
+  const strip = document.getElementById('photoStripDisplay');
+  strip.classList.remove('frame-white', 'frame-black');
+  strip.classList.add('frame-' + currentFrameColor);
+
+  // Set quote from filter
+  document.getElementById('stripQuote').textContent = FILTERS[currentFilter].quote;
+
   // Set date
   const now = new Date();
   const date = `${now.getFullYear()} · ${String(now.getMonth()+1).padStart(2,'0')} · ${String(now.getDate()).padStart(2,'0')}`;
   document.getElementById('stripDate').textContent = date;
+
   showScreen('result');
   stopCamera();
 }
 
-/* ═══ DOWNLOAD ═══ */
 function downloadStrip() {
-  // Compose final strip canvas
   const FRAME_SIZE = 600;
   const PADDING = 30;
   const FRAME_GAP = 18;
@@ -1144,13 +1194,17 @@ function downloadStrip() {
   canvas.width = stripW; canvas.height = stripH;
   const ctx = canvas.getContext('2d');
 
-  // Paper background
-  ctx.fillStyle = '#fdf8eb';
+  // Frame background color
+  const isBlack = currentFrameColor === 'black';
+  ctx.fillStyle = isBlack ? '#1a1410' : '#fdf8eb';
   ctx.fillRect(0, 0, stripW, stripH);
 
-  // Subtle paper texture
+  // Paper texture / grain
   for (let i = 0; i < 800; i++) {
-    ctx.fillStyle = `rgba(184, 140, 74, ${Math.random() * 0.04})`;
+    const alpha = Math.random() * (isBlack ? 0.06 : 0.04);
+    ctx.fillStyle = isBlack
+      ? `rgba(200, 190, 168, ${alpha})`
+      : `rgba(184, 140, 74, ${alpha})`;
     ctx.fillRect(Math.random() * stripW, Math.random() * stripH, 1, 1);
   }
 
@@ -1161,17 +1215,29 @@ function downloadStrip() {
   }
 
   // Footer
-  const footerY = PADDING + (FRAME_SIZE + FRAME_GAP) * 4 - FRAME_GAP + 40;
-  ctx.fillStyle = '#8b3a1e';
-  ctx.font = 'bold 26px "Courier New", monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('★ gracermy ★', stripW / 2, footerY);
+  const footerTopY = PADDING + (FRAME_SIZE + FRAME_GAP) * 4 - FRAME_GAP + 38;
+  const textColor = isBlack ? '#c8bea8' : '#5a5040';
+  const dateColor = isBlack ? 'rgba(200,190,168,0.7)' : 'rgba(90,80,64,0.7)';
+  const brandColor = isBlack ? 'rgba(200,190,168,0.55)' : 'rgba(90,80,64,0.55)';
 
-  ctx.fillStyle = '#847861';
+  // Quote — serif italic
+  ctx.fillStyle = textColor;
+  ctx.font = 'italic 30px "Georgia", serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(FILTERS[currentFilter].quote, stripW / 2, footerTopY);
+
+  // Date
+  ctx.fillStyle = dateColor;
   ctx.font = '16px "Courier New", monospace';
   const now = new Date();
   const date = `${now.getFullYear()} · ${String(now.getMonth()+1).padStart(2,'0')} · ${String(now.getDate()).padStart(2,'0')}`;
-  ctx.fillText(date, stripW / 2, footerY + 28);
+  ctx.fillText(date, stripW / 2, footerTopY + 28);
+
+  // Brand in bottom right
+  ctx.fillStyle = brandColor;
+  ctx.font = '14px "Courier New", monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText('@gracermy', stripW - PADDING + 10, stripH - 14);
 
   // Download
   canvas.toBlob((blob) => {
@@ -1184,7 +1250,6 @@ function downloadStrip() {
   }, 'image/png');
 }
 
-/* ═══ RETAKE ═══ */
 async function retake() {
   showScreen('booth');
   buildFilterRow();
