@@ -77,43 +77,56 @@ body::before {
 .booth-stage {
   position: relative;
   width: min(260px, 70vw);
+  /* explicit height from aspect ratio so absolute children fill correctly */
+  aspect-ratio: 480 / 720;
   filter: drop-shadow(0 12px 28px var(--shadow));
   transition: filter 0.2s, transform 0.2s;
+  cursor: default;
 }
-.booth-stage:hover { transform: translateY(-3px); filter: drop-shadow(0 18px 36px rgba(60,40,20,0.2)); }
+.booth-stage:hover {
+  transform: translateY(-3px);
+  filter: drop-shadow(0 18px 36px rgba(60,40,20,0.2));
+}
 
-.booth-layer {
-  width: 100%;
-  display: block;
-}
-/* curtain sits on top of body via absolute positioning */
+/* both layers fill the stage absolutely */
+.booth-layer,
 .booth-curtain-layer {
   position: absolute;
   top: 0; left: 0;
   width: 100%; height: 100%;
-  pointer-events: none; /* hit area inside the SVG handles clicks */
+  display: block;
 }
-/* the path inside gets pointer-events via attribute */
-.booth-curtain-layer svg { pointer-events: none; }
-#doorHitArea { pointer-events: all; }
+.booth-layer svg,
+.booth-curtain-layer svg {
+  width: 100%; height: 100%;
+  display: block;
+}
 
-/* curtain gather animation — folds to the left like real fabric */
+/* curtain div is the clickable element — reliable on all browsers/devices */
+.booth-curtain-layer {
+  cursor: pointer;
+  /* pointer-events enabled so the div itself is clickable */
+}
+.booth-curtain-layer svg { pointer-events: none; } /* SVG doesn't need to capture events */
+
+/* curtain gather — fabric scrunches to left jamb */
 .booth-curtain-layer.opening #curtainFabric {
   transform-box: fill-box;
-  transform-origin: 144px 162px;
+  transform-origin: left center;
   animation: curtainGather 0.9s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 @keyframes curtainGather {
-  0%   { transform: scaleX(1) skewY(0deg); opacity: 1; }
-  60%  { transform: scaleX(0.22) skewY(2deg); opacity: 1; }
+  0%   { transform: scaleX(1)    skewY(0deg);   opacity: 1; }
+  60%  { transform: scaleX(0.22) skewY(2deg);   opacity: 1; }
   80%  { transform: scaleX(0.18) skewY(1.5deg); opacity: 1; }
-  100% { transform: scaleX(0.18) skewY(1.5deg); opacity: 0.9; }
+  100% { transform: scaleX(0.18) skewY(1.5deg); opacity: 0.85; }
 }
-/* after open, fade out the whole curtain layer */
+
+/* hide curtain layer entirely after animation */
 .booth-curtain-layer.open {
   opacity: 0;
-  transition: opacity 0.3s ease 0.7s;
   pointer-events: none;
+  transition: opacity 0.3s ease 0.75s;
 }
 
 .tagline {
@@ -306,23 +319,40 @@ body::before {
 }
 .result-layout { display: flex; align-items: center; justify-content: center; width: 100%; max-width: 340px; }
 .result-booth-col { display: flex; flex-direction: column; align-items: center; gap: 18px; width: 100%; }
-.result-booth-wrap { width: min(300px, 82vw); filter: drop-shadow(0 14px 32px var(--shadow)); }
+.result-booth-wrap {
+  width: min(300px, 82vw);
+  filter: drop-shadow(0 14px 32px var(--shadow));
+  position: relative; /* needed for the strip overlay */
+}
 
-/* Strip print animation — peels out of slot */
+/* Strip HTML overlay — sits on top of the SVG, aligned to printer slot area.
+   The SVG viewBox is 480×720. Printer slot top is at y≈544, left at x≈163.
+   As percentages: left = 163/480 = 34%, top = 544/720 = 75.5%, width = 154/480 = 32% */
+.result-strip-overlay {
+  position: absolute;
+  left: 34%;
+  top: 75.5%;
+  width: 32%;
+  overflow: visible; /* allow strip to animate upward out of bounds */
+  pointer-events: none;
+}
+
+/* Strip print animation — peels upward out of the slot */
 .result-strip-inner {
   display: flex; flex-direction: column; gap: 2px;
   padding: 5px 5px 10px; border-radius: 2px;
   box-shadow: 0 8px 22px rgba(0,0,0,0.45);
-  animation: stripSlide 1.6s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
-  transform-origin: top center;
+  animation: stripPeel 1.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+  transform-origin: bottom center;
 }
-@keyframes stripSlide {
-  0%   { transform: translateY(-105%) scaleY(0.05); opacity: 0; }
-  25%  { opacity: 1; }
-  55%  { transform: translateY(-12%) scaleY(1); }
-  72%  { transform: translateY(5%) scaleY(1); }
-  86%  { transform: translateY(-2%) scaleY(1); }
-  100% { transform: translateY(0) scaleY(1); opacity: 1; }
+@keyframes stripPeel {
+  /* strip starts hidden inside the slot (translateY = full height downward = 0, clip from bottom) */
+  0%   { transform: translateY(100%) scaleY(0.05); opacity: 0; }
+  15%  { opacity: 1; }
+  55%  { transform: translateY(-8%) scaleY(1); }
+  72%  { transform: translateY(3%) scaleY(1); }
+  86%  { transform: translateY(-1%) scaleY(1); }
+  100% { transform: translateY(-100%) scaleY(1); opacity: 1; }
 }
 
 .rs-frame { width: 100%; aspect-ratio: 1; background: #1a1410; overflow: hidden; }

@@ -219,20 +219,19 @@ function showScreen(id) {
 ════════════════════════════════════════ */
 function openCurtain() {
   const curtainLayer = document.getElementById('boothCurtain');
+  if (!curtainLayer || curtainLayer.classList.contains('opening')) return; // prevent double-fire
+
   const sub = document.getElementById('welcomeSub');
+  if (sub) sub.style.opacity = '0';
 
-  // Update hint text
-  if (sub) { sub.style.opacity = '0'; }
+  // Disable further clicks while animating
+  curtainLayer.style.pointerEvents = 'none';
 
-  // Trigger gather animation
   curtainLayer.classList.add('opening');
 
-  // After curtain gathers, fade it out and enter booth
   setTimeout(() => {
     curtainLayer.classList.add('open');
-    setTimeout(() => {
-      enterBooth();
-    }, 350);
+    setTimeout(() => enterBooth(), 350);
   }, 900);
 }
 
@@ -311,11 +310,14 @@ function setPreviewDate() {
 function leaveCustomize() {
   stopCamera();
   showScreen('screen-welcome');
-  // Reset curtain state so it shows closed again
   const curtainLayer = document.getElementById('boothCurtain');
   if (curtainLayer) {
-    curtainLayer.classList.remove('opening', 'open');
+    curtainLayer.style.transition = 'none';
     curtainLayer.style.opacity = '';
+    curtainLayer.classList.remove('opening', 'open');
+    curtainLayer.style.pointerEvents = '';
+    void curtainLayer.offsetWidth;
+    curtainLayer.style.transition = '';
   }
   const sub = document.getElementById('welcomeSub');
   if (sub) sub.style.opacity = '1';
@@ -437,6 +439,10 @@ function showResult() {
   inner.style.animation = 'none';
   void inner.offsetWidth;
   inner.style.animation = '';
+
+  // Also ensure the overlay is visible
+  const overlay = document.getElementById('resultStripOverlay');
+  if (overlay) { overlay.style.display = ''; }
 }
 
 /* ═══════════════════════════════════════
@@ -549,10 +555,10 @@ function retakeBooth() {
   // Reset curtain to closed state
   const curtainLayer = document.getElementById('boothCurtain');
   if (curtainLayer) {
-    curtainLayer.classList.remove('opening', 'open');
-    curtainLayer.style.opacity = '';
     curtainLayer.style.transition = 'none';
-    // force reflow then re-enable transition
+    curtainLayer.style.opacity = '';
+    curtainLayer.classList.remove('opening', 'open');
+    curtainLayer.style.pointerEvents = '';
     void curtainLayer.offsetWidth;
     curtainLayer.style.transition = '';
   }

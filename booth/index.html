@@ -113,8 +113,8 @@
       </svg>
     </div>
 
-    <!-- Curtain layer (slides away on click) -->
-    <div class="booth-layer booth-curtain-layer" id="boothCurtain">
+    <!-- Curtain layer (slides away on click) — onclick on the div for reliable cross-browser -->
+    <div class="booth-layer booth-curtain-layer" id="boothCurtain" onclick="openCurtain()" role="button" tabindex="0" aria-label="Open booth door">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 720" width="100%" height="100%">
         <defs>
           <linearGradient id="curtainGrad" x1="0" y1="0" x2="1" y2="0">
@@ -182,8 +182,7 @@
           </g>
         </g>
 
-        <!-- Clickable hit area over door -->
-        <path id="doorHitArea" d="M132 144 L348 144 L348 462 L132 462 Z" fill="transparent" style="cursor:pointer;" onclick="openCurtain()"/>
+        <!-- hit area removed — parent div handles onclick -->
       </svg>
     </div>
 
@@ -299,8 +298,9 @@
 
     <div class="result-booth-col">
 
-      <!-- Booth illustration with printing strip -->
+      <!-- Booth illustration + strip overlay -->
       <div class="result-booth-wrap">
+        <!-- The SVG booth (no foreignObject) -->
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 720" width="100%" height="100%">
           <defs>
             <linearGradient id="bG2" x1="0" y1="0" x2="0" y2="1">
@@ -315,9 +315,6 @@
             <linearGradient id="sl2" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stop-color="#1a1226"/><stop offset="1" stop-color="#3a2a3f"/>
             </linearGradient>
-            <radialGradient id="di2" cx="0.5" cy="0.4" r="0.7">
-              <stop offset="0" stop-color="#3a2a3f"/><stop offset="1" stop-color="#1a1226"/>
-            </radialGradient>
             <radialGradient id="fs2" cx="0.5" cy="0.5" r="0.5">
               <stop offset="0" stop-color="#000" stop-opacity="0.22"/>
               <stop offset="1" stop-color="#000" stop-opacity="0"/>
@@ -330,9 +327,6 @@
             <symbol id="s4b" viewBox="-10 -10 20 20">
               <path d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5 Z" fill="#b8893b"/>
             </symbol>
-            <clipPath id="dcb2">
-              <path d="M132 168 Q132 144 156 144 L324 144 Q348 144 348 168 L348 460 L132 460 Z"/>
-            </clipPath>
           </defs>
           <ellipse cx="240" cy="690" rx="180" ry="14" fill="url(#fs2)"/>
           <path d="M70 130 Q70 110 90 110 L390 110 Q410 110 410 130 L410 660 L70 660 Z" fill="url(#bS2)"/>
@@ -351,22 +345,6 @@
           <!-- door open interior -->
           <path d="M132 168 Q132 144 156 144 L324 144 Q348 144 348 168 L348 460 L132 460 Z" fill="#1a1226"/>
           <path d="M132 168 Q132 144 156 144 L324 144 Q348 144 348 168 L348 460 L132 460 Z" fill="none" stroke="url(#br2)" stroke-width="3"/>
-          <!-- strip slides out of slot -->
-          <foreignObject x="163" y="366" width="154" height="250" id="resultStripFO">
-            <div xmlns="http://www.w3.org/1999/xhtml" style="width:154px;">
-              <div class="result-strip-inner" id="resultStripInner">
-                <div class="rs-frame"><canvas id="finalCanvas0"></canvas></div>
-                <div class="rs-frame"><canvas id="finalCanvas1"></canvas></div>
-                <div class="rs-frame"><canvas id="finalCanvas2"></canvas></div>
-                <div class="rs-frame"><canvas id="finalCanvas3"></canvas></div>
-                <div class="rs-footer">
-                  <div class="rs-quote" id="stripQuote"></div>
-                  <div class="rs-date" id="stripDate"></div>
-                  <div class="rs-brand">@gracermy</div>
-                </div>
-              </div>
-            </div>
-          </foreignObject>
           <line x1="100" y1="478" x2="380" y2="478" stroke="#c98c70" stroke-width="1.5" opacity="0.7"/>
           <!-- Printer slot — click to download -->
           <g id="printerGroup" onclick="showDownloadModal()" class="printer-clickable">
@@ -383,6 +361,21 @@
           <rect x="92" y="660" width="40" height="14" rx="3" fill="#7a4a2d"/>
           <rect x="348" y="660" width="40" height="14" rx="3" fill="#7a4a2d"/>
         </svg>
+
+        <!-- Strip overlay — HTML div positioned over the printer slot, not inside SVG -->
+        <div class="result-strip-overlay" id="resultStripOverlay">
+          <div class="result-strip-inner" id="resultStripInner">
+            <div class="rs-frame"><canvas id="finalCanvas0"></canvas></div>
+            <div class="rs-frame"><canvas id="finalCanvas1"></canvas></div>
+            <div class="rs-frame"><canvas id="finalCanvas2"></canvas></div>
+            <div class="rs-frame"><canvas id="finalCanvas3"></canvas></div>
+            <div class="rs-footer">
+              <div class="rs-quote" id="stripQuote"></div>
+              <div class="rs-date" id="stripDate"></div>
+              <div class="rs-brand">@gracermy</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Animated hint: arrow pointing at printer -->
