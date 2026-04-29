@@ -5,7 +5,9 @@ function getTheme() { return localStorage.getItem('theme') || 'light'; }
 
 function applyTheme(t) {
   document.documentElement.setAttribute('data-theme', t);
-  document.getElementById('themeIcon').innerHTML = t === 'dark' ? moonIcon : sunIcon;
+  document.body.style.background = t === 'dark' ? '#120810' : '#f5e8ea';
+  const icon = document.getElementById('themeIcon');
+  if (icon) icon.innerHTML = t === 'dark' ? moonIcon : sunIcon;
   localStorage.setItem('theme', t);
 }
 

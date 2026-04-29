@@ -1,4 +1,6 @@
-/* ═══ FILTERS ═══ */
+/* ═══════════════════════════════════════
+   FILTER PIPELINE
+════════════════════════════════════════ */
 function sCurve(val, strength) {
   const n = val / 255;
   const c = n < 0.5 ? 0.5 * Math.pow(2*n, 1+strength) : 1 - 0.5 * Math.pow(2*(1-n), 1+strength);
@@ -185,7 +187,6 @@ const FILTERS = {
 
 const FILTER_KEYS = ['warm_film','cinematic_cool','warm_noir','flash_booth','sepia_booth','silver_booth'];
 
-/* ═══ FRAME COLOR MAP ═══ */
 const FRAME_COLORS = {
   white:    { bg: '#fdf8eb', text: '#5a5040' },
   black:    { bg: '#1a1410', text: '#c8bea8' },
@@ -194,24 +195,47 @@ const FRAME_COLORS = {
   midnight: { bg: '#1e2240', text: '#c0c8e8' },
 };
 
-/* ═══ STATE ═══ */
+/* ═══════════════════════════════════════
+   STATE
+════════════════════════════════════════ */
 let stream = null;
 let facing = 'user';
 let currentFilter = 'warm_film';
 let currentFrameColor = 'white';
 let capturedPhotos = [];
 let isCapturing = false;
+let fullStripCanvas = null; // cached for modal preview
 
-/* ═══ SCREEN TRANSITIONS ═══ */
+/* ═══════════════════════════════════════
+   SCREEN TRANSITIONS
+════════════════════════════════════════ */
 function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => {
-    s.classList.remove('active');
-  });
-  const el = document.getElementById(id);
-  el.classList.add('active');
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
 }
 
-/* ═══ WELCOME → CUSTOMIZE ═══ */
+/* ═══════════════════════════════════════
+   WELCOME → CURTAIN OPEN → CUSTOMIZE
+════════════════════════════════════════ */
+function openCurtain() {
+  const curtainLayer = document.getElementById('boothCurtain');
+  const sub = document.getElementById('welcomeSub');
+
+  // Update hint text
+  if (sub) { sub.style.opacity = '0'; }
+
+  // Trigger gather animation
+  curtainLayer.classList.add('opening');
+
+  // After curtain gathers, fade it out and enter booth
+  setTimeout(() => {
+    curtainLayer.classList.add('open');
+    setTimeout(() => {
+      enterBooth();
+    }, 350);
+  }, 900);
+}
+
 function enterBooth() {
   showScreen('screen-customize');
   buildCustFilterRow();
@@ -220,7 +244,9 @@ function enterBooth() {
   initPreviewCamera();
 }
 
-/* ═══ CUSTOMIZE ═══ */
+/* ═══════════════════════════════════════
+   CUSTOMIZE
+════════════════════════════════════════ */
 function initPreviewCamera() {
   navigator.mediaDevices.getUserMedia({
     video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 1280 } },
@@ -230,8 +256,7 @@ function initPreviewCamera() {
     stream = s;
     const v = document.getElementById('previewVideo');
     v.srcObject = s;
-    const liveFrame = document.querySelector('.sp-frame-live');
-    liveFrame.classList.toggle('no-mirror', facing === 'environment');
+    document.querySelector('.sp-frame-live').classList.toggle('no-mirror', facing === 'environment');
   }).catch(() => {
     showError('Camera unavailable', 'Please grant camera permission and reload. On iPhone, use Safari.');
   });
@@ -259,9 +284,7 @@ function selectFilter(key) {
   document.querySelectorAll('.filter-chip').forEach((c, i) => {
     c.classList.toggle('active', FILTER_KEYS[i] === key);
   });
-  // apply CSS filter preview to live slot only
   document.getElementById('previewVideo').style.filter = FILTERS[key].cssPreview;
-  // update quote in preview footer
   document.getElementById('previewQuote').textContent = FILTERS[key].quote;
 }
 
@@ -275,37 +298,46 @@ function selectColor(color) {
 
 function updateStripPreview() {
   const strip = document.getElementById('stripPreview');
-  // remove all fc- classes
   strip.className = strip.className.replace(/\bfc-\S+/g, '').trim();
   strip.classList.add('fc-' + currentFrameColor);
 }
 
 function setPreviewDate() {
   const now = new Date();
-  const d = `${now.getFullYear()} · ${String(now.getMonth()+1).padStart(2,'0')} · ${String(now.getDate()).padStart(2,'0')}`;
-  document.getElementById('previewDate').textContent = d;
+  document.getElementById('previewDate').textContent =
+    `${now.getFullYear()} · ${String(now.getMonth()+1).padStart(2,'0')} · ${String(now.getDate()).padStart(2,'0')}`;
 }
 
 function leaveCustomize() {
   stopCamera();
   showScreen('screen-welcome');
+  // Reset curtain state so it shows closed again
+  const curtainLayer = document.getElementById('boothCurtain');
+  if (curtainLayer) {
+    curtainLayer.classList.remove('opening', 'open');
+    curtainLayer.style.opacity = '';
+  }
+  const sub = document.getElementById('welcomeSub');
+  if (sub) sub.style.opacity = '1';
 }
 
-/* ═══ BEGIN SESSION ═══ */
+/* ═══════════════════════════════════════
+   BEGIN SESSION
+════════════════════════════════════════ */
 async function beginSession() {
-  // move camera stream from preview to capture video
   const capVideo = document.getElementById('captureVideo');
   if (stream) {
     capVideo.srcObject = stream;
     document.getElementById('viewfinder').classList.toggle('no-mirror', facing === 'environment');
   }
   showScreen('screen-capture');
-  // small delay so screen renders, then auto-start
   await wait(300);
   await startCapture();
 }
 
-/* ═══ CAPTURE ═══ */
+/* ═══════════════════════════════════════
+   CAPTURE
+════════════════════════════════════════ */
 async function startCapture() {
   if (isCapturing) return;
   isCapturing = true;
@@ -321,10 +353,10 @@ async function startCapture() {
 
   document.getElementById('capStatus').textContent = 'Developing…';
   isCapturing = false;
-
   showScreen('screen-developing');
   await wait(700);
   await processPhotos();
+  buildFullStripCanvas();
   showResult();
 }
 
@@ -355,16 +387,13 @@ function capturePhoto(index) {
   const c = document.createElement('canvas');
   c.width = SIZE; c.height = SIZE;
   const ctx = c.getContext('2d');
-
   const vw = video.videoWidth, vh = video.videoHeight;
   const minDim = Math.min(vw, vh);
   const sx = (vw - minDim) / 2, sy = (vh - minDim) / 2;
-
   if (facing === 'user') { ctx.translate(SIZE, 0); ctx.scale(-1, 1); }
   ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, SIZE, SIZE);
   capturedPhotos.push(c);
 
-  // show thumbnail in mini strip
   const mini = document.getElementById('csm' + index);
   const thumb = document.createElement('canvas');
   thumb.width = 54; thumb.height = 54;
@@ -387,7 +416,9 @@ async function processPhotos() {
   }
 }
 
-/* ═══ RESULT ═══ */
+/* ═══════════════════════════════════════
+   RESULT
+════════════════════════════════════════ */
 function showResult() {
   const fc = FRAME_COLORS[currentFrameColor];
   const inner = document.getElementById('resultStripInner');
@@ -401,32 +432,35 @@ function showResult() {
 
   showScreen('screen-result');
   stopCamera();
+
+  // Retrigger print animation
+  inner.style.animation = 'none';
+  void inner.offsetWidth;
+  inner.style.animation = '';
 }
 
-/* ═══ DOWNLOAD ═══ */
-function downloadStrip() {
-  const btn = document.getElementById('dlBtn');
-  btn.classList.add('downloaded');
-  setTimeout(() => btn.classList.remove('downloaded'), 600);
-
-  const FRAME_SIZE = 600, PADDING = 30, FRAME_GAP = 18, FOOTER_HEIGHT = 130;
-  const stripW = FRAME_SIZE + PADDING * 2;
-  const stripH = PADDING + (FRAME_SIZE + FRAME_GAP) * 4 - FRAME_GAP + FOOTER_HEIGHT;
+/* ═══════════════════════════════════════
+   DOWNLOAD MODAL
+════════════════════════════════════════ */
+function buildFullStripCanvas() {
+  const FRAME_SIZE = 600, PADDING = 28, FRAME_GAP = 14, FOOTER_H = 120;
+  const W = FRAME_SIZE + PADDING * 2;
+  const H = PADDING + (FRAME_SIZE + FRAME_GAP) * 4 - FRAME_GAP + FOOTER_H;
 
   const canvas = document.createElement('canvas');
-  canvas.width = stripW; canvas.height = stripH;
+  canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
 
   const fc = FRAME_COLORS[currentFrameColor];
   ctx.fillStyle = fc.bg;
-  ctx.fillRect(0, 0, stripW, stripH);
+  ctx.fillRect(0, 0, W, H);
 
-  // paper grain
+  // paper grain texture
   const isDark = ['black','midnight'].includes(currentFrameColor);
-  for (let i = 0; i < 800; i++) {
+  for (let i = 0; i < 900; i++) {
     const alpha = Math.random() * (isDark ? 0.06 : 0.04);
     ctx.fillStyle = isDark ? `rgba(200,190,168,${alpha})` : `rgba(184,140,74,${alpha})`;
-    ctx.fillRect(Math.random() * stripW, Math.random() * stripH, 1, 1);
+    ctx.fillRect(Math.random() * W, Math.random() * H, 1, 1);
   }
 
   for (let i = 0; i < 4; i++) {
@@ -434,71 +468,104 @@ function downloadStrip() {
     ctx.drawImage(document.getElementById('finalCanvas' + i), PADDING, y, FRAME_SIZE, FRAME_SIZE);
   }
 
-  const footerY = PADDING + (FRAME_SIZE + FRAME_GAP) * 4 - FRAME_GAP + 38;
+  const footerY = PADDING + (FRAME_SIZE + FRAME_GAP) * 4 - FRAME_GAP + 36;
   ctx.fillStyle = fc.text;
-  ctx.font = 'italic 30px Georgia, serif';
+  ctx.font = 'italic 28px Georgia, serif';
   ctx.textAlign = 'center';
-  ctx.fillText(FILTERS[currentFilter].quote, stripW / 2, footerY);
+  ctx.fillText(FILTERS[currentFilter].quote, W / 2, footerY);
 
-  ctx.fillStyle = fc.text; ctx.globalAlpha = 0.7;
-  ctx.font = '16px "Courier New", monospace';
+  ctx.globalAlpha = 0.7;
+  ctx.font = '15px "Courier New", monospace';
   const now = new Date();
   ctx.fillText(
     `${now.getFullYear()} · ${String(now.getMonth()+1).padStart(2,'0')} · ${String(now.getDate()).padStart(2,'0')}`,
-    stripW / 2, footerY + 28
+    W / 2, footerY + 26
   );
-
-  ctx.globalAlpha = 0.55;
-  ctx.font = '14px "Courier New", monospace';
+  ctx.globalAlpha = 0.5;
+  ctx.font = '13px "Courier New", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('@gracermy', stripW - PADDING + 10, stripH - 14);
+  ctx.fillText('@gracermy', W - PADDING + 8, H - 12);
   ctx.globalAlpha = 1;
 
-  canvas.toBlob(blob => {
+  fullStripCanvas = canvas;
+}
+
+function showDownloadModal() {
+  if (!fullStripCanvas) return;
+
+  const modal = document.getElementById('downloadModal');
+  const stripHolder = document.getElementById('dlModalStrip');
+
+  // Show a scaled-down preview image in the modal
+  stripHolder.innerHTML = '';
+  const img = document.createElement('img');
+  img.src = fullStripCanvas.toDataURL('image/jpeg', 0.88);
+  img.style.width = '100%';
+  img.alt = 'Your photo strip preview';
+  stripHolder.appendChild(img);
+
+  // Reset download button
+  const btn = document.getElementById('dlModalBtn');
+  btn.classList.remove('done');
+  btn.textContent = '';
+  const span1 = document.createElement('span'); span1.textContent = '↓';
+  const span2 = document.createElement('span'); span2.textContent = ' Download Strip';
+  btn.appendChild(span1); btn.appendChild(span2);
+
+  modal.classList.add('active');
+}
+
+function closeDownloadModal() {
+  document.getElementById('downloadModal').classList.remove('active');
+}
+
+function triggerDownload() {
+  if (!fullStripCanvas) return;
+
+  const btn = document.getElementById('dlModalBtn');
+  btn.classList.add('done');
+  btn.textContent = '✓ Saved!';
+
+  fullStripCanvas.toBlob(blob => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `photobooth_${Date.now()}.png`;
+    a.href = url;
+    a.download = `photobooth_${Date.now()}.png`;
     a.click();
     URL.revokeObjectURL(url);
   }, 'image/png');
+
+  // Auto-close modal after brief confirmation
+  setTimeout(() => closeDownloadModal(), 1600);
 }
 
-/* ═══ AGAIN SCREEN ═══ */
-function goToAgain() {
-  // populate the peek strip on the "again" screen with the 4 photos
-  const peek = document.getElementById('againStripPeek');
-  const fc = FRAME_COLORS[currentFrameColor];
-  peek.style.background = fc.bg;
-  peek.innerHTML = '';
-  for (let i = 0; i < 4; i++) {
-    const div = document.createElement('div');
-    div.className = 'mini-frame';
-    const src = document.getElementById('finalCanvas' + i);
-    const c = document.createElement('canvas');
-    c.width = 80; c.height = 80;
-    c.getContext('2d').drawImage(src, 0, 0, 80, 80);
-    div.appendChild(c);
-    peek.appendChild(div);
+/* ═══════════════════════════════════════
+   RETAKE — go back to welcome screen
+════════════════════════════════════════ */
+function retakeBooth() {
+  capturedPhotos = [];
+  fullStripCanvas = null;
+
+  // Reset curtain to closed state
+  const curtainLayer = document.getElementById('boothCurtain');
+  if (curtainLayer) {
+    curtainLayer.classList.remove('opening', 'open');
+    curtainLayer.style.opacity = '';
+    curtainLayer.style.transition = 'none';
+    // force reflow then re-enable transition
+    void curtainLayer.offsetWidth;
+    curtainLayer.style.transition = '';
   }
-  showScreen('screen-again');
-}
+  const sub = document.getElementById('welcomeSub');
+  if (sub) { sub.style.opacity = '0'; void sub.offsetWidth; sub.style.opacity = '1'; }
 
-function goAgain() {
-  capturedPhotos = [];
-  showScreen('screen-customize');
-  buildCustFilterRow();
-  updateStripPreview();
-  setPreviewDate();
-  initPreviewCamera();
-}
-
-function goHome() {
   stopCamera();
-  capturedPhotos = [];
-  window.location.href = '/';
+  showScreen('screen-welcome');
 }
 
-/* ═══ UTILS ═══ */
+/* ═══════════════════════════════════════
+   UTILS
+════════════════════════════════════════ */
 function stopCamera() {
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
 }
@@ -508,3 +575,13 @@ function showError(title, msg) {
   document.getElementById('errorMsg').textContent = msg;
   document.getElementById('errorModal').classList.add('active');
 }
+
+// Close modals on overlay click
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('downloadModal').addEventListener('click', function(e) {
+    if (e.target === this) closeDownloadModal();
+  });
+  document.getElementById('errorModal').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('active');
+  });
+});
