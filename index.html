@@ -5,218 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>gracermy</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Source+Sans+3:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #fafaf8;
-    --bg-card: #ffffff;
-    --text: #1a1a1a;
-    --text-secondary: #6b6b6b;
-    --text-muted: #a0a0a0;
-    --accent: #2563eb;
-    --accent-soft: rgba(37, 99, 235, 0.06);
-    --border: #e8e8e4;
-    --border-hover: #d0d0cc;
-    --radius: 14px;
-  }
-
-  [data-theme="dark"] {
-    --bg: #111113;
-    --bg-card: #1a1a1e;
-    --text: #e4e4e7;
-    --text-secondary: #8b8b95;
-    --text-muted: #55555e;
-    --accent: #6dacf7;
-    --accent-soft: rgba(109, 172, 247, 0.08);
-    --border: #27272a;
-    --border-hover: #3f3f44;
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    background: var(--bg); color: var(--text);
-    font-family: 'Source Sans 3', sans-serif;
-    font-weight: 400; line-height: 1.6;
-    min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
-    transition: background 0.35s, color 0.35s;
-  }
-
-  .container { max-width: 760px; margin: 0 auto; padding: 0 24px; width: 100%; }
-
-  /* ── NAV ── */
-  nav { padding: 28px 0; border-bottom: 1px solid var(--border); transition: border-color 0.35s; }
-  nav .container { display: flex; justify-content: space-between; align-items: center; }
-  .nav-left { display: flex; align-items: center; gap: 28px; }
-  .nav-logo {
-    font-family: 'JetBrains Mono', monospace; font-size: 0.95rem;
-    font-weight: 500; color: var(--text); text-decoration: none;
-    letter-spacing: -0.02em; transition: color 0.35s;
-  }
-  .nav-links { display: flex; gap: 28px; }
-  .nav-links a {
-    font-size: 0.9rem; color: var(--text-secondary); text-decoration: none;
-    transition: color 0.2s; font-weight: 400;
-  }
-  .nav-links a:hover { color: var(--text); }
-  .nav-links a.active { color: var(--text); font-weight: 500; }
-
-  .theme-toggle {
-    width: 32px; height: 32px; border-radius: 50%;
-    border: 1px solid var(--border); background: transparent;
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    transition: all 0.25s; color: var(--text-muted);
-  }
-  .theme-toggle:hover { border-color: var(--border-hover); color: var(--text-secondary); }
-  .theme-toggle svg { width: 16px; height: 16px; transition: transform 0.3s; }
-  .theme-toggle:hover svg { transform: rotate(25deg); }
-
-  /* ── HERO ── */
-  .hero { padding: 72px 0 0; }
-  .hero-name {
-    font-family: 'Instrument Serif', serif;
-    font-size: clamp(2.8rem, 6vw, 4rem);
-    font-weight: 400; line-height: 1.08;
-    letter-spacing: -0.02em;
-    margin-bottom: 16px;
-  }
-  .hero-intro {
-    font-size: 1.1rem; color: var(--text-secondary);
-    max-width: 520px; line-height: 1.7; font-weight: 300;
-  }
-  .hero-intro strong { color: var(--text); font-weight: 500; }
-
-  /* ── TWO-COL SECTION ── */
-  .content-section {
-    padding: 48px 0 64px;
-  }
-  .two-col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 40px;
-    align-items: start;
-  }
-
-  /* Left column: cards */
-  .col-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem; font-weight: 500;
-    text-transform: uppercase; letter-spacing: 0.1em;
-    color: var(--text-muted); margin-bottom: 16px;
-  }
-
-  .card-stack { display: flex; flex-direction: column; gap: 12px; }
-
-  .card {
-    display: flex; align-items: center; gap: 14px;
-    padding: 18px 20px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    text-decoration: none; color: var(--text);
-    transition: all 0.2s;
-  }
-  .card:hover {
-    border-color: var(--border-hover);
-    box-shadow: 0 2px 16px rgba(0,0,0,0.04);
-    transform: translateY(-1px);
-  }
-  [data-theme="dark"] .card:hover {
-    box-shadow: 0 2px 16px rgba(0,0,0,0.2);
-  }
-  .card-icon {
-    width: 42px; height: 42px; border-radius: 10px;
-    background: var(--accent-soft);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.15rem; flex-shrink: 0;
-  }
-  .card-info h3 {
-    font-size: 0.95rem; font-weight: 600; margin-bottom: 1px;
-  }
-  .card-info p {
-    font-size: 0.8rem; color: var(--text-secondary); font-weight: 300;
-  }
-  .card-arrow {
-    margin-left: auto; color: var(--text-muted); font-size: 1rem;
-    transition: transform 0.2s, color 0.2s;
-  }
-  .card:hover .card-arrow { transform: translateX(3px); color: var(--accent); }
-
-  /* Right column: index */
-  .index-list { display: flex; flex-direction: column; }
-
-  .index-item {
-    display: flex; align-items: baseline; gap: 12px;
-    padding: 14px 0;
-    border-bottom: 1px solid var(--border);
-    text-decoration: none; color: var(--text);
-    transition: all 0.2s;
-  }
-  .index-item:last-child { border-bottom: none; }
-  .index-item:hover { padding-left: 4px; }
-
-  .index-num {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.68rem; color: var(--text-muted);
-    min-width: 18px; transition: color 0.2s;
-  }
-  .index-item:hover .index-num { color: var(--accent); }
-
-  .index-text { display: flex; flex-direction: column; }
-  .index-label { font-size: 0.95rem; font-weight: 500; letter-spacing: -0.01em; }
-  .index-desc { font-size: 0.78rem; color: var(--text-secondary); font-weight: 300; margin-top: 1px; }
-
-  .index-arrow {
-    margin-left: auto; color: var(--text-muted); font-size: 0.85rem;
-    opacity: 0; transform: translateX(-4px); transition: all 0.2s;
-  }
-  .index-item:hover .index-arrow { opacity: 1; transform: translateX(0); }
-
-  .index-item.coming {
-    pointer-events: none; opacity: 0.4;
-  }
-  .coming-tag {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.58rem; color: var(--text-muted);
-    letter-spacing: 0.06em; text-transform: uppercase;
-    margin-left: auto;
-  }
-
-  /* ── DIVIDER ── */
-  .divider {
-    height: 1px; background: var(--border);
-    margin: 0; transition: background 0.35s;
-  }
-
-  /* ── FOOTER ── */
-  footer { padding: 32px 0; }
-  footer p {
-    font-size: 0.78rem; color: var(--text-muted);
-    text-align: center; font-weight: 300;
-  }
-
-  /* ── ANIMATIONS ── */
-  .fade-up {
-    opacity: 0; transform: translateY(14px);
-    animation: fadeUp 0.6s ease forwards;
-  }
-  @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
-  .fd1 { animation-delay: 0s; }
-  .fd2 { animation-delay: 0.08s; }
-  .fd3 { animation-delay: 0.18s; }
-  .fd4 { animation-delay: 0.28s; }
-
-  /* ── RESPONSIVE ── */
-  @media (max-width: 600px) {
-    .hero { padding: 48px 0 0; }
-    .two-col { grid-template-columns: 1fr; gap: 32px; }
-    nav { padding: 20px 0; }
-    .nav-links { gap: 20px; }
-    .content-section { padding: 36px 0 48px; }
-  }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<canvas id="blossom-canvas"></canvas>
 
 <nav>
   <div class="container">
@@ -257,7 +50,6 @@
     <section class="content-section">
       <div class="two-col">
 
-        <!-- Left: featured work -->
         <div class="fade-up fd3">
           <div class="col-label">Featured</div>
           <div class="card-stack">
@@ -280,7 +72,6 @@
           </div>
         </div>
 
-        <!-- Right: content index -->
         <div class="fade-up fd4">
           <div class="col-label">Index</div>
           <div class="index-list">
@@ -331,22 +122,8 @@
   </div>
 </footer>
 
-<script>
-  const sunIcon = `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`;
-  const moonIcon = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
-
-  function getTheme() { return localStorage.getItem('theme') || 'light'; }
-
-  function applyTheme(t) {
-    document.documentElement.setAttribute('data-theme', t);
-    document.getElementById('themeIcon').innerHTML = t === 'dark' ? moonIcon : sunIcon;
-    localStorage.setItem('theme', t);
-  }
-
-  function toggleTheme() { applyTheme(getTheme() === 'dark' ? 'light' : 'dark'); }
-
-  applyTheme(getTheme());
-</script>
+<script src="theme.js"></script>
+<script src="blossom.js"></script>
 
 </body>
 </html>
