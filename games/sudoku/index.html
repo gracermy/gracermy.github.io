@@ -10,6 +10,17 @@
 <body>
 <a href="/games/" class="back-link">← Games</a>
 
+<!-- DAILY REWARD TOAST -->
+<div class="daily-toast" id="dailyToast">
+  <div class="daily-toast-inner">
+    <span class="daily-toast-icon">✦</span>
+    <div class="daily-toast-text">
+      <span class="daily-toast-title" id="dailyToastTitle">Daily reward!</span>
+      <span class="daily-toast-sub" id="dailyToastSub"></span>
+    </div>
+  </div>
+</div>
+
 <div class="loading-overlay" id="loading"><div class="spinner"></div><p>Generating puzzle…</p></div>
 
 <!-- TUTORIAL -->
@@ -81,6 +92,9 @@
 <!-- HOME -->
 <div id="home" class="screen active">
   <div class="home-actions">
+    <div class="coin-display" id="homeCoinDisplay">
+      <span class="coin-icon">◈</span><span class="coin-count" id="homeCoinCount">0</span>
+    </div>
     <button class="btn-icon info" onclick="openTutorial()" title="How to play">
       <span class="icon-bang" style="color:var(--text-dim);">!</span>
     </button>
@@ -96,6 +110,9 @@
       <h2>Sudoku</h2><span class="diff-tag" id="diffTag"></span>
     </div>
     <div class="timer-group">
+      <div class="coin-display compact" id="gameCoinDisplay">
+        <span class="coin-icon">◈</span><span class="coin-count" id="gameCoinCount">0</span>
+      </div>
       <div class="timer" id="timer">00:00</div>
       <button class="btn-icon undo" id="btnUndo" onclick="undoMove()" title="Undo" disabled>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
@@ -108,6 +125,9 @@
       </button>
       <button class="btn-icon info" id="btnInfo" onclick="openTutorial()" title="How to play">
         <span class="icon-bang" style="color:var(--text-dim);">!</span>
+      </button>
+      <button class="btn-icon hint" onclick="openHintShop()" title="Hints" id="btnHint">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       </button>
       <button class="btn-icon give-up" onclick="confirmGiveUp()" title="Give Up" id="btnGiveUp">
         <svg viewBox="0 0 24 24" fill="none"><path d="M4 4l16 16M4 20L20 4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
@@ -135,8 +155,34 @@
 <div class="modal-overlay" id="modal"><div class="modal"><div id="modal-icon" class="success-icon"></div><h3 id="modal-title"></h3><p id="modal-text"></p><div id="modal-best" class="new-best" style="display:none;"></div><div class="modal-actions" id="modal-actions"></div></div></div>
 <div class="modal-overlay" id="confirmModal"><div class="modal"><div class="success-icon" style="font-size:2.2rem;color:var(--text-dim);margin-bottom:10px;">⚠</div><h3>Leave Game?</h3><p>Are you sure? You'll lose your current progress.</p><div class="modal-actions" style="margin-top:22px;"><button class="btn-primary" onclick="doGoHome()">Leave</button><button class="btn-secondary" onclick="cancelAnyModal()">Stay</button></div></div></div>
 <div class="modal-overlay" id="giveUpModal"><div class="modal"><div class="success-icon" style="font-size:2.2rem;color:var(--error);margin-bottom:10px;">⚑</div><h3>Give Up?</h3><p>This will reveal the solution. Your time won't be recorded.</p><div class="modal-actions" style="margin-top:22px;"><button class="btn-primary" onclick="doGiveUp()">Reveal</button><button class="btn-secondary" onclick="cancelAnyModal()">Keep Trying</button></div></div></div>
+<div class="modal-overlay" id="hintModal">
+  <div class="modal hint-modal">
+    <div class="hint-modal-header">
+      <div class="hint-modal-title">Hint Shop</div>
+      <div class="hint-modal-coins"><span class="coin-icon">◈</span><span id="hintModalCoins">0</span></div>
+    </div>
+    <div class="hint-options">
+      <button class="hint-option" id="hintRandom" onclick="useRandomHint()">
+        <div class="hint-option-top">
+          <span class="hint-option-name">Random Reveal</span>
+          <span class="hint-option-cost"><span class="coin-icon">◈</span> 2</span>
+        </div>
+        <p class="hint-option-desc">Reveals a random unfilled cell anywhere on the board.</p>
+      </button>
+      <button class="hint-option" id="hintChosen" onclick="useChosenHint()">
+        <div class="hint-option-top">
+          <span class="hint-option-name">Cell Reveal</span>
+          <span class="hint-option-cost"><span class="coin-icon">◈</span> 5</span>
+        </div>
+        <p class="hint-option-desc">Reveals the cell you have selected. Select a cell first.</p>
+      </button>
+    </div>
+    <button class="hint-modal-close btn-secondary" onclick="closeHintShop()">Cancel</button>
+  </div>
+</div>
 <div class="modal-overlay" id="restartModal"><div class="modal"><div class="success-icon" style="font-size:2.2rem;color:var(--success);margin-bottom:10px;">↺</div><h3>Restart Puzzle?</h3><p>This will clear all your answers and reset the timer.</p><div class="modal-actions" style="margin-top:22px;"><button class="btn-primary" onclick="doRestart()">Restart</button><button class="btn-secondary" onclick="cancelAnyModal()">Cancel</button></div></div></div>
 
+<script src="/games/profile.js"></script>
 <script src="sudoku.js"></script>
 </body>
 </html>

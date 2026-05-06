@@ -126,11 +126,35 @@ let solution=[],puzzle=[],userGrid=[],clueMap=[],selectedCell=null;
 let timerInterval=null,seconds=0,paused=false,currentDifficulty='easy',revealed=false;
 let undoStack=[],errorCells=new Set();
 
-function getBestTimes(){try{return JSON.parse(localStorage.getItem('sudoku_best_times'))||{};}catch{return {};}}
-function setBestTime(d,s){const b=getBestTimes();if(!b[d]||s<b[d]){b[d]=s;localStorage.setItem('sudoku_best_times',JSON.stringify(b));return true;}return false;}
+const COIN_REWARDS = { easy: 3, medium: 6, hard: 10 };
+
 function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
 
-function buildHome(){const b=getBestTimes();const el=document.getElementById('diffSelect');el.innerHTML='';for(const[k,cfg]of Object.entries(DIFFICULTIES)){const btn=document.createElement('button');btn.className='diff-btn';const bs=b[k]?`<span class="best-badge">Best ${fmt(b[k])}</span>`:'';btn.innerHTML=`<div class="diff-label"><span class="diff-dot ${cfg.dot}"></span>${cfg.label}</div><div class="diff-meta">${bs}</div>`;btn.onclick=()=>startGame(k);el.appendChild(btn);}}
+function updateCoinUI() {
+  const c = getCoins();
+  document.getElementById('homeCoinCount').textContent = c;
+  document.getElementById('gameCoinCount').textContent = c;
+}
+
+function showDailyToast(reward, streak) {
+  const toast = document.getElementById('dailyToast');
+  document.getElementById('dailyToastTitle').textContent = `+${reward} coins`;
+  document.getElementById('dailyToastSub').textContent = streak > 1 ? `${streak}-day streak 🔥` : 'Daily login reward';
+  toast.classList.add('visible');
+  setTimeout(() => toast.classList.remove('visible'), 3500);
+}
+
+function buildHome(){
+  const el=document.getElementById('diffSelect');el.innerHTML='';
+  for(const[k,cfg]of Object.entries(DIFFICULTIES)){
+    const btn=document.createElement('button');btn.className='diff-btn';
+    const best=getBestTime('sudoku',k);
+    const bs=best?`<span class="best-badge">Best ${fmt(best)}</span>`:'';
+    btn.innerHTML=`<div class="diff-label"><span class="diff-dot ${cfg.dot}"></span>${cfg.label}</div><div class="diff-meta">${bs}</div>`;
+    btn.onclick=()=>startGame(k);el.appendChild(btn);
+  }
+  updateCoinUI();
+}
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
 function cancelAnyModal(){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));paused=false;}
 function confirmHome(){if(revealed){doGoHome();return;}paused=true;document.getElementById('confirmModal').classList.add('active');}
@@ -145,7 +169,7 @@ function doGiveUp(){
   clearInterval(timerInterval);revealed=true;paused=true;
   document.getElementById('picker').classList.remove('visible');
   document.getElementById('btnFinish').disabled=true;
-  ['btnGiveUp','btnPause','btnRestart','btnUndo','btnInfo'].forEach(id=>document.getElementById(id).style.display='none');
+  ['btnGiveUp','btnPause','btnRestart','btnUndo','btnInfo','btnHint'].forEach(id=>document.getElementById(id).style.display='none');
   selectedCell=null;
   document.querySelectorAll('.cell').forEach(c=>c.classList.remove('selected','constrained','same-number','error-cell'));
   let cc=0,wc=0,ec=0;
@@ -177,11 +201,11 @@ function startGame(diff){
     userGrid=puzzle.map(r=>[...r]);clueMap=puzzle.map(r=>r.map(v=>v!==0));selectedCell=null;
     const tag=document.getElementById('diffTag');tag.textContent=DIFFICULTIES[diff].label;tag.className='diff-tag '+diff;
     document.getElementById('btnFinish').disabled=false;
-    ['btnGiveUp','btnPause','btnRestart','btnUndo','btnInfo'].forEach(id=>document.getElementById(id).style.display='');
+    ['btnGiveUp','btnPause','btnRestart','btnUndo','btnInfo','btnHint'].forEach(id=>document.getElementById(id).style.display='');
     document.getElementById('revealedBar').classList.remove('active');
     updateUndoBtn();buildGrid();
     document.getElementById('loading').classList.remove('active');
-    showScreen('game');startTimer();
+    showScreen('game');startTimer();updateCoinUI();
     document.getElementById('picker').classList.remove('visible');
     document.getElementById('pauseOverlay').classList.remove('active');
     document.getElementById('pauseIcon').innerHTML='<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
@@ -216,6 +240,65 @@ function placeNumber(num){
   if(num!==0)for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(userGrid[r][c]===num)getCellEl(r,c).classList.add('same-number');
 }
 
+/* ═══ HINTS ═══ */
+const HINT_COST_RANDOM = 2;
+const HINT_COST_CHOSEN = 5;
+
+function openHintShop() {
+  if (paused || revealed) return;
+  document.getElementById('hintModalCoins').textContent = getCoins();
+  const hasSelected = selectedCell && !clueMap[selectedCell.row][selectedCell.col];
+  const canAffordRandom = getCoins() >= HINT_COST_RANDOM;
+  const canAffordChosen = getCoins() >= HINT_COST_CHOSEN;
+  document.getElementById('hintRandom').disabled = !canAffordRandom;
+  document.getElementById('hintChosen').disabled = !canAffordChosen || !hasSelected;
+  if (!hasSelected) {
+    document.getElementById('hintChosen').querySelector('.hint-option-desc').textContent = 'Select an empty cell first, then come back.';
+  } else {
+    document.getElementById('hintChosen').querySelector('.hint-option-desc').textContent = 'Reveals the cell you have selected.';
+  }
+  paused = true;
+  document.getElementById('hintModal').classList.add('active');
+}
+
+function closeHintShop() {
+  document.getElementById('hintModal').classList.remove('active');
+  paused = false;
+}
+
+function revealCell(row, col) {
+  const val = solution[row][col];
+  userGrid[row][col] = val;
+  const el = getCellEl(row, col);
+  el.textContent = val;
+  el.classList.remove('user-filled', 'error-cell');
+  errorCells.delete(`${row},${col}`);
+  el.classList.add('hint-revealed');
+  updateCoinUI();
+}
+
+function useRandomHint() {
+  if (!spendCoins(HINT_COST_RANDOM)) return;
+  closeHintShop();
+  const empty = [];
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+    if (!clueMap[r][c] && userGrid[r][c] === 0) empty.push([r, c]);
+  }
+  if (empty.length === 0) return;
+  const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+  revealCell(r, c);
+  selectCell(r, c);
+}
+
+function useChosenHint() {
+  if (!selectedCell) return;
+  if (!spendCoins(HINT_COST_CHOSEN)) return;
+  closeHintShop();
+  const { row, col } = selectedCell;
+  revealCell(row, col);
+  selectCell(row, col);
+}
+
 function checkSolution(){
   if(paused||revealed)return;clearInterval(timerInterval);
   for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(userGrid[r][c]===0){showModal('incomplete');return;}
@@ -229,7 +312,17 @@ function checkSolution(){
 function showModal(type){
   const modal=document.getElementById('modal'),icon=document.getElementById('modal-icon'),title=document.getElementById('modal-title'),text=document.getElementById('modal-text'),bestEl=document.getElementById('modal-best'),actions=document.getElementById('modal-actions');
   bestEl.style.display='none';actions.innerHTML='';
-  if(type==='success'){const isNew=setBestTime(currentDifficulty,seconds);icon.textContent='✦';icon.style.color='var(--pink)';title.textContent='Brilliant!';text.textContent=`Solved in ${fmt(seconds)}.`;if(isNew){bestEl.style.display='block';bestEl.textContent='★ New best time!';}actions.innerHTML=`<button class="btn-primary" onclick="closeModal();startGame('${currentDifficulty}')">Play Again</button><button class="btn-secondary" onclick="closeModal();doGoHome()">Home</button>`;}
+  if(type==='success'){
+    const isNew=submitBestTime('sudoku',currentDifficulty,seconds);
+    const reward=COIN_REWARDS[currentDifficulty]||3;
+    addCoins(reward);
+    updateCoinUI();
+    icon.textContent='✦';icon.style.color='var(--pink)';title.textContent='Brilliant!';
+    text.textContent=`Solved in ${fmt(seconds)}.`;
+    bestEl.style.display='block';
+    bestEl.innerHTML=`<span class="coin-earned">+${reward} ◈</span>${isNew?' &nbsp;★ New best time!':''}`;
+    actions.innerHTML=`<button class="btn-primary" onclick="closeModal();startGame('${currentDifficulty}')">Play Again</button><button class="btn-secondary" onclick="closeModal();doGoHome()">Home</button>`;
+  }
   else if(type==='incomplete'){icon.textContent='○';icon.style.color='var(--text-dim)';title.textContent='Not Done Yet';text.textContent='Some cells are still empty.';actions.innerHTML=`<button class="btn-primary" onclick="closeModal();resumeTimer()">Continue</button>`;}
   else if(type==='errors'){icon.textContent='✕';icon.style.color='var(--error)';title.textContent='Not Quite';text.textContent='Some values are incorrect. The wrong cells are highlighted.';actions.innerHTML=`<button class="btn-primary" onclick="closeModal();resumeTimer()">Try Again</button>`;}
   modal.classList.add('active');
@@ -243,3 +336,10 @@ buildHome();
 buildTutDots();
 buildTutVisuals();
 updateTutSlide();
+
+/* Daily reward — runs once per calendar day */
+const daily = claimDailyReward();
+if (daily.awarded) {
+  updateCoinUI();
+  setTimeout(() => showDailyToast(daily.reward, daily.streak), 800);
+}
