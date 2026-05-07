@@ -10,14 +10,17 @@
 <body>
 <a href="/games/" class="back-link">← Games</a>
 
-<!-- DAILY REWARD TOAST -->
-<div class="daily-toast" id="dailyToast">
-  <div class="daily-toast-inner">
-    <span class="daily-toast-icon">✦</span>
-    <div class="daily-toast-text">
-      <span class="daily-toast-title" id="dailyToastTitle">Daily reward!</span>
-      <span class="daily-toast-sub" id="dailyToastSub"></span>
+<!-- DAILY REWARD OVERLAY -->
+<div class="daily-overlay" id="dailyOverlay">
+  <div class="daily-overlay-content">
+    <div class="daily-overlay-icon">✦</div>
+    <h2 class="daily-overlay-title" id="dailyOverlayTitle">Welcome back!</h2>
+    <div class="daily-overlay-streak" id="dailyOverlayStreak"></div>
+    <div class="daily-overlay-reward">
+      <span class="daily-overlay-plus">+</span><span class="daily-overlay-amount" id="dailyOverlayAmount">0</span><span class="daily-overlay-coin">◈</span>
     </div>
+    <div class="daily-overlay-balance">Balance: <span class="daily-overlay-balance-val" id="dailyOverlayBalance">0</span> ◈</div>
+    <button class="daily-overlay-btn" onclick="dismissDailyOverlay()">Let's play</button>
   </div>
 </div>
 
@@ -92,8 +95,11 @@
 <!-- HOME -->
 <div id="home" class="screen active">
   <div class="home-actions">
-    <div class="coin-display" id="homeCoinDisplay">
-      <span class="coin-icon">◈</span><span class="coin-count" id="homeCoinCount">0</span>
+    <div class="home-stats">
+      <div class="streak-badge" id="streakBadge" style="display:none;"></div>
+      <div class="coin-display" id="homeCoinDisplay">
+        <span class="coin-icon">◈</span><span class="coin-count" id="homeCoinCount">0</span>
+      </div>
     </div>
     <button class="btn-icon info" onclick="openTutorial()" title="How to play">
       <span class="icon-bang" style="color:var(--text-dim);">!</span>

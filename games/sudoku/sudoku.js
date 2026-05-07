@@ -136,12 +136,33 @@ function updateCoinUI() {
   document.getElementById('gameCoinCount').textContent = c;
 }
 
-function showDailyToast(reward, streak) {
-  const toast = document.getElementById('dailyToast');
-  document.getElementById('dailyToastTitle').textContent = `+${reward} coins`;
-  document.getElementById('dailyToastSub').textContent = streak > 1 ? `${streak}-day streak 🔥` : 'Daily login reward';
-  toast.classList.add('visible');
-  setTimeout(() => toast.classList.remove('visible'), 3500);
+function showDailyOverlay(reward, streak, totalCoins) {
+  const profile = loadProfile();
+  document.getElementById('dailyOverlayTitle').textContent =
+    profile.totalSolved === 0 ? 'Hello!' : 'Welcome back!';
+  document.getElementById('dailyOverlayStreak').textContent =
+    streak > 1 ? `🔥 ${streak}-day streak` : '';
+  document.getElementById('dailyOverlayBalance').textContent = totalCoins;
+
+  /* count-up the reward amount */
+  const amountEl = document.getElementById('dailyOverlayAmount');
+  amountEl.textContent = '0';
+  let current = 0;
+  const duration = 600;
+  const steps = 20;
+  const increment = reward / steps;
+  const interval = duration / steps;
+  const counter = setInterval(() => {
+    current = Math.min(current + increment, reward);
+    amountEl.textContent = Math.round(current);
+    if (current >= reward) clearInterval(counter);
+  }, interval);
+
+  document.getElementById('dailyOverlay').classList.add('active');
+}
+
+function dismissDailyOverlay() {
+  document.getElementById('dailyOverlay').classList.remove('active');
 }
 
 function buildHome(){
@@ -154,6 +175,14 @@ function buildHome(){
     btn.onclick=()=>startGame(k);el.appendChild(btn);
   }
   updateCoinUI();
+  const profile = loadProfile();
+  const streakEl = document.getElementById('streakBadge');
+  if (profile.streak >= 2) {
+    streakEl.textContent = `🔥 ${profile.streak}`;
+    streakEl.style.display = '';
+  } else {
+    streakEl.style.display = 'none';
+  }
 }
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
 function cancelAnyModal(){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));paused=false;}
@@ -243,27 +272,26 @@ function placeNumber(num){
 /* ═══ HINTS ═══ */
 const HINT_COST_RANDOM = 2;
 const HINT_COST_CHOSEN = 5;
+let hintWasPausedBefore = false;
 
 function openHintShop() {
-  if (paused || revealed) return;
+  if (revealed) return;
+  hintWasPausedBefore = paused;
   document.getElementById('hintModalCoins').textContent = getCoins();
   const hasSelected = selectedCell && !clueMap[selectedCell.row][selectedCell.col];
   const canAffordRandom = getCoins() >= HINT_COST_RANDOM;
   const canAffordChosen = getCoins() >= HINT_COST_CHOSEN;
   document.getElementById('hintRandom').disabled = !canAffordRandom;
   document.getElementById('hintChosen').disabled = !canAffordChosen || !hasSelected;
-  if (!hasSelected) {
-    document.getElementById('hintChosen').querySelector('.hint-option-desc').textContent = 'Select an empty cell first, then come back.';
-  } else {
-    document.getElementById('hintChosen').querySelector('.hint-option-desc').textContent = 'Reveals the cell you have selected.';
-  }
+  document.getElementById('hintChosen').querySelector('.hint-option-desc').textContent =
+    hasSelected ? 'Reveals the cell you have selected.' : 'Select an empty cell first, then come back.';
   paused = true;
   document.getElementById('hintModal').classList.add('active');
 }
 
 function closeHintShop() {
   document.getElementById('hintModal').classList.remove('active');
-  paused = false;
+  paused = hintWasPausedBefore;
 }
 
 function revealCell(row, col) {
@@ -316,12 +344,20 @@ function showModal(type){
     const isNew=submitBestTime('sudoku',currentDifficulty,seconds);
     const reward=COIN_REWARDS[currentDifficulty]||3;
     addCoins(reward);
-    updateCoinUI();
     icon.textContent='✦';icon.style.color='var(--pink)';title.textContent='Brilliant!';
     text.textContent=`Solved in ${fmt(seconds)}.`;
     bestEl.style.display='block';
-    bestEl.innerHTML=`<span class="coin-earned">+${reward} ◈</span>${isNew?' &nbsp;★ New best time!':''}`;
+    bestEl.innerHTML=`<div class="coin-reward-row"><span class="coin-earned-label">+<span id="coinCountUp">0</span> ◈ earned</span></div>${isNew?'<div class="new-best-line">★ New best time!</div>':''}`;
     actions.innerHTML=`<button class="btn-primary" onclick="closeModal();startGame('${currentDifficulty}')">Play Again</button><button class="btn-secondary" onclick="closeModal();doGoHome()">Home</button>`;
+    /* count-up animation */
+    let cur=0;
+    const steps=20, duration=700, inc=reward/steps;
+    const countEl=document.getElementById('coinCountUp');
+    const iv=setInterval(()=>{
+      cur=Math.min(cur+inc,reward);
+      countEl.textContent=Math.round(cur);
+      if(cur>=reward){clearInterval(iv);updateCoinUI();}
+    },duration/steps);
   }
   else if(type==='incomplete'){icon.textContent='○';icon.style.color='var(--text-dim)';title.textContent='Not Done Yet';text.textContent='Some cells are still empty.';actions.innerHTML=`<button class="btn-primary" onclick="closeModal();resumeTimer()">Continue</button>`;}
   else if(type==='errors'){icon.textContent='✕';icon.style.color='var(--error)';title.textContent='Not Quite';text.textContent='Some values are incorrect. The wrong cells are highlighted.';actions.innerHTML=`<button class="btn-primary" onclick="closeModal();resumeTimer()">Try Again</button>`;}
@@ -341,5 +377,5 @@ updateTutSlide();
 const daily = claimDailyReward();
 if (daily.awarded) {
   updateCoinUI();
-  setTimeout(() => showDailyToast(daily.reward, daily.streak), 800);
+  showDailyOverlay(daily.reward, daily.streak, daily.coins);
 }

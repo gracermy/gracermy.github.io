@@ -233,6 +233,79 @@ body::before {
 .tg-cell.tg-br { border-right: 1.5px solid rgba(96,165,250,0.3); }
 .tg-cell.tg-bb { border-bottom: 1.5px solid rgba(96,165,250,0.3); }
 
+/* DAILY REWARD OVERLAY */
+.daily-overlay {
+  display: none; position: fixed; inset: 0; z-index: 400;
+  align-items: flex-end; justify-content: center;
+  padding-bottom: 0;
+}
+.daily-overlay.active { display: flex; }
+.daily-overlay-content {
+  width: 100%; max-width: 520px;
+  background: var(--bg-surface);
+  border-top: 1px solid rgba(250,204,21,0.2);
+  border-radius: 28px 28px 0 0;
+  padding: 36px 32px 48px;
+  text-align: center;
+  box-shadow: 0 -20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(250,204,21,0.08);
+  animation: slideUpSheet 0.45s cubic-bezier(0.34,1.4,0.64,1);
+}
+@keyframes slideUpSheet {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.daily-overlay-icon {
+  font-size: 2.4rem; color: #facc15;
+  margin-bottom: 10px;
+  animation: popIn 0.4s 0.3s cubic-bezier(0.34,1.6,0.64,1) both;
+}
+@keyframes popIn {
+  from { transform: scale(0.4); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+.daily-overlay-title {
+  font-family: 'DM Serif Display', serif; font-size: 1.8rem;
+  margin-bottom: 6px; color: var(--text);
+}
+.daily-overlay-streak {
+  font-size: 0.88rem; color: var(--text-dim); min-height: 1.2em;
+  margin-bottom: 20px; letter-spacing: 0.04em;
+}
+.daily-overlay-reward {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 3rem; font-weight: 700; color: #facc15;
+  line-height: 1; margin-bottom: 8px;
+}
+.daily-overlay-plus { font-size: 2rem; }
+.daily-overlay-coin { font-size: 2rem; }
+.daily-overlay-balance {
+  font-size: 0.8rem; color: var(--text-dim); margin-bottom: 28px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.daily-overlay-balance-val { color: #facc15; font-weight: 600; }
+.daily-overlay-btn {
+  width: 100%; padding: 16px;
+  border: none; border-radius: 14px;
+  background: linear-gradient(135deg, #facc15, #f59e0b);
+  color: #0d0f1a; font-family: 'Outfit', sans-serif;
+  font-size: 1rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 20px rgba(250,204,21,0.3);
+}
+.daily-overlay-btn:hover  { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(250,204,21,0.4); }
+.daily-overlay-btn:active { transform: scale(0.98); }
+
+/* HOME STATS ROW */
+.home-stats { display: flex; align-items: center; gap: 8px; }
+.streak-badge {
+  font-size: 0.8rem; font-weight: 600; color: #fb923c;
+  background: rgba(251,146,60,0.12); border: 1px solid rgba(251,146,60,0.25);
+  border-radius: 20px; padding: 4px 10px;
+  font-family: 'Outfit', sans-serif;
+}
+
 /* COIN DISPLAY */
 .coin-display {
   display: flex; align-items: center; gap: 5px;
@@ -252,28 +325,17 @@ body::before {
 .coin-earned {
   color: #facc15; font-weight: 700; font-size: 0.95rem;
 }
+.coin-reward-row {
+  display: flex; justify-content: center; margin: 4px 0 2px;
+}
+.coin-earned-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.3rem; font-weight: 700; color: #facc15;
+}
+.new-best-line {
+  font-size: 0.82rem; color: var(--pink); font-weight: 600; margin-top: 4px;
+}
 
-/* DAILY TOAST */
-.daily-toast {
-  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px);
-  z-index: 300; transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease;
-  opacity: 0; pointer-events: none;
-}
-.daily-toast.visible { transform: translateX(-50%) translateY(0); opacity: 1; }
-.daily-toast-inner {
-  display: flex; align-items: center; gap: 12px;
-  background: var(--bg-surface); border: 1px solid rgba(250,204,21,0.3);
-  border-radius: 16px; padding: 14px 20px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(250,204,21,0.1);
-  white-space: nowrap;
-}
-.daily-toast-icon { font-size: 1.3rem; color: #facc15; }
-.daily-toast-text { display: flex; flex-direction: column; gap: 2px; }
-.daily-toast-title {
-  font-family: 'JetBrains Mono', monospace; font-size: 0.9rem;
-  font-weight: 700; color: #facc15;
-}
-.daily-toast-sub { font-size: 0.75rem; color: var(--text-dim); }
 
 /* HINT CELL */
 .cell.hint-revealed { color: #facc15 !important; }
