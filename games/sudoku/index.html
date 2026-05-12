@@ -98,11 +98,12 @@
     <div class="home-stats">
       <div class="streak-badge" id="streakBadge" style="display:none;"></div>
       <div class="coin-display" id="homeCoinDisplay">
-        <span class="coin-icon">◈</span><span class="coin-count" id="homeCoinCount">0</span>
+        <img src="icons/coin.svg" class="coin-icon-img" alt="coins">
+        <span class="coin-count" id="homeCoinCount">0</span>
       </div>
     </div>
     <button class="btn-icon info" onclick="openTutorial()" title="How to play">
-      <span class="icon-bang" style="color:var(--text-dim);">!</span>
+      <img src="icons/info.svg" class="btn-svg" alt="info">
     </button>
   </div>
   <div class="logo-cluster"><h1>Sudoku</h1><p>A number puzzle</p></div>
@@ -117,26 +118,27 @@
     </div>
     <div class="timer-group">
       <div class="coin-display compact" id="gameCoinDisplay">
-        <span class="coin-icon">◈</span><span class="coin-count" id="gameCoinCount">0</span>
+        <img src="icons/coin.svg" class="coin-icon-img" alt="coins">
+        <span class="coin-count" id="gameCoinCount">0</span>
       </div>
       <div class="timer" id="timer">00:00</div>
       <button class="btn-icon undo" id="btnUndo" onclick="undoMove()" title="Undo" disabled>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        <img src="icons/undo.svg" class="btn-svg" alt="undo">
       </button>
       <button class="btn-icon restart" id="btnRestart" onclick="confirmRestart()" title="Restart">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+        <img src="icons/restart.svg" class="btn-svg" alt="restart">
       </button>
-      <button class="btn-icon" onclick="togglePause()" title="Pause" id="btnPause">
-        <svg id="pauseIcon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      <button class="btn-icon" onclick="togglePause()" title="Pause/Resume" id="btnPause">
+        <img src="icons/pause.svg" class="btn-svg" id="pauseIcon" alt="pause">
       </button>
       <button class="btn-icon info" id="btnInfo" onclick="openTutorial()" title="How to play">
-        <span class="icon-bang" style="color:var(--text-dim);">!</span>
+        <img src="icons/info.svg" class="btn-svg" alt="info">
       </button>
       <button class="btn-icon hint" onclick="openHintShop()" title="Hints" id="btnHint">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <img src="icons/hint.svg" class="btn-svg" alt="hint">
       </button>
       <button class="btn-icon give-up" onclick="confirmGiveUp()" title="Give Up" id="btnGiveUp">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M4 4l16 16M4 20L20 4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+        <img src="icons/close.svg" class="btn-svg" alt="give up">
       </button>
     </div>
   </div>
@@ -148,7 +150,7 @@
     <button class="num-btn" onclick="placeNumber(1)">1</button><button class="num-btn" onclick="placeNumber(2)">2</button><button class="num-btn" onclick="placeNumber(3)">3</button>
     <button class="num-btn" onclick="placeNumber(4)">4</button><button class="num-btn" onclick="placeNumber(5)">5</button><button class="num-btn" onclick="placeNumber(6)">6</button>
     <button class="num-btn" onclick="placeNumber(7)">7</button><button class="num-btn" onclick="placeNumber(8)">8</button><button class="num-btn" onclick="placeNumber(9)">9</button>
-    <button class="num-btn erase" onclick="placeNumber(0)">✕</button>
+    <button class="num-btn erase" onclick="placeNumber(0)"><img src="icons/erase.svg" class="btn-svg" alt="erase"></button>
   </div>
   <div class="revealed-bar" id="revealedBar"><div class="stats" id="revealStats"></div></div>
   <div class="actions">
@@ -165,20 +167,20 @@
   <div class="modal hint-modal">
     <div class="hint-modal-header">
       <div class="hint-modal-title">Hint Shop</div>
-      <div class="hint-modal-coins"><span class="coin-icon">◈</span><span id="hintModalCoins">0</span></div>
+      <div class="hint-modal-coins"><img src="icons/coin.svg" class="coin-icon-img" alt="coins"><span id="hintModalCoins">0</span></div>
     </div>
     <div class="hint-options">
       <button class="hint-option" id="hintRandom" onclick="useRandomHint()">
         <div class="hint-option-top">
           <span class="hint-option-name">Random Reveal</span>
-          <span class="hint-option-cost"><span class="coin-icon">◈</span> 2</span>
+          <span class="hint-option-cost"><img src="icons/coin.svg" class="coin-icon-img" alt="coins"> 2</span>
         </div>
         <p class="hint-option-desc">Reveals a random unfilled cell anywhere on the board.</p>
       </button>
       <button class="hint-option" id="hintChosen" onclick="useChosenHint()">
         <div class="hint-option-top">
           <span class="hint-option-name">Cell Reveal</span>
-          <span class="hint-option-cost"><span class="coin-icon">◈</span> 5</span>
+          <span class="hint-option-cost"><img src="icons/coin.svg" class="coin-icon-img" alt="coins"> 5</span>
         </div>
         <p class="hint-option-desc">Reveals the cell you have selected. Select a cell first.</p>
       </button>

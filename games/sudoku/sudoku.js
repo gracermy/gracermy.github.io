@@ -211,7 +211,7 @@ function doGiveUp(){
 function startTimer(){seconds=0;paused=false;clearInterval(timerInterval);updateTimer();timerInterval=setInterval(()=>{if(!paused){seconds++;updateTimer();}},1000);}
 function updateTimer(){document.getElementById('timer').textContent=fmt(seconds);}
 
-function togglePause(){if(revealed)return;paused=!paused;document.getElementById('pauseOverlay').classList.toggle('active',paused);document.querySelectorAll('.cell').forEach(c=>c.classList.toggle('hidden-cell',paused));document.getElementById('pauseIcon').innerHTML=paused?'<polygon points="6,4 20,12 6,20"/>':'<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';if(paused){document.getElementById('picker').classList.remove('visible');selectedCell=null;document.querySelectorAll('.cell').forEach(c=>c.classList.remove('selected','constrained','same-number'));}}
+function togglePause(){if(revealed)return;paused=!paused;document.getElementById('pauseOverlay').classList.toggle('active',paused);document.querySelectorAll('.cell').forEach(c=>c.classList.toggle('hidden-cell',paused));document.getElementById('pauseIcon').src=paused?'icons/play.svg':'icons/pause.svg';if(paused){document.getElementById('picker').classList.remove('visible');selectedCell=null;document.querySelectorAll('.cell').forEach(c=>c.classList.remove('selected','constrained','same-number'));}}
 
 function undoMove(){if(undoStack.length===0||paused||revealed)return;const m=undoStack.pop();userGrid[m.row][m.col]=m.prevVal;const el=getCellEl(m.row,m.col);el.textContent=m.prevVal===0?'':m.prevVal;el.classList.remove('user-filled','error-cell');errorCells.delete(`${m.row},${m.col}`);if(m.prevVal!==0)el.classList.add('user-filled');updateUndoBtn();selectCell(m.row,m.col);}
 function updateUndoBtn(){document.getElementById('btnUndo').disabled=undoStack.length===0;}
@@ -237,7 +237,7 @@ function startGame(diff){
     showScreen('game');startTimer();updateCoinUI();
     document.getElementById('picker').classList.remove('visible');
     document.getElementById('pauseOverlay').classList.remove('active');
-    document.getElementById('pauseIcon').innerHTML='<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+    document.getElementById('pauseIcon').src='icons/pause.svg';
   },50);
 }
 
