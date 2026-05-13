@@ -31,7 +31,10 @@
   <div class="tut-panel">
     <div class="tut-header">
       <h2>How to Play</h2>
-      <div class="tut-counter" id="tutCounter">1 / 6</div>
+      <div class="tut-header-row">
+        <div class="tut-counter" id="tutCounter">1 / 6</div>
+        <button class="tut-close-btn" onclick="closeTutorial()" title="Close">✕</button>
+      </div>
     </div>
     <div class="tut-slide-area">
 
@@ -155,7 +158,6 @@
   <div class="revealed-bar" id="revealedBar"><div class="stats" id="revealStats"></div></div>
   <div class="actions">
     <button class="btn-home-bottom" onclick="confirmHome()">Home</button>
-    <button class="btn-finish" id="btnFinish" onclick="checkSolution()">Finish</button>
   </div>
 </div>
 

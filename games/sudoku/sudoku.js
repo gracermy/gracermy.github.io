@@ -197,7 +197,6 @@ function doGiveUp(){
   document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));
   clearInterval(timerInterval);revealed=true;paused=true;
   document.getElementById('picker').classList.remove('visible');
-  document.getElementById('btnFinish').disabled=true;
   ['btnGiveUp','btnPause','btnRestart','btnUndo','btnInfo','btnHint'].forEach(id=>document.getElementById(id).style.display='none');
   selectedCell=null;
   document.querySelectorAll('.cell').forEach(c=>c.classList.remove('selected','constrained','same-number','error-cell'));
@@ -229,7 +228,6 @@ function startGame(diff){
     solution=generateSolution();puzzle=generatePuzzle(solution,DIFFICULTIES[diff].clues);
     userGrid=puzzle.map(r=>[...r]);clueMap=puzzle.map(r=>r.map(v=>v!==0));selectedCell=null;
     const tag=document.getElementById('diffTag');tag.textContent=DIFFICULTIES[diff].label;tag.className='diff-tag '+diff;
-    document.getElementById('btnFinish').disabled=false;
     ['btnGiveUp','btnPause','btnRestart','btnUndo','btnInfo','btnHint'].forEach(id=>document.getElementById(id).style.display='');
     document.getElementById('revealedBar').classList.remove('active');
     updateUndoBtn();buildGrid();
@@ -267,6 +265,9 @@ function placeNumber(num){
   el.classList.toggle('user-filled',num!==0);
   document.querySelectorAll('.cell').forEach(c=>c.classList.remove('same-number'));
   if(num!==0)for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(userGrid[r][c]===num)getCellEl(r,c).classList.add('same-number');
+  /* auto-check when all cells are filled */
+  const allFilled = userGrid.every(row=>row.every(v=>v!==0));
+  if(allFilled) checkSolution();
 }
 
 /* ═══ HINTS ═══ */
@@ -328,13 +329,21 @@ function useChosenHint() {
 }
 
 function checkSolution(){
-  if(paused||revealed)return;clearInterval(timerInterval);
-  for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(userGrid[r][c]===0){showModal('incomplete');return;}
+  if(paused||revealed)return;
   let hasErr=false;
+  const wrong=[];
   errorCells.forEach(k=>{const[r,c]=k.split(',').map(Number);getCellEl(r,c).classList.remove('error-cell');});
   errorCells=new Set();
-  for(let r=0;r<9;r++)for(let c=0;c<9;c++){if(clueMap[r][c])continue;if(userGrid[r][c]!==solution[r][c]){hasErr=true;errorCells.add(`${r},${c}`);getCellEl(r,c).classList.add('error-cell');}}
-  showModal(hasErr?'errors':'success');
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++){if(clueMap[r][c])continue;if(userGrid[r][c]!==solution[r][c]){hasErr=true;wrong.push(`${r},${c}`);errorCells.add(`${r},${c}`);getCellEl(r,c).classList.add('error-cell');}}
+  if(hasErr){
+    /* flash wrong cells then quietly remove highlight so player can fix them */
+    setTimeout(()=>{
+      wrong.forEach(k=>{const[r,c]=k.split(',').map(Number);getCellEl(r,c).classList.remove('error-cell');errorCells.delete(k);});
+    },1500);
+    return;
+  }
+  clearInterval(timerInterval);
+  showModal('success');
 }
 
 function showModal(type){

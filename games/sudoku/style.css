@@ -112,12 +112,10 @@ body::before {
 
 /* GRID */
 .grid-wrapper {
-  /* fill available vertical space, stay square, never exceed screen width */
-  width: 100%;
-  flex: 1 1 0;
-  min-height: 0;
-  aspect-ratio: 1;
-  max-width: min(100%, calc(100dvh - 220px));
+  /* strictly square: size driven by the smaller of viewport width and available height */
+  width: min(100%, calc(100dvh - 220px));
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
   align-self: center;
   background: var(--bg-surface);
   border-radius: 14px; padding: 5px;
@@ -183,11 +181,7 @@ body::before {
 .num-btn.erase { border-color: rgba(255,255,255,0.08); }
 .num-btn.erase .btn-svg { width: 55%; height: 55%; opacity: 0.5; }
 
-.actions { display: flex; gap: 10px; width: 100%; flex-shrink: 0; }
-.btn-finish { flex: 1; padding: 12px; border: none; border-radius: 12px; font-family: 'Outfit', sans-serif; font-size: 0.9rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; background: linear-gradient(135deg,var(--pink),var(--blue)); color: #fff; box-shadow: 0 4px 20px rgba(244,114,182,0.2); }
-.btn-finish:hover { transform: translateY(-1px); }
-.btn-finish:active { transform: translateY(0); }
-.btn-finish:disabled { opacity: 0.4; pointer-events: none; }
+.actions { display: flex; gap: 10px; width: 100%; flex-shrink: 0; justify-content: center; }
 .btn-home-bottom { padding: 12px 18px; border: 1.5px solid var(--border-soft); border-radius: 12px; background: transparent; color: var(--text-dim); font-family: 'Outfit', sans-serif; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
 .btn-home-bottom:hover { border-color: var(--blue); color: var(--text); }
 
@@ -228,9 +222,18 @@ body::before {
   box-shadow: 0 20px 60px rgba(0,0,0,0.5); animation: modalIn 0.3s ease;
   display: flex; flex-direction: column;
 }
-.tut-header { padding: 24px 24px 0; text-align: center; }
-.tut-header h2 { font-family: 'DM Serif Display', serif; font-size: 1.4rem; margin-bottom: 4px; }
+.tut-header { padding: 20px 20px 0; text-align: center; position: relative; }
+.tut-header h2 { font-family: 'DM Serif Display', serif; font-size: 1.4rem; margin-bottom: 6px; }
+.tut-header-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .tut-counter { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text-dim); }
+.tut-close-btn {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 1.5px solid var(--border-soft); background: transparent;
+  color: var(--text-dim); font-size: 0.7rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+}
+.tut-close-btn:hover { border-color: var(--text-dim); color: var(--text); }
 
 .tut-slide-area { flex: 1; overflow: hidden; position: relative; }
 .tut-slide {
@@ -372,7 +375,7 @@ body::before {
   .timer-group { gap: 6px; }
   .timer { font-size: 1rem; min-width: 52px; }
   .top-bar h2 { font-size: 1.3rem; }
-  .grid-wrapper { max-width: min(100%, calc(100dvh - 260px)); }
+  .grid-wrapper { width: min(100%, calc(100dvh - 260px)); }
 }
 
 /* COIN EARNED in modal */
