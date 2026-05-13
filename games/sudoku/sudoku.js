@@ -336,10 +336,7 @@ function checkSolution(){
   errorCells=new Set();
   for(let r=0;r<9;r++)for(let c=0;c<9;c++){if(clueMap[r][c])continue;if(userGrid[r][c]!==solution[r][c]){hasErr=true;wrong.push(`${r},${c}`);errorCells.add(`${r},${c}`);getCellEl(r,c).classList.add('error-cell');}}
   if(hasErr){
-    /* flash wrong cells then quietly remove highlight so player can fix them */
-    setTimeout(()=>{
-      wrong.forEach(k=>{const[r,c]=k.split(',').map(Number);getCellEl(r,c).classList.remove('error-cell');errorCells.delete(k);});
-    },1500);
+    /* wrong cells stay red until the user edits them (cleared in placeNumber) */
     return;
   }
   clearInterval(timerInterval);
@@ -356,7 +353,7 @@ function showModal(type){
     icon.textContent='✦';icon.style.color='var(--pink)';title.textContent='Brilliant!';
     text.textContent=`Solved in ${fmt(seconds)}.`;
     bestEl.style.display='block';
-    bestEl.innerHTML=`<div class="coin-reward-row"><span class="coin-earned-label">+<span id="coinCountUp">0</span> ◈ earned</span></div>${isNew?'<div class="new-best-line">★ New best time!</div>':''}`;
+    bestEl.innerHTML=`<div class="coin-reward-row"><span class="coin-earned-label">+<span id="coinCountUp">0</span><img src="icons/coin.svg" class="coin-icon-img" alt="coins" style="vertical-align:middle;margin-left:3px;"> earned</span></div>${isNew?'<div class="new-best-line">★ New best time!</div>':''}`;
     actions.innerHTML=`<button class="btn-primary" onclick="closeModal();startGame('${currentDifficulty}')">Play Again</button><button class="btn-secondary" onclick="closeModal();doGoHome()">Home</button>`;
     /* count-up animation */
     let cur=0;
