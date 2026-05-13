@@ -120,13 +120,15 @@ function closeTutorial() {
   if (!wasPausedBefore && document.getElementById('game').classList.contains('active')) paused = false;
 }
 
-/* ═══ GAME LOGIC ═══ */
+/* ═══ GAME STATE ═══ */
 const DIFFICULTIES = { easy:{label:'Easy',clues:38,dot:'easy'}, medium:{label:'Medium',clues:30,dot:'medium'}, hard:{label:'Hard',clues:24,dot:'hard'} };
-let solution=[],puzzle=[],userGrid=[],clueMap=[],selectedCell=null;
+let solution=[],puzzle=[],userGrid=[],clueMap=[],candidateGrid=[],selectedCell=null;
 let timerInterval=null,seconds=0,paused=false,currentDifficulty='easy',revealed=false;
 let undoStack=[],errorCells=new Set();
+let pencilMode=false;
 
 const COIN_REWARDS = { easy: 3, medium: 6, hard: 10 };
+const SAVE_KEY = 'sudoku_resume';
 
 function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
 
@@ -136,6 +138,33 @@ function updateCoinUI() {
   document.getElementById('gameCoinCount').textContent = c;
 }
 
+/* ═══ RESUME / SAVE ═══ */
+function saveGameState() {
+  if (revealed) { clearSavedGame(); return; }
+  const state = {
+    difficulty: currentDifficulty,
+    solution, puzzle, userGrid,
+    clueMap, seconds,
+    candidates: candidateGrid.map(row => row.map(s => [...s]))
+  };
+  localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+}
+
+function clearSavedGame() {
+  localStorage.removeItem(SAVE_KEY);
+}
+
+function loadGameState() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    s.candidates = s.candidates.map(row => row.map(arr => new Set(arr)));
+    return s;
+  } catch(e) { return null; }
+}
+
+/* ═══ DAILY OVERLAY ═══ */
 function showDailyOverlay(reward, streak, totalCoins) {
   const profile = loadProfile();
   document.getElementById('dailyOverlayTitle').textContent =
@@ -144,14 +173,10 @@ function showDailyOverlay(reward, streak, totalCoins) {
     streak > 1 ? `🔥 ${streak}-day streak` : '';
   document.getElementById('dailyOverlayBalance').textContent = totalCoins;
 
-  /* count-up the reward amount */
   const amountEl = document.getElementById('dailyOverlayAmount');
   amountEl.textContent = '0';
   let current = 0;
-  const duration = 600;
-  const steps = 20;
-  const increment = reward / steps;
-  const interval = duration / steps;
+  const duration = 600, steps = 20, increment = reward / steps, interval = duration / steps;
   const counter = setInterval(() => {
     current = Math.min(current + increment, reward);
     amountEl.textContent = Math.round(current);
@@ -165,14 +190,35 @@ function dismissDailyOverlay() {
   document.getElementById('dailyOverlay').classList.remove('active');
 }
 
-function buildHome(){
-  const el=document.getElementById('diffSelect');el.innerHTML='';
+/* ═══ HOME ═══ */
+function buildHome() {
+  const el=document.getElementById('diffSelect'); el.innerHTML='';
+
+  /* resume button if a saved game exists */
+  const saved = loadGameState();
+  const resumeWrap = document.getElementById('resumeWrap');
+  if (saved) {
+    const cfg = DIFFICULTIES[saved.difficulty];
+    resumeWrap.innerHTML = `
+      <button class="btn-resume-game" onclick="resumeGame()">
+        <div class="resume-left">
+          <span class="resume-label">Continue</span>
+          <span class="resume-sub"><span class="diff-dot ${cfg.dot}" style="display:inline-block;"></span> ${cfg.label} · ${fmt(saved.seconds)}</span>
+        </div>
+        <span class="resume-arrow">→</span>
+      </button>`;
+    resumeWrap.style.display = '';
+  } else {
+    resumeWrap.innerHTML = '';
+    resumeWrap.style.display = 'none';
+  }
+
   for(const[k,cfg]of Object.entries(DIFFICULTIES)){
-    const btn=document.createElement('button');btn.className='diff-btn';
+    const btn=document.createElement('button'); btn.className='diff-btn';
     const best=getBestTime('sudoku',k);
     const bs=best?`<span class="best-badge">Best ${fmt(best)}</span>`:'';
     btn.innerHTML=`<div class="diff-label"><span class="diff-dot ${cfg.dot}"></span>${cfg.label}</div><div class="diff-meta">${bs}</div>`;
-    btn.onclick=()=>startGame(k);el.appendChild(btn);
+    btn.onclick=()=>startGame(k); el.appendChild(btn);
   }
   updateCoinUI();
   const profile = loadProfile();
@@ -184,89 +230,240 @@ function buildHome(){
     streakEl.style.display = 'none';
   }
 }
+
+function resumeGame() {
+  const saved = loadGameState();
+  if (!saved) return;
+  currentDifficulty = saved.difficulty;
+  solution = saved.solution;
+  puzzle = saved.puzzle;
+  userGrid = saved.userGrid;
+  clueMap = saved.clueMap;
+  candidateGrid = saved.candidates;
+  seconds = saved.seconds;
+  revealed = false; undoStack = []; errorCells = new Set(); selectedCell = null; pencilMode = false;
+
+  const tag = document.getElementById('diffTag');
+  tag.textContent = DIFFICULTIES[currentDifficulty].label;
+  tag.className = 'diff-tag ' + currentDifficulty;
+  ['btnGiveUp','btnPause','btnRestart','btnUndo','btnInfo','btnHint'].forEach(id=>document.getElementById(id).style.display='');
+  document.getElementById('revealedBar').classList.remove('active');
+  updateUndoBtn(); buildGrid();
+  showScreen('game');
+  updateTimer();
+  timerInterval = setInterval(()=>{ if(!paused){ seconds++; updateTimer(); }}, 1000);
+  updateCoinUI();
+  document.getElementById('picker').classList.remove('visible');
+  document.getElementById('pauseOverlay').classList.remove('active');
+  document.getElementById('pauseIcon').src = 'icons/pause.svg';
+  setPencilMode(false);
+}
+
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
 function cancelAnyModal(){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));paused=false;}
 function confirmHome(){if(revealed){doGoHome();return;}paused=true;document.getElementById('confirmModal').classList.add('active');}
-function doGoHome(){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));clearInterval(timerInterval);revealed=false;buildHome();showScreen('home');}
+function doGoHome(){
+  document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));
+  clearInterval(timerInterval);
+  if(!revealed) saveGameState();
+  else clearSavedGame();
+  revealed=false; buildHome(); showScreen('home');
+}
 function confirmGiveUp(){if(revealed)return;paused=true;document.getElementById('giveUpModal').classList.add('active');}
 function confirmRestart(){if(revealed)return;paused=true;document.getElementById('restartModal').classList.add('active');}
 
-function doRestart(){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));userGrid=puzzle.map(r=>[...r]);undoStack=[];errorCells=new Set();selectedCell=null;revealed=false;document.getElementById('picker').classList.remove('visible');updateUndoBtn();buildGrid();clearInterval(timerInterval);startTimer();}
+function doRestart(){
+  document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));
+  candidateGrid=Array.from({length:9},()=>Array.from({length:9},()=>new Set()));
+  userGrid=puzzle.map(r=>[...r]); undoStack=[]; errorCells=new Set(); selectedCell=null; revealed=false;
+  document.getElementById('picker').classList.remove('visible');
+  updateUndoBtn(); buildGrid(); clearInterval(timerInterval); startTimer();
+  setPencilMode(false); clearSavedGame();
+}
 
 function doGiveUp(){
   document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'));
-  clearInterval(timerInterval);revealed=true;paused=true;
+  clearInterval(timerInterval); revealed=true; paused=true;
   document.getElementById('picker').classList.remove('visible');
   ['btnGiveUp','btnPause','btnRestart','btnUndo','btnInfo','btnHint'].forEach(id=>document.getElementById(id).style.display='none');
   selectedCell=null;
   document.querySelectorAll('.cell').forEach(c=>c.classList.remove('selected','constrained','same-number','error-cell'));
   let cc=0,wc=0,ec=0;
-  for(let r=0;r<9;r++)for(let c=0;c<9;c++){if(clueMap[r][c])continue;const el=getCellEl(r,c),uv=userGrid[r][c],sv=solution[r][c];el.classList.remove('user-filled');if(uv===0){el.textContent=sv;el.classList.add('reveal-filled');ec++;}else if(uv===sv){el.classList.add('reveal-correct');cc++;}else{el.textContent=sv;el.classList.add('reveal-wrong');wc++;}}
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++){
+    if(clueMap[r][c])continue;
+    const el=getCellEl(r,c),uv=userGrid[r][c],sv=solution[r][c];
+    el.classList.remove('user-filled','has-candidates');
+    el.innerHTML='';
+    if(uv===0){el.textContent=sv;el.classList.add('reveal-filled');ec++;}
+    else if(uv===sv){el.textContent=sv;el.classList.add('reveal-correct');cc++;}
+    else{el.textContent=sv;el.classList.add('reveal-wrong');wc++;}
+  }
   const t=cc+wc+ec;
   document.getElementById('revealStats').innerHTML=`<span class="g">✓ ${cc} correct</span> · <span class="r">✕ ${wc} wrong</span> · <span class="r">○ ${ec} empty</span><br>out of ${t} cells to fill`;
   document.getElementById('revealedBar').classList.add('active');
+  clearSavedGame();
 }
 
+/* ═══ TIMER ═══ */
 function startTimer(){seconds=0;paused=false;clearInterval(timerInterval);updateTimer();timerInterval=setInterval(()=>{if(!paused){seconds++;updateTimer();}},1000);}
 function updateTimer(){document.getElementById('timer').textContent=fmt(seconds);}
 
-function togglePause(){if(revealed)return;paused=!paused;document.getElementById('pauseOverlay').classList.toggle('active',paused);document.querySelectorAll('.cell').forEach(c=>c.classList.toggle('hidden-cell',paused));document.getElementById('pauseIcon').src=paused?'icons/play.svg':'icons/pause.svg';if(paused){document.getElementById('picker').classList.remove('visible');selectedCell=null;document.querySelectorAll('.cell').forEach(c=>c.classList.remove('selected','constrained','same-number'));}}
+function togglePause(){
+  if(revealed)return;
+  paused=!paused;
+  document.getElementById('pauseOverlay').classList.toggle('active',paused);
+  document.querySelectorAll('.cell').forEach(c=>c.classList.toggle('hidden-cell',paused));
+  document.getElementById('pauseIcon').src=paused?'icons/play.svg':'icons/pause.svg';
+  if(paused){document.getElementById('picker').classList.remove('visible');selectedCell=null;document.querySelectorAll('.cell').forEach(c=>c.classList.remove('selected','constrained','same-number'));}
+}
 
-function undoMove(){if(undoStack.length===0||paused||revealed)return;const m=undoStack.pop();userGrid[m.row][m.col]=m.prevVal;const el=getCellEl(m.row,m.col);el.textContent=m.prevVal===0?'':m.prevVal;el.classList.remove('user-filled','error-cell');errorCells.delete(`${m.row},${m.col}`);if(m.prevVal!==0)el.classList.add('user-filled');updateUndoBtn();selectCell(m.row,m.col);}
+/* ═══ UNDO ═══ */
+function undoMove(){
+  if(undoStack.length===0||paused||revealed)return;
+  const m=undoStack.pop();
+  userGrid[m.row][m.col]=m.prevVal;
+  candidateGrid[m.row][m.col]=m.prevCandidates;
+  errorCells.delete(`${m.row},${m.col}`);
+  renderCell(m.row,m.col);
+  updateUndoBtn();
+  selectCell(m.row,m.col);
+}
 function updateUndoBtn(){document.getElementById('btnUndo').disabled=undoStack.length===0;}
 
+/* ═══ PUZZLE GENERATION ═══ */
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function isValid(b,r,c,n){for(let i=0;i<9;i++)if(b[r][i]===n||b[i][c]===n)return false;const br=Math.floor(r/3)*3,bc=Math.floor(c/3)*3;for(let rr=br;rr<br+3;rr++)for(let cc=bc;cc<bc+3;cc++)if(b[rr][cc]===n)return false;return true;}
 function generateSolution(){const b=Array.from({length:9},()=>Array(9).fill(0));function solve(b){for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(b[r][c]===0){for(const n of shuffle([1,2,3,4,5,6,7,8,9]))if(isValid(b,r,c,n)){b[r][c]=n;if(solve(b))return true;b[r][c]=0;}return false;}return true;}solve(b);return b;}
 function countSolutions(board,limit){let count=0;function solve(b){if(count>=limit)return;for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(b[r][c]===0){for(let n=1;n<=9;n++)if(isValid(b,r,c,n)){b[r][c]=n;solve(b);b[r][c]=0;if(count>=limit)return;}return;}count++;}solve(board);return count;}
 function generatePuzzle(sol,numClues){const p=sol.map(r=>[...r]);const cells=shuffle([...Array(81).keys()]);let rem=0;const target=81-numClues;for(const idx of cells){if(rem>=target)break;const r=Math.floor(idx/9),c=idx%9;const bk=p[r][c];p[r][c]=0;if(countSolutions(p.map(r=>[...r]),2)!==1)p[r][c]=bk;else rem++;}return p;}
 
+/* ═══ GAME START ═══ */
 function startGame(diff){
-  currentDifficulty=diff;revealed=false;undoStack=[];errorCells=new Set();
+  currentDifficulty=diff; revealed=false; undoStack=[]; errorCells=new Set();
   document.getElementById('loading').classList.add('active');
   setTimeout(()=>{
-    solution=generateSolution();puzzle=generatePuzzle(solution,DIFFICULTIES[diff].clues);
-    userGrid=puzzle.map(r=>[...r]);clueMap=puzzle.map(r=>r.map(v=>v!==0));selectedCell=null;
-    const tag=document.getElementById('diffTag');tag.textContent=DIFFICULTIES[diff].label;tag.className='diff-tag '+diff;
+    solution=generateSolution(); puzzle=generatePuzzle(solution,DIFFICULTIES[diff].clues);
+    userGrid=puzzle.map(r=>[...r]);
+    clueMap=puzzle.map(r=>r.map(v=>v!==0));
+    candidateGrid=Array.from({length:9},()=>Array.from({length:9},()=>new Set()));
+    selectedCell=null;
+    const tag=document.getElementById('diffTag'); tag.textContent=DIFFICULTIES[diff].label; tag.className='diff-tag '+diff;
     ['btnGiveUp','btnPause','btnRestart','btnUndo','btnInfo','btnHint'].forEach(id=>document.getElementById(id).style.display='');
     document.getElementById('revealedBar').classList.remove('active');
-    updateUndoBtn();buildGrid();
+    updateUndoBtn(); buildGrid();
     document.getElementById('loading').classList.remove('active');
-    showScreen('game');startTimer();updateCoinUI();
+    showScreen('game'); startTimer(); updateCoinUI();
     document.getElementById('picker').classList.remove('visible');
     document.getElementById('pauseOverlay').classList.remove('active');
     document.getElementById('pauseIcon').src='icons/pause.svg';
+    setPencilMode(false);
+    clearSavedGame();
   },50);
 }
 
-function buildGrid(){const g=document.getElementById('grid');g.innerHTML='';for(let r=0;r<9;r++)for(let c=0;c<9;c++){const d=document.createElement('div');d.className='cell';d.dataset.row=r;d.dataset.col=c;if(clueMap[r][c]){d.classList.add('clue');d.textContent=puzzle[r][c];}d.addEventListener('click',()=>selectCell(r,c));g.appendChild(d);}}
+/* ═══ GRID RENDER ═══ */
+function buildGrid(){
+  const g=document.getElementById('grid'); g.innerHTML='';
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++){
+    const d=document.createElement('div'); d.className='cell'; d.dataset.row=r; d.dataset.col=c;
+    if(clueMap[r][c]){ d.classList.add('clue'); d.textContent=puzzle[r][c]; }
+    else { renderCell(r,c,d); }
+    d.addEventListener('click',()=>selectCell(r,c));
+    g.appendChild(d);
+  }
+}
 
+function renderCell(r,c,el){
+  el = el || getCellEl(r,c);
+  if(clueMap[r][c]) return;
+  const val = userGrid[r][c];
+  const cands = candidateGrid[r][c];
+
+  el.classList.remove('has-candidates','user-filled','hint-revealed','reveal-correct','reveal-wrong','reveal-filled');
+  el.innerHTML = '';
+
+  if(val !== 0){
+    el.textContent = val;
+    if(!el.classList.contains('error-cell')) el.classList.add('user-filled');
+  } else if(cands.size > 0){
+    el.classList.add('has-candidates');
+    const grid = document.createElement('div');
+    grid.className = 'candidates-grid';
+    for(let n=1;n<=9;n++){
+      const sp = document.createElement('span');
+      sp.className = 'cand-num';
+      sp.textContent = cands.has(n) ? n : '';
+      grid.appendChild(sp);
+    }
+    el.appendChild(grid);
+  }
+}
+
+/* ═══ SELECTION ═══ */
 function selectCell(row,col){
   if(paused||revealed)return;
   document.querySelectorAll('.cell').forEach(c=>c.classList.remove('selected','constrained','same-number'));
   getCellEl(row,col).classList.add('selected');
   const br=Math.floor(row/3)*3,bc=Math.floor(col/3)*3;
-  for(let r=0;r<9;r++)for(let c=0;c<9;c++){if(r===row&&c===col)continue;if(r===row||c===col||(r>=br&&r<br+3&&c>=bc&&c<bc+3))getCellEl(r,c).classList.add('constrained');}
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++){
+    if(r===row&&c===col)continue;
+    if(r===row||c===col||(r>=br&&r<br+3&&c>=bc&&c<bc+3)) getCellEl(r,c).classList.add('constrained');
+  }
   const val=userGrid[row][col];
-  if(val!==0)for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(userGrid[r][c]===val)getCellEl(r,c).classList.add('same-number');
+  if(val!==0) for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(userGrid[r][c]===val) getCellEl(r,c).classList.add('same-number');
   if(clueMap[row][col]){selectedCell=null;document.getElementById('picker').classList.remove('visible');}
   else{selectedCell={row,col};document.getElementById('picker').classList.add('visible');}
 }
 function getCellEl(r,c){return document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`);}
 
+/* ═══ PENCIL MODE ═══ */
+function setPencilMode(on){
+  pencilMode=on;
+  const btn=document.getElementById('btnPencil');
+  btn.classList.toggle('pencil-active', on);
+}
+function togglePencilMode(){ setPencilMode(!pencilMode); }
+
+/* ═══ PLACE NUMBER ═══ */
 function placeNumber(num){
   if(!selectedCell||paused||revealed)return;
-  const{row,col}=selectedCell;if(clueMap[row][col])return;
-  const prev=userGrid[row][col];if(prev===num)return;
-  undoStack.push({row,col,prevVal:prev});updateUndoBtn();
-  userGrid[row][col]=num;const el=getCellEl(row,col);
-  el.textContent=num===0?'':num;
-  el.classList.remove('error-cell');errorCells.delete(`${row},${col}`);
-  el.classList.toggle('user-filled',num!==0);
+  const{row,col}=selectedCell; if(clueMap[row][col])return;
+
+  /* snapshot for undo */
+  undoStack.push({
+    row, col,
+    prevVal: userGrid[row][col],
+    prevCandidates: new Set(candidateGrid[row][col])
+  });
+  updateUndoBtn();
+
+  if(pencilMode){
+    if(num===0){
+      candidateGrid[row][col].clear();
+    } else {
+      if(userGrid[row][col]!==0){ /* cell has a value — ignore pencil */ undoStack.pop(); updateUndoBtn(); return; }
+      if(candidateGrid[row][col].has(num)) candidateGrid[row][col].delete(num);
+      else candidateGrid[row][col].add(num);
+    }
+    renderCell(row,col);
+    return;
+  }
+
+  /* normal mode */
+  if(userGrid[row][col]===num){ undoStack.pop(); updateUndoBtn(); return; }
+  userGrid[row][col]=num;
+  const el=getCellEl(row,col);
+  el.classList.remove('error-cell'); errorCells.delete(`${row},${col}`);
+
+  /* placing a final number clears this cell's candidates */
+  if(num!==0) candidateGrid[row][col].clear();
+
+  renderCell(row,col);
+
   document.querySelectorAll('.cell').forEach(c=>c.classList.remove('same-number'));
-  if(num!==0)for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(userGrid[r][c]===num)getCellEl(r,c).classList.add('same-number');
-  /* auto-check when all cells are filled */
-  const allFilled = userGrid.every(row=>row.every(v=>v!==0));
+  if(num!==0) for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(userGrid[r][c]===num) getCellEl(r,c).classList.add('same-number');
+
+  const allFilled=userGrid.every(row=>row.every(v=>v!==0));
   if(allFilled) checkSolution();
 }
 
@@ -298,11 +495,13 @@ function closeHintShop() {
 function revealCell(row, col) {
   const val = solution[row][col];
   userGrid[row][col] = val;
+  candidateGrid[row][col].clear();
   const el = getCellEl(row, col);
+  el.classList.remove('user-filled','error-cell','has-candidates');
+  el.innerHTML = '';
   el.textContent = val;
-  el.classList.remove('user-filled', 'error-cell');
-  errorCells.delete(`${row},${col}`);
   el.classList.add('hint-revealed');
+  errorCells.delete(`${row},${col}`);
   updateCoinUI();
 }
 
@@ -315,8 +514,7 @@ function useRandomHint() {
   }
   if (empty.length === 0) return;
   const [r, c] = empty[Math.floor(Math.random() * empty.length)];
-  revealCell(r, c);
-  selectCell(r, c);
+  revealCell(r, c); selectCell(r, c);
 }
 
 function useChosenHint() {
@@ -324,46 +522,43 @@ function useChosenHint() {
   if (!spendCoins(HINT_COST_CHOSEN)) return;
   closeHintShop();
   const { row, col } = selectedCell;
-  revealCell(row, col);
-  selectCell(row, col);
+  revealCell(row, col); selectCell(row, col);
 }
 
+/* ═══ CHECK SOLUTION ═══ */
 function checkSolution(){
   if(paused||revealed)return;
   let hasErr=false;
   const wrong=[];
   errorCells.forEach(k=>{const[r,c]=k.split(',').map(Number);getCellEl(r,c).classList.remove('error-cell');});
   errorCells=new Set();
-  for(let r=0;r<9;r++)for(let c=0;c<9;c++){if(clueMap[r][c])continue;if(userGrid[r][c]!==solution[r][c]){hasErr=true;wrong.push(`${r},${c}`);errorCells.add(`${r},${c}`);getCellEl(r,c).classList.add('error-cell');}}
-  if(hasErr){
-    /* wrong cells stay red until the user edits them (cleared in placeNumber) */
-    return;
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++){
+    if(clueMap[r][c])continue;
+    if(userGrid[r][c]!==solution[r][c]){hasErr=true;wrong.push(`${r},${c}`);errorCells.add(`${r},${c}`);getCellEl(r,c).classList.add('error-cell');}
   }
+  if(hasErr) return;
   clearInterval(timerInterval);
+  clearSavedGame();
   showModal('success');
 }
 
+/* ═══ MODALS ═══ */
 function showModal(type){
   const modal=document.getElementById('modal'),icon=document.getElementById('modal-icon'),title=document.getElementById('modal-title'),text=document.getElementById('modal-text'),bestEl=document.getElementById('modal-best'),actions=document.getElementById('modal-actions');
-  bestEl.style.display='none';actions.innerHTML='';
+  bestEl.style.display='none'; actions.innerHTML='';
   if(type==='success'){
     const isNew=submitBestTime('sudoku',currentDifficulty,seconds);
     const reward=COIN_REWARDS[currentDifficulty]||3;
     addCoins(reward);
-    icon.textContent='✦';icon.style.color='var(--pink)';title.textContent='Brilliant!';
+    icon.textContent='✦'; icon.style.color='var(--pink)'; title.textContent='Brilliant!';
     text.textContent=`Solved in ${fmt(seconds)}.`;
     bestEl.style.display='block';
     bestEl.innerHTML=`<div class="coin-reward-row"><span class="coin-earned-label">+<span id="coinCountUp">0</span><img src="icons/coin.svg" class="coin-icon-img" alt="coins" style="vertical-align:middle;margin-left:3px;"> earned</span></div>${isNew?'<div class="new-best-line">★ New best time!</div>':''}`;
     actions.innerHTML=`<button class="btn-primary" onclick="closeModal();startGame('${currentDifficulty}')">Play Again</button><button class="btn-secondary" onclick="closeModal();doGoHome()">Home</button>`;
-    /* count-up animation */
     let cur=0;
-    const steps=20, duration=700, inc=reward/steps;
+    const steps=20,duration=700,inc=reward/steps;
     const countEl=document.getElementById('coinCountUp');
-    const iv=setInterval(()=>{
-      cur=Math.min(cur+inc,reward);
-      countEl.textContent=Math.round(cur);
-      if(cur>=reward){clearInterval(iv);updateCoinUI();}
-    },duration/steps);
+    const iv=setInterval(()=>{cur=Math.min(cur+inc,reward);countEl.textContent=Math.round(cur);if(cur>=reward){clearInterval(iv);updateCoinUI();}},duration/steps);
   }
   else if(type==='incomplete'){icon.textContent='○';icon.style.color='var(--text-dim)';title.textContent='Not Done Yet';text.textContent='Some cells are still empty.';actions.innerHTML=`<button class="btn-primary" onclick="closeModal();resumeTimer()">Continue</button>`;}
   else if(type==='errors'){icon.textContent='✕';icon.style.color='var(--error)';title.textContent='Not Quite';text.textContent='Some values are incorrect. The wrong cells are highlighted.';actions.innerHTML=`<button class="btn-primary" onclick="closeModal();resumeTimer()">Try Again</button>`;}
@@ -372,14 +567,22 @@ function showModal(type){
 function closeModal(){document.getElementById('modal').classList.remove('active');}
 function resumeTimer(){timerInterval=setInterval(()=>{if(!paused){seconds++;updateTimer();}},1000);}
 
-document.addEventListener('keydown',(e)=>{if(paused||revealed)return;if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undoMove();return;}if(!selectedCell)return;const n=parseInt(e.key);if(n>=1&&n<=9)placeNumber(n);if(e.key==='Backspace'||e.key==='Delete')placeNumber(0);});
+/* ═══ KEYBOARD ═══ */
+document.addEventListener('keydown',(e)=>{
+  if(paused||revealed)return;
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undoMove();return;}
+  if(e.key==='p'||e.key==='P'){togglePencilMode();return;}
+  if(!selectedCell)return;
+  const n=parseInt(e.key);
+  if(n>=1&&n<=9) placeNumber(n);
+  if(e.key==='Backspace'||e.key==='Delete') placeNumber(0);
+});
 
 buildHome();
 buildTutDots();
 buildTutVisuals();
 updateTutSlide();
 
-/* Daily reward — runs once per calendar day */
 const daily = claimDailyReward();
 if (daily.awarded) {
   updateCoinUI();

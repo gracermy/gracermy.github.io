@@ -110,13 +110,17 @@
     </button>
   </div>
   <div class="logo-cluster"><h1>Sudoku</h1><p>A number puzzle</p></div>
+  <div class="resume-wrap" id="resumeWrap" style="display:none;"></div>
   <div class="difficulty-select" id="diffSelect"></div>
 </div>
 
 <!-- GAME -->
 <div id="game" class="screen">
   <div class="top-bar">
-    <div style="display:flex;align-items:center;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button class="btn-icon home-btn" onclick="confirmHome()" title="Home">
+        <img src="icons/home.svg" class="btn-svg" alt="home">
+      </button>
       <h2>Sudoku</h2><span class="diff-tag" id="diffTag"></span>
     </div>
     <div class="timer-group">
@@ -150,15 +154,15 @@
     <div class="pause-overlay" id="pauseOverlay"><span>Paused</span><button class="btn-resume" onclick="togglePause()">Resume</button></div>
   </div>
   <div class="number-picker" id="picker">
+    <button class="num-btn tool-btn" id="btnPencil" onclick="togglePencilMode()" title="Pencil mode (P)">
+      <img src="icons/pencil.svg" class="btn-svg" alt="pencil">
+    </button>
     <button class="num-btn" onclick="placeNumber(1)">1</button><button class="num-btn" onclick="placeNumber(2)">2</button><button class="num-btn" onclick="placeNumber(3)">3</button>
     <button class="num-btn" onclick="placeNumber(4)">4</button><button class="num-btn" onclick="placeNumber(5)">5</button><button class="num-btn" onclick="placeNumber(6)">6</button>
     <button class="num-btn" onclick="placeNumber(7)">7</button><button class="num-btn" onclick="placeNumber(8)">8</button><button class="num-btn" onclick="placeNumber(9)">9</button>
-    <button class="num-btn erase" onclick="placeNumber(0)"><img src="icons/erase.svg" class="btn-svg" alt="erase"></button>
+    <button class="num-btn tool-btn erase" onclick="placeNumber(0)"><img src="icons/erase.svg" class="btn-svg" alt="erase"></button>
   </div>
   <div class="revealed-bar" id="revealedBar"><div class="stats" id="revealStats"></div></div>
-  <div class="actions">
-    <button class="btn-home-bottom" onclick="confirmHome()">Home</button>
-  </div>
 </div>
 
 <!-- MODALS -->
