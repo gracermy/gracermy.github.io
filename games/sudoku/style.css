@@ -391,7 +391,8 @@ body::before {
   line-height: 1; margin-bottom: 8px;
 }
 .daily-overlay-plus { font-size: 2rem; }
-.daily-overlay-coin { font-size: 2rem; }
+.daily-overlay-coin-img { width: 2rem; height: 2rem; vertical-align: middle; margin-left: 4px; }
+.daily-overlay-coin-sm { width: 1rem; height: 1rem; }
 .daily-overlay-balance {
   font-size: 0.8rem; color: var(--text-dim); margin-bottom: 28px;
   font-family: 'JetBrains Mono', monospace;
