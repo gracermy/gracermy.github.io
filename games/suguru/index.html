@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Suguru · gracermy</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a href="/games/" class="back-link">← Games</a>
+
+<!-- DAILY REWARD OVERLAY -->
+<div class="daily-overlay" id="dailyOverlay">
+  <div class="daily-overlay-content">
+    <div class="daily-overlay-icon">✦</div>
+    <h2 class="daily-overlay-title" id="dailyOverlayTitle">Welcome back!</h2>
+    <div class="daily-overlay-streak" id="dailyOverlayStreak"></div>
+    <div class="daily-overlay-reward">
+      <span class="daily-overlay-plus">+</span><span class="daily-overlay-amount" id="dailyOverlayAmount">0</span><img src="../sudoku/icons/coin.svg" class="daily-overlay-coin-img" alt="coins">
+    </div>
+    <div class="daily-overlay-balance">Balance: <span class="daily-overlay-balance-val" id="dailyOverlayBalance">0</span> <img src="../sudoku/icons/coin.svg" class="daily-overlay-coin-img daily-overlay-coin-sm" alt="coins"></div>
+    <button class="daily-overlay-btn" onclick="dismissDailyOverlay()">Let's play</button>
+  </div>
+</div>
+
+<div class="loading-overlay" id="loading"><div class="spinner"></div><p>Generating puzzle…</p></div>
+
+<!-- TUTORIAL -->
+<div class="tutorial-overlay" id="tutorial">
+  <div class="tut-panel">
+    <div class="tut-header">
+      <h2>How to Play</h2>
+      <div class="tut-header-row">
+        <div class="tut-counter" id="tutCounter">1 / 5</div>
+        <button class="tut-close-btn" onclick="closeTutorial()" title="Close">✕</button>
+      </div>
+    </div>
+    <div class="tut-slide-area">
+
+      <div class="tut-slide active" data-slide="0">
+        <div class="tut-visual" id="tutVis1"></div>
+        <div class="tut-text">
+          <h4>Coloured Cages</h4>
+          <p>The grid is divided into coloured groups called cages. Each cage of size N must contain the numbers 1 through N — no repeats within a cage.</p>
+        </div>
+      </div>
+
+      <div class="tut-slide" data-slide="1">
+        <div class="tut-visual" id="tutVis2"></div>
+        <div class="tut-text">
+          <h4>No Touching</h4>
+          <p>Two cells with the same number cannot touch — not even diagonally. This applies across all cages on the whole board.</p>
+        </div>
+      </div>
+
+      <div class="tut-slide" data-slide="2">
+        <div class="tut-visual" id="tutVis3"></div>
+        <div class="tut-text">
+          <h4>Picking a Number</h4>
+          <p>Tap a cell to select it. The number buttons light up to show only the numbers valid for that cage's size. Tap a number to place it.</p>
+        </div>
+      </div>
+
+      <div class="tut-slide" data-slide="3">
+        <div class="tut-visual" id="tutVis4"></div>
+        <div class="tut-text">
+          <h4>Use Elimination</h4>
+          <p>If a cage of 3 already has 1 and 2, the last cell must be 3. Start with the smallest cages — single-cell cages are always 1!</p>
+        </div>
+      </div>
+
+      <div class="tut-slide" data-slide="4">
+        <div class="tut-visual" id="tutVis5"></div>
+        <div class="tut-text">
+          <h4>Wrong Answers</h4>
+          <p>When the board is full, wrong cells turn pink. Fix them and the puzzle solves itself — no submit button needed.</p>
+        </div>
+      </div>
+
+    </div>
+    <div class="tut-footer">
+      <button class="tut-nav-btn tut-btn-prev" id="tutPrev" onclick="tutNav(-1)">Back</button>
+      <div class="tut-dots" id="tutDots"></div>
+      <button class="tut-nav-btn tut-btn-next" id="tutNext" onclick="tutNav(1)">Next</button>
+    </div>
+  </div>
+</div>
+
+<!-- HOME -->
+<div id="home" class="screen active">
+  <div class="home-actions">
+    <div class="home-stats">
+      <div class="streak-badge" id="streakBadge" style="display:none;"></div>
+      <div class="coin-display" id="homeCoinDisplay">
+        <img src="../sudoku/icons/coin.svg" class="coin-icon-img" alt="coins">
+        <span class="coin-count" id="homeCoinCount">0</span>
+      </div>
+    </div>
+    <button class="btn-icon info" onclick="openTutorial()" title="How to play">
+      <img src="../sudoku/icons/info.svg" class="btn-svg" alt="info">
+    </button>
+  </div>
+  <div class="logo-cluster">
+    <h1>Suguru</h1>
+    <p>A cage number puzzle</p>
+  </div>
+  <div class="resume-wrap" id="resumeWrap" style="display:none;"></div>
+  <div class="difficulty-select" id="diffSelect"></div>
+</div>
+
+<!-- GAME -->
+<div id="game" class="screen">
+  <div class="top-bar">
+    <div style="display:flex;align-items:center;">
+      <h2 class="game-title-btn" onclick="confirmHome()" title="Home">Suguru</h2>
+      <span class="diff-tag" id="diffTag"></span>
+    </div>
+    <div class="timer-group">
+      <div class="coin-display compact" id="gameCoinDisplay">
+        <img src="../sudoku/icons/coin.svg" class="coin-icon-img" alt="coins">
+        <span class="coin-count" id="gameCoinCount">0</span>
+      </div>
+      <div class="timer" id="timer">00:00</div>
+      <button class="btn-icon undo" id="btnUndo" onclick="undoMove()" title="Undo" disabled>
+        <img src="../sudoku/icons/undo.svg" class="btn-svg" alt="undo">
+      </button>
+      <button class="btn-icon restart" id="btnRestart" onclick="confirmRestart()" title="Restart">
+        <img src="../sudoku/icons/restart.svg" class="btn-svg" alt="restart">
+      </button>
+      <button class="btn-icon" onclick="togglePause()" title="Pause/Resume" id="btnPause">
+        <img src="../sudoku/icons/pause.svg" class="btn-svg" id="pauseIcon" alt="pause">
+      </button>
+      <button class="btn-icon info" id="btnInfo" onclick="openTutorial()" title="How to play">
+        <img src="../sudoku/icons/info.svg" class="btn-svg" alt="info">
+      </button>
+      <button class="btn-icon give-up" onclick="confirmGiveUp()" title="Give Up" id="btnGiveUp">
+        <img src="../sudoku/icons/close.svg" class="btn-svg" alt="give up">
+      </button>
+    </div>
+  </div>
+
+  <div class="grid-wrapper" id="gridWrapper">
+    <div class="sgr-grid" id="grid"></div>
+    <div class="pause-overlay" id="pauseOverlay">
+      <span>Paused</span>
+      <button class="btn-resume" onclick="togglePause()">Resume</button>
+    </div>
+  </div>
+
+  <div class="number-picker" id="picker">
+    <div class="picker-digits" id="pickerDigits">
+      <!-- filled dynamically based on max cage size -->
+    </div>
+    <div class="picker-tools">
+      <button class="num-btn tool-btn" id="btnPencil" onclick="togglePencilMode()" title="Pencil mode">
+        <img src="../sudoku/icons/pencil.svg" class="btn-svg" alt="pencil">
+        <span class="tool-label">Pencil</span>
+      </button>
+      <button class="num-btn tool-btn" onclick="placeNumber(0)" title="Erase">
+        <img src="../sudoku/icons/erase.svg" class="btn-svg" alt="erase">
+        <span class="tool-label">Erase</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div id="modal-icon" class="success-icon"></div>
+    <h3 id="modal-title"></h3>
+    <p id="modal-text"></p>
+    <div id="modal-best" class="new-best" style="display:none;"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <div class="success-icon" style="font-size:2.2rem;color:var(--text-dim);margin-bottom:10px;">⚠</div>
+    <h3>Leave Game?</h3>
+    <p>Are you sure? You'll lose your current progress.</p>
+    <div class="modal-actions" style="margin-top:22px;">
+      <button class="btn-primary" onclick="doGoHome()">Leave</button>
+      <button class="btn-secondary" onclick="cancelAnyModal()">Stay</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="giveUpModal">
+  <div class="modal">
+    <div class="success-icon" style="font-size:2.2rem;color:var(--error);margin-bottom:10px;">⚑</div>
+    <h3>Give Up?</h3>
+    <p>This will reveal the solution. Your time won't be recorded.</p>
+    <div class="modal-actions" style="margin-top:22px;">
+      <button class="btn-primary" onclick="doGiveUp()">Reveal</button>
+      <button class="btn-secondary" onclick="cancelAnyModal()">Keep Trying</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="restartModal">
+  <div class="modal">
+    <div class="success-icon" style="font-size:2.2rem;color:var(--success);margin-bottom:10px;">↺</div>
+    <h3>Restart Puzzle?</h3>
+    <p>This will clear all your answers and reset the timer.</p>
+    <div class="modal-actions" style="margin-top:22px;">
+      <button class="btn-primary" onclick="doRestart()">Restart</button>
+      <button class="btn-secondary" onclick="cancelAnyModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="/games/profile.js"></script>
+<script src="suguru.js"></script>
+</body>
+</html>

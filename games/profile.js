@@ -41,7 +41,7 @@ function claimDailyReward() {
 
   const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
   const newStreak = profile.lastVisitDate === yesterday ? profile.streak + 1 : 1;
-  const reward = 5 + Math.min(newStreak - 1, 5); // 5 base, +1 per streak day up to +5
+  const reward = 50 + Math.min(newStreak - 1, 5) * 10; // 50 base, +10 per streak day up to +50
 
   profile.coins += reward;
   profile.streak = newStreak;

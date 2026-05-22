@@ -427,13 +427,13 @@ body::before {
   background: rgba(250,204,21,0.08); border: 1px solid rgba(250,204,21,0.2);
   border-radius: 20px; padding: 5px 12px; cursor: default; flex-shrink: 0;
 }
-.coin-display.compact { padding: 3px 8px; gap: 4px; }
+.coin-display.compact { padding: 3px 10px; gap: 5px; }
 .coin-count {
   font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
   font-weight: 600; color: #facc15; line-height: 1;
 }
-.coin-display.compact .coin-count { font-size: 0.72rem; }
-.coin-display.compact .coin-icon-img { width: 12px; height: 12px; }
+.coin-display.compact .coin-count { font-size: 0.85rem; }
+.coin-display.compact .coin-icon-img { width: 16px; height: 16px; }
 .coin-display:not(.compact) .coin-icon-img { width: 20px; height: 20px; }
 .coin-display:not(.compact) .coin-count { font-size: 0.95rem; }
 
