@@ -188,7 +188,7 @@
     letter-spacing: 0.02em;
   }
 
-  .coming-soon { opacity: 0.5; pointer-events: none; }
+  .coming-soon { opacity: 0.55; cursor: default; }
   .coming-soon .game-thumb {
     background: rgba(255,255,255,0.3);
   }
@@ -200,6 +200,71 @@
     font-size: 0.7rem; color: var(--text-muted);
     letter-spacing: 0.06em; text-transform: uppercase;
   }
+
+  /* thumb previews */
+  .game-thumb.suguru-thumb  { background: linear-gradient(135deg, #0d0f1a 0%, #141729 100%); }
+  .game-thumb.wordle-thumb  { background: linear-gradient(135deg, #0f1a0d 0%, #172914 100%); }
+  .game-thumb.nonogram-thumb{ background: linear-gradient(135deg, #0d0f1a 0%, #1a1429 100%); }
+  .game-thumb.masyu-thumb   { background: linear-gradient(135deg, #1a0d0f 0%, #291418 100%); }
+  .game-thumb.kakuro-thumb  { background: linear-gradient(135deg, #1a140d 0%, #291f14 100%); }
+
+  /* suguru mini preview */
+  .mini-suguru {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 2px; width: 80px; height: 80px; opacity: 0.75;
+  }
+  .mini-suguru .sc {
+    background: rgba(255,255,255,0.06); border-radius: 2px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; font-weight: 700;
+  }
+  .sc-b { color: #60a5fa; border: 1px solid rgba(96,165,250,0.35) !important; }
+  .sc-p { color: #f472b6; border: 1px solid rgba(244,114,182,0.35) !important; }
+  .sc-g { color: #34d399; border: 1px solid rgba(52,211,153,0.35) !important; }
+  .sc-y { color: #fbbf24; border: 1px solid rgba(251,191,36,0.35) !important; }
+  .sc-v { color: #a78bfa; border: 1px solid rgba(167,139,250,0.35) !important; }
+
+  /* wordle mini preview */
+  .mini-wordle { display: flex; flex-direction: column; gap: 3px; opacity: 0.8; }
+  .wordle-row { display: flex; gap: 3px; }
+  .wc {
+    width: 22px; height: 22px; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; font-weight: 700; color: #fff;
+  }
+  .wc-g { background: #538d4e; }
+  .wc-y { background: #b59f3b; }
+  .wc-x { background: rgba(255,255,255,0.12); }
+
+  /* nonogram mini preview */
+  .mini-nonogram { display: flex; gap: 6px; opacity: 0.8; align-items: flex-end; }
+  .nono-col { display: flex; flex-direction: column; gap: 2px; align-items: center; }
+  .nono-clue { font-family: 'JetBrains Mono', monospace; font-size: 0.45rem; color: rgba(167,139,250,0.8); margin-bottom: 2px; }
+  .nono-cell { width: 14px; height: 14px; border-radius: 2px; }
+  .nono-filled { background: rgba(167,139,250,0.7); }
+  .nono-empty  { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); }
+
+  /* masyu mini preview */
+  .mini-masyu { position: relative; width: 76px; height: 76px; opacity: 0.8; }
+  .masyu-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 2px; width: 100%; height: 100%; }
+  .masyu-cell {
+    background: rgba(255,255,255,0.05); border-radius: 2px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .masyu-circle { width: 8px; height: 8px; border-radius: 50%; }
+  .masyu-black { background: #f472b6; }
+  .masyu-white { background: transparent; border: 1.5px solid rgba(255,255,255,0.5); }
+
+  /* kakuro mini preview */
+  .mini-kakuro { display: grid; grid-template-columns: repeat(4,1fr); gap: 2px; width: 80px; height: 80px; opacity: 0.75; }
+  .kk {
+    background: rgba(255,255,255,0.05); border-radius: 2px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.5rem; font-weight: 600;
+  }
+  .kk-black { background: rgba(0,0,0,0.45); }
+  .kk-clue  { background: rgba(251,191,36,0.15); color: #fbbf24; font-size: 0.42rem; }
+  .kk-val   { color: #f0abcf; }
 
   /* ── FOOTER ── */
   footer {
@@ -269,6 +334,8 @@
     </div>
 
     <div class="games-grid">
+
+      <!-- SUDOKU -->
       <a href="/games/sudoku/" class="game-card fade-up fd2">
         <div class="game-thumb sudoku-thumb">
           <div class="mini-grid">
@@ -292,24 +359,188 @@
         </div>
         <div class="game-body">
           <h3>Sudoku</h3>
-          <p>Classic 9×9 number puzzle with three difficulty levels, undo, pause, and unique-solution guarantee.</p>
+          <p>Classic 9×9 number puzzle. Three difficulty levels, undo, pencil mode, and unique-solution guarantee.</p>
           <div class="game-tags">
             <span class="game-tag">puzzle</span>
             <span class="game-tag">logic</span>
-            <span class="game-tag">offline</span>
+            <span class="game-tag">numbers</span>
           </div>
         </div>
       </a>
 
-      <div class="game-card coming-soon fade-up fd3">
-        <div class="game-thumb">
-          <span class="coming-badge">Coming soon</span>
+      <!-- SUGURU -->
+      <a href="/games/suguru/" class="game-card fade-up fd2">
+        <div class="game-thumb suguru-thumb">
+          <div class="mini-suguru">
+            <div class="sc sc-b">2</div><div class="sc sc-b">1</div><div class="sc sc-p">3</div><div class="sc sc-p">1</div><div class="sc sc-g">2</div>
+            <div class="sc sc-b">3</div><div class="sc sc-y">1</div><div class="sc sc-p">2</div><div class="sc sc-g">3</div><div class="sc sc-g">1</div>
+            <div class="sc sc-y">2</div><div class="sc sc-y">3</div><div class="sc sc-v">1</div><div class="sc sc-v">2</div><div class="sc sc-g">4</div>
+            <div class="sc sc-p">1</div><div class="sc sc-b">4</div><div class="sc sc-v">3</div><div class="sc sc-y">4</div><div class="sc sc-v">5</div>
+            <div class="sc sc-p">4</div><div class="sc sc-b">5</div><div class="sc sc-y">5</div><div class="sc sc-p">5</div><div class="sc sc-v">4</div>
+          </div>
         </div>
         <div class="game-body">
-          <h3>More games</h3>
-          <p>New puzzles and games are on the way. Stay tuned.</p>
+          <h3>Suguru</h3>
+          <p>Fill coloured cages with 1–N, no two identical numbers touching — even diagonally.</p>
+          <div class="game-tags">
+            <span class="game-tag">puzzle</span>
+            <span class="game-tag">logic</span>
+            <span class="game-tag">cages</span>
+          </div>
         </div>
-      </div>
+      </a>
+
+      <!-- WORDLE -->
+      <a href="/games/wordle/" class="game-card fade-up fd3">
+        <div class="game-thumb wordle-thumb">
+          <div class="mini-wordle">
+            <div class="wordle-row">
+              <div class="wc wc-x">C</div><div class="wc wc-y">R</div><div class="wc wc-x">A</div><div class="wc wc-x">N</div><div class="wc wc-x">E</div>
+            </div>
+            <div class="wordle-row">
+              <div class="wc wc-x">S</div><div class="wc wc-g">R</div><div class="wc wc-g">O</div><div class="wc wc-x">U</div><div class="wc wc-g">S</div>
+            </div>
+            <div class="wordle-row">
+              <div class="wc wc-g">G</div><div class="wc wc-g">R</div><div class="wc wc-g">O</div><div class="wc wc-g">S</div><div class="wc wc-g">S</div>
+            </div>
+          </div>
+        </div>
+        <div class="game-body">
+          <h3>Wordle</h3>
+          <p>Guess the hidden 5-letter word in six tries. Green means right place, yellow means wrong place.</p>
+          <div class="game-tags">
+            <span class="game-tag">word</span>
+            <span class="game-tag">daily</span>
+            <span class="game-tag">logic</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- NONOGRAM -->
+      <a href="/games/nonogram/" class="game-card fade-up fd3">
+        <div class="game-thumb nonogram-thumb">
+          <div class="mini-nonogram">
+            <div class="nono-col">
+              <div class="nono-clue">3</div>
+              <div class="nono-cell nono-filled"></div>
+              <div class="nono-cell nono-filled"></div>
+              <div class="nono-cell nono-filled"></div>
+              <div class="nono-cell nono-empty"></div>
+              <div class="nono-cell nono-empty"></div>
+            </div>
+            <div class="nono-col">
+              <div class="nono-clue">1</div>
+              <div class="nono-cell nono-empty"></div>
+              <div class="nono-cell nono-filled"></div>
+              <div class="nono-cell nono-empty"></div>
+              <div class="nono-cell nono-empty"></div>
+              <div class="nono-cell nono-empty"></div>
+            </div>
+            <div class="nono-col">
+              <div class="nono-clue">4</div>
+              <div class="nono-cell nono-filled"></div>
+              <div class="nono-cell nono-filled"></div>
+              <div class="nono-cell nono-filled"></div>
+              <div class="nono-cell nono-filled"></div>
+              <div class="nono-cell nono-empty"></div>
+            </div>
+            <div class="nono-col">
+              <div class="nono-clue">2</div>
+              <div class="nono-cell nono-empty"></div>
+              <div class="nono-cell nono-empty"></div>
+              <div class="nono-cell nono-filled"></div>
+              <div class="nono-cell nono-filled"></div>
+              <div class="nono-cell nono-empty"></div>
+            </div>
+            <div class="nono-col">
+              <div class="nono-clue">5</div>
+              <div class="nono-cell nono-filled"></div>
+              <div class="nono-cell nono-filled"></div>
+              <div class="nono-cell nono-filled"></div>
+              <div class="nono-cell nono-filled"></div>
+              <div class="nono-cell nono-filled"></div>
+            </div>
+          </div>
+        </div>
+        <div class="game-body">
+          <h3>Nonogram</h3>
+          <p>Use row and column number clues to paint a hidden pixel picture. Also called Picross.</p>
+          <div class="game-tags">
+            <span class="game-tag">puzzle</span>
+            <span class="game-tag">visual</span>
+            <span class="game-tag">logic</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- MASYU -->
+      <a href="/games/masyu/" class="game-card fade-up fd3">
+        <div class="game-thumb masyu-thumb">
+          <div class="mini-masyu">
+            <div class="masyu-grid">
+              <div class="masyu-cell"></div>
+              <div class="masyu-cell"><div class="masyu-circle masyu-black"></div></div>
+              <div class="masyu-cell"></div>
+              <div class="masyu-cell"><div class="masyu-circle masyu-white"></div></div>
+              <div class="masyu-cell"><div class="masyu-circle masyu-white"></div></div>
+              <div class="masyu-cell"></div>
+              <div class="masyu-cell"><div class="masyu-circle masyu-black"></div></div>
+              <div class="masyu-cell"></div>
+              <div class="masyu-cell"></div>
+              <div class="masyu-cell"><div class="masyu-circle masyu-black"></div></div>
+              <div class="masyu-cell"></div>
+              <div class="masyu-cell"><div class="masyu-circle masyu-white"></div></div>
+              <div class="masyu-cell"><div class="masyu-circle masyu-white"></div></div>
+              <div class="masyu-cell"></div>
+              <div class="masyu-cell"></div>
+              <div class="masyu-cell"><div class="masyu-circle masyu-black"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="game-body">
+          <h3>Masyu</h3>
+          <p>Draw a single closed loop through black and white circles following simple bend and straight rules.</p>
+          <div class="game-tags">
+            <span class="game-tag">puzzle</span>
+            <span class="game-tag">loop</span>
+            <span class="game-tag">logic</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- KAKURO -->
+      <a href="/games/kakuro/" class="game-card fade-up fd3">
+        <div class="game-thumb kakuro-thumb">
+          <div class="mini-kakuro">
+            <div class="kk kk-black"></div>
+            <div class="kk kk-clue">16</div>
+            <div class="kk kk-clue">9</div>
+            <div class="kk kk-black"></div>
+            <div class="kk kk-clue">7</div>
+            <div class="kk kk-val">3</div>
+            <div class="kk kk-val">4</div>
+            <div class="kk kk-black"></div>
+            <div class="kk kk-clue">8</div>
+            <div class="kk kk-val">6</div>
+            <div class="kk kk-val">2</div>
+            <div class="kk kk-black"></div>
+            <div class="kk kk-black"></div>
+            <div class="kk kk-val">7</div>
+            <div class="kk kk-val">3</div>
+            <div class="kk kk-black"></div>
+          </div>
+        </div>
+        <div class="game-body">
+          <h3>Kakuro</h3>
+          <p>Fill the grid so each run of cells sums to its clue, using 1–9 with no repeats per run.</p>
+          <div class="game-tags">
+            <span class="game-tag">puzzle</span>
+            <span class="game-tag">sums</span>
+            <span class="game-tag">numbers</span>
+          </div>
+        </div>
+      </a>
+
     </div>
 
   </div>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kakuro · gracermy</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a140d; color: #f0ece6;
+    font-family: 'Outfit', sans-serif;
+    min-height: 100dvh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 28px;
+    padding: 24px;
+  }
+  body::before {
+    content: ''; position: fixed; top: -50%; left: -50%; width: 200%; height: 200%;
+    background: radial-gradient(ellipse at 30% 20%, rgba(251,191,36,0.07) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(249,115,22,0.05) 0%, transparent 50%);
+    pointer-events: none;
+  }
+  .back-link {
+    position: fixed; top: 14px; left: 16px;
+    font-size: 0.78rem; color: rgba(255,255,255,0.35); text-decoration: none;
+    transition: color 0.2s;
+  }
+  .back-link:hover { color: rgba(255,255,255,0.7); }
+  .icon { font-size: 3rem; line-height: 1; }
+  h1 {
+    font-family: 'DM Serif Display', serif; font-size: clamp(2.4rem, 7vw, 3.5rem);
+    background: linear-gradient(135deg, #fbbf24, #f97316);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  p { font-size: 0.95rem; color: rgba(255,255,255,0.4); font-weight: 300; text-align: center; max-width: 300px; line-height: 1.6; }
+  .badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: #fbbf24;
+    border: 1px solid rgba(251,191,36,0.35); border-radius: 20px; padding: 5px 14px;
+  }
+</style>
+</head>
+<body>
+<a href="/games/" class="back-link">← Games</a>
+<div class="icon">🔢</div>
+<h1>Kakuro</h1>
+<span class="badge">Coming soon</span>
+<p>Fill the grid so each run of cells sums to its clue, using digits 1–9 with no repeats per run.</p>
+</body>
+</html>
