@@ -1,0 +1,8 @@
+{
+  "name": "gracermy-site",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "generate-suguru": "node scripts/generate-suguru.js"
+  }
+}

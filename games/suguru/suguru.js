@@ -41,19 +41,60 @@ function shuffle(a) {
 function idx(r, c) { return r * COLS + c; }
 
 
-/* ── PUZZLE GENERATION (Web Worker) ── */
-let generationWorker = null;
+/* ── PUZZLE BANK (pre-generated, fetched from JSON) ── */
+const PLAYED_KEY_PREFIX = 'suguru_played_';
+const bankCache = {}; // diff → array of puzzles
 
-function runGeneration(diff, callback) {
-  const cfg = DIFFICULTIES[diff];
-  if (generationWorker) { generationWorker.terminate(); generationWorker = null; }
-  generationWorker = new Worker('suguru-worker.js');
-  generationWorker.onmessage = function(e) {
-    generationWorker = null;
-    if (e.data.error) { runGeneration(diff, callback); return; } // retry on rare failure
-    callback(e.data);
-  };
-  generationWorker.postMessage({ diff, rows: cfg.rows, cols: cfg.cols, clueRatio: cfg.clueRatio });
+async function loadBank(diff) {
+  if (bankCache[diff]) return bankCache[diff];
+  const res = await fetch(`puzzles/${diff}.json`);
+  if (!res.ok) throw new Error(`Failed to load ${diff} bank`);
+  const data = await res.json();
+  bankCache[diff] = data.puzzles;
+  return bankCache[diff];
+}
+
+function getPlayedSet(diff) {
+  try {
+    const raw = localStorage.getItem(PLAYED_KEY_PREFIX + diff);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch { return new Set(); }
+}
+
+function markPlayed(diff, index) {
+  const set = getPlayedSet(diff);
+  set.add(index);
+  localStorage.setItem(PLAYED_KEY_PREFIX + diff, JSON.stringify([...set]));
+}
+
+function pickNextPuzzle(diff, bank) {
+  let played = getPlayedSet(diff);
+  // Silent loop: if exhausted, reset and start over
+  if (played.size >= bank.length) {
+    localStorage.removeItem(PLAYED_KEY_PREFIX + diff);
+    played = new Set();
+  }
+  const unplayed = [];
+  for (let i = 0; i < bank.length; i++) if (!played.has(i)) unplayed.push(i);
+  return unplayed[Math.floor(Math.random() * unplayed.length)];
+}
+
+async function runGeneration(diff, callback) {
+  try {
+    const bank = await loadBank(diff);
+    const index = pickNextPuzzle(diff, bank);
+    markPlayed(diff, index);
+    const p = bank[index];
+    callback({
+      solution: p.solution,
+      puzzle: p.puzzle,
+      cageList: p.cageList,
+      cageMap: p.cageMap,
+    });
+  } catch (err) {
+    console.error('Suguru puzzle load failed:', err);
+    alert('Could not load puzzle. Please refresh and try again.');
+  }
 }
 
 /* ── COIN UI ── */
