@@ -82,7 +82,9 @@ body::before {
   font-family: 'DM Serif Display', serif; font-size: clamp(3rem, 8vw, 5rem);
   letter-spacing: 0.06em;
   background: linear-gradient(135deg, var(--blue) 0%, var(--pink) 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1.1;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  line-height: 1.25;
+  padding: 0.08em 0;
 }
 .logo-cluster p { font-size: 0.9rem; color: var(--text-dim); margin-top: 10px; font-weight: 300; letter-spacing: 0.18em; text-transform: uppercase; }
 
@@ -237,22 +239,26 @@ body::before {
 .cell.user-filled  { color: var(--blue); }
 .cell.selected     { outline: 2px solid var(--pink); outline-offset: -2px; z-index: 2; }
 .cell.same-cage    { filter: brightness(1.35); }
-.cell.same-number  { font-weight: 800 !important; text-shadow: 0 0 8px currentColor; }
+.cell.same-number  {
+  background: rgba(244, 114, 182, 0.28) !important;
+  box-shadow: inset 0 0 0 1px rgba(244, 114, 182, 0.55);
+  font-weight: 800 !important;
+}
 .cell.error-cell   { color: var(--pink) !important; }
 .cell.hidden-cell  { color: transparent !important; }
 .cell.reveal-correct { color: var(--success) !important; }
 .cell.reveal-wrong   { color: var(--error)   !important; }
 
 /* Candidates mini-grid */
-.cell.has-candidates { padding: 1px; }
+.cell.has-candidates { padding: 2px; }
 .candidates-grid {
-  display: grid; width: 100%; height: 100%; gap: 0;
+  display: grid; width: 100%; height: 100%; gap: 1px;
 }
 .cand-num {
   display: flex; align-items: center; justify-content: center;
   font-family: 'JetBrains Mono', monospace;
-  font-size: clamp(0.22rem, 0.9vw, 0.38rem);
-  font-weight: 600; color: var(--blue); opacity: 0.75; line-height: 1; user-select: none;
+  font-size: clamp(0.55rem, 1.8vw, 0.85rem);
+  font-weight: 600; color: var(--blue); opacity: 0.85; line-height: 1; user-select: none;
 }
 
 /* Pause overlay */

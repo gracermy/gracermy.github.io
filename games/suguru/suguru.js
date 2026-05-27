@@ -422,10 +422,23 @@ function buildPicker(maxSize) {
 }
 
 function updatePickerForCell(r, c) {
-  const cageSize = cages[cageMap[idx(r, c)]].size;
+  const cageId = cageMap[idx(r, c)];
+  const cage = cages[cageId];
+  const cageSize = cage.size;
+
+  // Collect values already used in this cage (clue or filled by user),
+  // excluding the currently-selected cell so the user can change their answer.
+  const usedInCage = new Set();
+  for (const ci of cage.cells) {
+    const cr = Math.floor(ci / COLS), cc = ci % COLS;
+    if (cr === r && cc === c) continue;
+    const v = clueMap[cr][cc] ? solution[cr][cc] : userGrid[cr][cc];
+    if (v !== 0) usedInCage.add(v);
+  }
+
   document.querySelectorAll('#pickerDigits .num-btn').forEach(btn => {
     const n = parseInt(btn.dataset.num);
-    btn.classList.toggle('dimmed', n > cageSize);
+    btn.classList.toggle('dimmed', n > cageSize || usedInCage.has(n));
   });
 }
 
@@ -511,6 +524,9 @@ function placeNumber(num) {
       if (v === num && !(r === row && c === col)) getCellEl(r, c).classList.add('same-number');
     }
   }
+
+  // Refresh picker so just-used values get dimmed (or re-enabled on erase)
+  updatePickerForCell(row, col);
 
   // Auto-check when grid is full
   let allFilled = true;
