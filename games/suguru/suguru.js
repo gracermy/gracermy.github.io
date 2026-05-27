@@ -95,34 +95,53 @@ function generateCages(rows, cols) {
   return { cageList, cageMap: map };
 }
 
+/* ── LOOKUP TABLES (built once per puzzle, reused by solver) ── */
+let neighborTable = [];   // neighborTable[r][c] = [[nr,nc], ...]
+let cagePeerTable = [];   // cagePeerTable[r][c] = [[pr,pc], ...]
+
+function buildLookups(rows, cols, cageList, cageMapArr) {
+  neighborTable = [];
+  cagePeerTable = [];
+  for (let r = 0; r < rows; r++) {
+    neighborTable[r] = [];
+    cagePeerTable[r] = [];
+    for (let c = 0; c < cols; c++) {
+      neighborTable[r][c] = neighbors8(r, c);
+      const cage = cageList[cageMapArr[r * cols + c]];
+      cagePeerTable[r][c] = cage.cells
+        .filter(ci => ci !== r * cols + c)
+        .map(ci => [Math.floor(ci / cols), ci % cols]);
+    }
+  }
+}
+
 /* ── SOLUTION GENERATION ── */
-function isValidPlacement(board, r, c, val, cageId, cageList) {
-  // No-touch rule: no same value in any of the 8 neighbours
-  for (const [nr, nc] of neighbors8(r, c)) {
+function isValidPlacement(board, r, c, val) {
+  for (const [nr, nc] of neighborTable[r][c]) {
     if (board[nr][nc] === val) return false;
   }
-  // Within-cage uniqueness
-  const cage = cageList[cageId];
-  for (const ci of cage.cells) {
-    const cr = Math.floor(ci / COLS), cc = ci % COLS;
-    if (cr === r && cc === c) continue;
-    if (board[cr][cc] === val) return false;
+  for (const [pr, pc] of cagePeerTable[r][c]) {
+    if (board[pr][pc] === val) return false;
   }
   return true;
 }
 
 function generateSolution(rows, cols, cageList, cageMapArr) {
+  buildLookups(rows, cols, cageList, cageMapArr);
   const board = Array.from({ length: rows }, () => Array(cols).fill(0));
-  const cells = [...Array(rows * cols).keys()];
+
+  // Order cells by cage size ascending — most constrained first
+  const cells = [...Array(rows * cols).keys()]
+    .sort((a, b) => cageList[cageMapArr[a]].size - cageList[cageMapArr[b]].size);
 
   function solve(ci) {
     if (ci === cells.length) return true;
     const r = Math.floor(cells[ci] / cols), c = cells[ci] % cols;
-    const cid = cageMapArr[idx(r, c)];
-    const maxVal = cageList[cid].size;
+    const maxVal = cageList[cageMapArr[cells[ci]]].size;
+    // Randomise order so each generated puzzle differs
     const nums = shuffle([...Array(maxVal).keys()].map(x => x + 1));
     for (const v of nums) {
-      if (isValidPlacement(board, r, c, v, cid, cageList)) {
+      if (isValidPlacement(board, r, c, v)) {
         board[r][c] = v;
         if (solve(ci + 1)) return true;
         board[r][c] = 0;
@@ -135,30 +154,7 @@ function generateSolution(rows, cols, cageList, cageMapArr) {
 }
 
 /* ── PUZZLE (CLUE REMOVAL) ── */
-function countSolutions(board, cageList, cageMapArr, limit = 2) {
-  let count = 0;
-  const rows = board.length, cols = board[0].length;
-
-  function solve(ci) {
-    if (count >= limit) return;
-    if (ci === rows * cols) { count++; return; }
-    const r = Math.floor(ci / cols), c = ci % cols;
-    if (board[r][c] !== 0) { solve(ci + 1); return; }
-    const cid = cageMapArr[idx(r, c)];
-    const maxVal = cageList[cid].size;
-    for (let v = 1; v <= maxVal; v++) {
-      if (isValidPlacement(board, r, c, v, cid, cageList)) {
-        board[r][c] = v;
-        solve(ci + 1);
-        board[r][c] = 0;
-      }
-    }
-  }
-  solve(0);
-  return count;
-}
-
-function generatePuzzle(sol, cageList, cageMapArr, clueRatio) {
+function generatePuzzle(sol, clueRatio) {
   const rows = sol.length, cols = sol[0].length;
   const total = rows * cols;
   const puzzle = sol.map(r => [...r]);
@@ -169,14 +165,8 @@ function generatePuzzle(sol, cageList, cageMapArr, clueRatio) {
   for (const ci of order) {
     if (clueCount <= targetClues) break;
     const r = Math.floor(ci / cols), c = ci % cols;
-    const backup = puzzle[r][c];
     puzzle[r][c] = 0;
-    const copy = puzzle.map(row => [...row]);
-    if (countSolutions(copy, cageList, cageMapArr, 2) !== 1) {
-      puzzle[r][c] = backup;
-    } else {
-      clueCount--;
-    }
+    clueCount--;
   }
   return puzzle;
 }
@@ -365,7 +355,7 @@ function startGame(diff) {
     const sol = generateSolution(ROWS, COLS, cages, cageMap);
     solution = sol;
 
-    const puz = generatePuzzle(sol, cages, cageMap, cfg.clueRatio);
+    const puz = generatePuzzle(sol, cfg.clueRatio);
     userGrid = puz.map(r => [...r]);
     clueMap = puz.map(r => r.map(v => v !== 0));
     candidateGrid = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => new Set()));
