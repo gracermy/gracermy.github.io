@@ -426,19 +426,27 @@ function updatePickerForCell(r, c) {
   const cage = cages[cageId];
   const cageSize = cage.size;
 
-  // Collect values already used in this cage (clue or filled by user),
-  // excluding the currently-selected cell so the user can change their answer.
-  const usedInCage = new Set();
+  // Values already used in this cage (excluding the selected cell itself)
+  const blocked = new Set();
   for (const ci of cage.cells) {
     const cr = Math.floor(ci / COLS), cc = ci % COLS;
     if (cr === r && cc === c) continue;
     const v = clueMap[cr][cc] ? solution[cr][cc] : userGrid[cr][cc];
-    if (v !== 0) usedInCage.add(v);
+    if (v !== 0) blocked.add(v);
+  }
+
+  // Values held by any 8-directional neighbour (no-touch rule)
+  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+    if (dr === 0 && dc === 0) continue;
+    const nr = r + dr, nc = c + dc;
+    if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+    const v = clueMap[nr][nc] ? solution[nr][nc] : userGrid[nr][nc];
+    if (v !== 0) blocked.add(v);
   }
 
   document.querySelectorAll('#pickerDigits .num-btn').forEach(btn => {
     const n = parseInt(btn.dataset.num);
-    btn.classList.toggle('dimmed', n > cageSize || usedInCage.has(n));
+    btn.classList.toggle('dimmed', n > cageSize || blocked.has(n));
   });
 }
 
