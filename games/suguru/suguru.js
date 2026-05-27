@@ -82,6 +82,7 @@ function pickNextPuzzle(diff, bank) {
 async function runGeneration(diff, callback) {
   try {
     const bank = await loadBank(diff);
+    if (!bank || bank.length === 0) throw new Error(`${diff} bank is empty`);
     const index = pickNextPuzzle(diff, bank);
     markPlayed(diff, index);
     const p = bank[index];
@@ -93,7 +94,8 @@ async function runGeneration(diff, callback) {
     });
   } catch (err) {
     console.error('Suguru puzzle load failed:', err);
-    alert('Could not load puzzle. Please refresh and try again.');
+    document.getElementById('loading').classList.remove('active');
+    alert(`Could not load puzzle: ${err.message}\n\nPlease refresh and try again.`);
   }
 }
 
@@ -270,29 +272,35 @@ function startGame(diff) {
   document.getElementById('loading').classList.add('active');
 
   runGeneration(diff, ({ solution: sol, puzzle: puz, cageList, cageMap: cm }) => {
-    const cfg = DIFFICULTIES[diff];
-    ROWS = cfg.rows; COLS = cfg.cols;
-    solution = sol;
-    cages = cageList;
-    cageMap = cm;
+    try {
+      const cfg = DIFFICULTIES[diff];
+      ROWS = cfg.rows; COLS = cfg.cols;
+      solution = sol;
+      cages = cageList;
+      cageMap = cm;
 
-    userGrid = puz.map(r => [...r]);
-    clueMap = puz.map(r => r.map(v => v !== 0));
-    candidateGrid = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => new Set()));
+      userGrid = puz.map(r => [...r]);
+      clueMap = puz.map(r => r.map(v => v !== 0));
+      candidateGrid = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => new Set()));
 
-    const tag = document.getElementById('diffTag');
-    tag.textContent = cfg.label; tag.className = 'diff-tag ' + diff;
+      const tag = document.getElementById('diffTag');
+      tag.textContent = cfg.label; tag.className = 'diff-tag ' + diff;
 
-    buildGrid();
-    document.getElementById('loading').classList.remove('active');
-    showScreen('game');
-    startTimer(); updateCoinUI();
-    document.getElementById('picker').classList.remove('visible');
-    document.getElementById('pauseOverlay').classList.remove('active');
-    document.getElementById('pauseIcon').src = '../sudoku/icons/pause.svg';
-    setPencilMode(false);
-    updateUndoBtn();
-    clearSavedGame();
+      buildGrid();
+      document.getElementById('loading').classList.remove('active');
+      showScreen('game');
+      startTimer(); updateCoinUI();
+      document.getElementById('picker').classList.remove('visible');
+      document.getElementById('pauseOverlay').classList.remove('active');
+      document.getElementById('pauseIcon').src = '../sudoku/icons/pause.svg';
+      setPencilMode(false);
+      updateUndoBtn();
+      clearSavedGame();
+    } catch (err) {
+      console.error('Suguru render failed:', err);
+      document.getElementById('loading').classList.remove('active');
+      alert(`Could not render puzzle: ${err.message}`);
+    }
   });
 }
 
