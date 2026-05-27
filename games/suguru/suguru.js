@@ -39,136 +39,21 @@ function shuffle(a) {
   return a;
 }
 function idx(r, c) { return r * COLS + c; }
-function neighbors8(r, c) {
-  const out = [];
-  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-    if (dr === 0 && dc === 0) continue;
-    const nr = r + dr, nc = c + dc;
-    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) out.push([nr, nc]);
-  }
-  return out;
-}
-function neighbors4(r, c) {
-  return [[r-1,c],[r+1,c],[r,c-1],[r,c+1]].filter(([nr,nc]) => nr>=0&&nr<ROWS&&nc>=0&&nc<COLS);
-}
 
-/* ── CAGE GENERATION ── */
-function generateCages(rows, cols) {
-  const total = rows * cols;
-  const assigned = new Array(total).fill(-1);
-  const cageList = [];
-  const order = shuffle([...Array(total).keys()]);
 
-  for (const start of order) {
-    if (assigned[start] !== -1) continue;
-    const cageId = cageList.length;
-    const size = 1 + Math.floor(Math.random() * MAX_CAGE_SIZE);
-    const members = [start];
-    assigned[start] = cageId;
+/* ── PUZZLE GENERATION (Web Worker) ── */
+let generationWorker = null;
 
-    // Grow cage by BFS frontier, up to size
-    const frontier = [];
-    const sr = Math.floor(start / cols), sc = start % cols;
-    for (const [nr, nc] of neighbors4(sr, sc)) {
-      if (assigned[idx(nr, nc)] === -1) frontier.push(idx(nr, nc));
-    }
-    shuffle(frontier);
-    while (members.length < size && frontier.length > 0) {
-      const next = frontier.shift();
-      if (assigned[next] !== -1) continue;
-      assigned[next] = cageId;
-      members.push(next);
-      const nr = Math.floor(next / cols), nc = next % cols;
-      for (const [nnr, nnc] of neighbors4(nr, nc)) {
-        const ni = idx(nnr, nnc);
-        if (assigned[ni] === -1 && !frontier.includes(ni)) frontier.push(ni);
-      }
-    }
-    cageList.push({ id: cageId, cells: members, size: members.length });
-  }
-
-  // Build cageMap (cell index → cage id)
-  const map = new Array(total);
-  for (const cage of cageList) {
-    for (const ci of cage.cells) map[ci] = cage.id;
-  }
-  return { cageList, cageMap: map };
-}
-
-/* ── LOOKUP TABLES (built once per puzzle, reused by solver) ── */
-let neighborTable = [];   // neighborTable[r][c] = [[nr,nc], ...]
-let cagePeerTable = [];   // cagePeerTable[r][c] = [[pr,pc], ...]
-
-function buildLookups(rows, cols, cageList, cageMapArr) {
-  neighborTable = [];
-  cagePeerTable = [];
-  for (let r = 0; r < rows; r++) {
-    neighborTable[r] = [];
-    cagePeerTable[r] = [];
-    for (let c = 0; c < cols; c++) {
-      neighborTable[r][c] = neighbors8(r, c);
-      const cage = cageList[cageMapArr[r * cols + c]];
-      cagePeerTable[r][c] = cage.cells
-        .filter(ci => ci !== r * cols + c)
-        .map(ci => [Math.floor(ci / cols), ci % cols]);
-    }
-  }
-}
-
-/* ── SOLUTION GENERATION ── */
-function isValidPlacement(board, r, c, val) {
-  for (const [nr, nc] of neighborTable[r][c]) {
-    if (board[nr][nc] === val) return false;
-  }
-  for (const [pr, pc] of cagePeerTable[r][c]) {
-    if (board[pr][pc] === val) return false;
-  }
-  return true;
-}
-
-function generateSolution(rows, cols, cageList, cageMapArr) {
-  buildLookups(rows, cols, cageList, cageMapArr);
-  const board = Array.from({ length: rows }, () => Array(cols).fill(0));
-
-  // Order cells by cage size ascending — most constrained first
-  const cells = [...Array(rows * cols).keys()]
-    .sort((a, b) => cageList[cageMapArr[a]].size - cageList[cageMapArr[b]].size);
-
-  function solve(ci) {
-    if (ci === cells.length) return true;
-    const r = Math.floor(cells[ci] / cols), c = cells[ci] % cols;
-    const maxVal = cageList[cageMapArr[cells[ci]]].size;
-    // Randomise order so each generated puzzle differs
-    const nums = shuffle([...Array(maxVal).keys()].map(x => x + 1));
-    for (const v of nums) {
-      if (isValidPlacement(board, r, c, v)) {
-        board[r][c] = v;
-        if (solve(ci + 1)) return true;
-        board[r][c] = 0;
-      }
-    }
-    return false;
-  }
-  if (!solve(0)) return null;
-  return board;
-}
-
-/* ── PUZZLE (CLUE REMOVAL) ── */
-function generatePuzzle(sol, clueRatio) {
-  const rows = sol.length, cols = sol[0].length;
-  const total = rows * cols;
-  const puzzle = sol.map(r => [...r]);
-  const order = shuffle([...Array(total).keys()]);
-  const targetClues = Math.round(total * clueRatio);
-  let clueCount = total;
-
-  for (const ci of order) {
-    if (clueCount <= targetClues) break;
-    const r = Math.floor(ci / cols), c = ci % cols;
-    puzzle[r][c] = 0;
-    clueCount--;
-  }
-  return puzzle;
+function runGeneration(diff, callback) {
+  const cfg = DIFFICULTIES[diff];
+  if (generationWorker) { generationWorker.terminate(); generationWorker = null; }
+  generationWorker = new Worker('suguru-worker.js');
+  generationWorker.onmessage = function(e) {
+    generationWorker = null;
+    if (e.data.error) { runGeneration(diff, callback); return; } // retry on rare failure
+    callback(e.data);
+  };
+  generationWorker.postMessage({ diff, rows: cfg.rows, cols: cfg.cols, clueRatio: cfg.clueRatio });
 }
 
 /* ── COIN UI ── */
@@ -343,19 +228,13 @@ function startGame(diff) {
   revealed = false; undoStack = []; errorCells = new Set(); selectedCell = null;
   document.getElementById('loading').classList.add('active');
 
-  // Defer heavy work so the loading spinner can render
-  setTimeout(() => {
+  runGeneration(diff, ({ solution: sol, puzzle: puz, cageList, cageMap: cm }) => {
     const cfg = DIFFICULTIES[diff];
     ROWS = cfg.rows; COLS = cfg.cols;
-
-    const gen = generateCages(ROWS, COLS);
-    cages = gen.cageList;
-    cageMap = gen.cageMap;
-
-    const sol = generateSolution(ROWS, COLS, cages, cageMap);
     solution = sol;
+    cages = cageList;
+    cageMap = cm;
 
-    const puz = generatePuzzle(sol, cfg.clueRatio);
     userGrid = puz.map(r => [...r]);
     clueMap = puz.map(r => r.map(v => v !== 0));
     candidateGrid = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => new Set()));
@@ -373,7 +252,7 @@ function startGame(diff) {
     setPencilMode(false);
     updateUndoBtn();
     clearSavedGame();
-  }, 50);
+  });
 }
 
 function resumeGame() {
