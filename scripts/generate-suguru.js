@@ -204,15 +204,100 @@ function generateSolution(rows, cols, cageList, cageMap, deadline) {
   return result;
 }
 
-function removeClues(sol, clueRatio) {
+// Count solutions of `board` up to `limit`. Returns 0, 1, or `limit`.
+// Reuses MRV + constraint propagation from generateSolution.
+function countSolutions(board2d, rows, cols, cageList, cageMap, limit = 2) {
+  const peers = buildPeers(rows, cols, cageList, cageMap);
+  const total = rows * cols;
+  const board = new Int8Array(total);
+  const domain = new Int8Array(total);
+
+  // Initialise domains from the given board
+  for (let ci = 0; ci < total; ci++) {
+    domain[ci] = (1 << cageList[cageMap[ci]].size) - 1;
+  }
+  // Place existing clues and propagate
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const v = board2d[r][c];
+      if (v === 0) continue;
+      const ci = r * cols + c;
+      const bit = 1 << (v - 1);
+      board[ci] = v;
+      domain[ci] = bit;
+      for (const pi of peers[ci]) {
+        if (domain[pi] & bit) domain[pi] ^= bit;
+      }
+    }
+  }
+  // Quick check: did the initial propagation leave any cell empty-domained?
+  for (let ci = 0; ci < total; ci++) {
+    if (board[ci] === 0 && domain[ci] === 0) return 0;
+  }
+
+  let count = 0;
+
+  function solve() {
+    let bestCi = -1, bestSize = 99;
+    for (let ci = 0; ci < total; ci++) {
+      if (board[ci] !== 0) continue;
+      const s = popcount(domain[ci]);
+      if (s === 0) return;
+      if (s < bestSize) { bestSize = s; bestCi = ci; if (s === 1) break; }
+    }
+    if (bestCi === -1) { count++; return; }
+
+    const ci = bestCi;
+    const maxVal = cageList[cageMap[ci]].size;
+    for (let v = 1; v <= maxVal && count < limit; v++) {
+      const bit = 1 << (v - 1);
+      if (!(domain[ci] & bit)) continue;
+      const affected = [];
+      let ok = true;
+      for (const pi of peers[ci]) {
+        if (domain[pi] & bit) {
+          domain[pi] ^= bit;
+          affected.push(pi);
+          if (domain[pi] === 0 && board[pi] === 0) { ok = false; break; }
+        }
+      }
+      if (ok) {
+        board[ci] = v;
+        const saved = domain[ci];
+        domain[ci] = bit;
+        solve();
+        board[ci] = 0;
+        domain[ci] = saved;
+      }
+      for (const pi of affected) domain[pi] |= bit;
+    }
+  }
+
+  solve();
+  return count;
+}
+
+// Remove clues while preserving uniqueness. Greedily tries cells in random
+// order; if removing a cell would create ambiguity, keep that cell and move on.
+function removeClues(sol, cageList, cageMap, clueRatio) {
   const rows = sol.length, cols = sol[0].length;
   const total = rows * cols;
   const puzzle = sol.map(r => [...r]);
-  const toRemove = total - Math.round(total * clueRatio);
+  const targetClues = Math.round(total * clueRatio);
   const order = shuffle([...Array(total).keys()]);
-  for (let i = 0; i < toRemove; i++) {
-    const r = Math.floor(order[i] / cols), c = order[i] % cols;
+  let remaining = total;
+
+  for (const ci of order) {
+    if (remaining <= targetClues) break;
+    const r = Math.floor(ci / cols), c = ci % cols;
+    const backup = puzzle[r][c];
     puzzle[r][c] = 0;
+    const n = countSolutions(puzzle, rows, cols, cageList, cageMap, 2);
+    if (n === 1) {
+      remaining--;
+    } else {
+      puzzle[r][c] = backup;
+    }
   }
   return puzzle;
 }
@@ -221,10 +306,10 @@ function removeClues(sol, clueRatio) {
 function generateOne(cfg) {
   for (let attempt = 0; attempt < 100; attempt++) {
     const { cageList, cageMap } = generateCages(cfg.rows, cfg.cols);
-    const deadline = Date.now() + 3000; // 3s budget per attempt
+    const deadline = Date.now() + 3000;
     const solution = generateSolution(cfg.rows, cfg.cols, cageList, cageMap, deadline);
     if (!solution) continue;
-    const puzzle = removeClues(solution, cfg.clueRatio);
+    const puzzle = removeClues(solution, cageList, cageMap, cfg.clueRatio);
     return { solution, puzzle, cageList, cageMap, createdAt: new Date().toISOString() };
   }
   return null;

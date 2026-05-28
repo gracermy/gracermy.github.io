@@ -43,7 +43,20 @@ function idx(r, c) { return r * COLS + c; }
 
 /* ── PUZZLE BANK (pre-generated, fetched from JSON) ── */
 const PLAYED_KEY_PREFIX = 'suguru_played_';
+const BANK_VERSION_KEY = 'suguru_bank_version';
+const CURRENT_BANK_VERSION = 2; // bump when JSON banks are regenerated
 const bankCache = {}; // diff → array of puzzles
+
+// Clear stale played-index lists if the bank has been regenerated.
+(function migratePlayedLists() {
+  const v = parseInt(localStorage.getItem(BANK_VERSION_KEY) || '0');
+  if (v !== CURRENT_BANK_VERSION) {
+    for (const diff of ['easy', 'medium', 'hard']) {
+      localStorage.removeItem(PLAYED_KEY_PREFIX + diff);
+    }
+    localStorage.setItem(BANK_VERSION_KEY, String(CURRENT_BANK_VERSION));
+  }
+})();
 
 async function loadBank(diff) {
   if (bankCache[diff]) return bankCache[diff];
@@ -501,7 +514,8 @@ function placeNumber(num) {
   undoStack.push({
     row, col,
     prevVal: userGrid[row][col],
-    prevCandidates: new Set(candidateGrid[row][col])
+    prevCandidates: new Set(candidateGrid[row][col]),
+    cagePencilChanges: []   // [{r, c, hadNum}] for cage peers that had `num` stripped
   });
   updateUndoBtn();
 
@@ -523,6 +537,22 @@ function placeNumber(num) {
   el.classList.remove('error-cell'); errorCells.delete(`${row},${col}`);
   if (num !== 0) candidateGrid[row][col].clear();
   renderCell(row, col);
+
+  // Auto-clean pencil candidates of same-cage cells: if user placed a real
+  // number, remove that number from candidates of other cells in the cage.
+  if (num !== 0) {
+    const undoEntry = undoStack[undoStack.length - 1];
+    const cageId = cageMap[idx(row, col)];
+    for (const ci of cages[cageId].cells) {
+      const cr = Math.floor(ci / COLS), cc = ci % COLS;
+      if (cr === row && cc === col) continue;
+      if (candidateGrid[cr][cc].has(num)) {
+        candidateGrid[cr][cc].delete(num);
+        undoEntry.cagePencilChanges.push({ r: cr, c: cc, num });
+        renderCell(cr, cc);
+      }
+    }
+  }
 
   // Refresh same-number highlights
   document.querySelectorAll('.cell').forEach(c => c.classList.remove('same-number'));
@@ -552,6 +582,15 @@ function undoMove() {
   candidateGrid[m.row][m.col] = m.prevCandidates;
   errorCells.delete(`${m.row},${m.col}`);
   renderCell(m.row, m.col);
+
+  // Restore any cage-peer pencil candidates that were auto-stripped
+  if (m.cagePencilChanges) {
+    for (const change of m.cagePencilChanges) {
+      candidateGrid[change.r][change.c].add(change.num);
+      renderCell(change.r, change.c);
+    }
+  }
+
   updateUndoBtn();
   selectCell(m.row, m.col);
 }
