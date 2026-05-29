@@ -165,13 +165,30 @@ function loadGameState() {
 }
 
 /* ═══ DAILY OVERLAY ═══ */
-function showDailyOverlay(reward, streak, totalCoins) {
+function renderDailyCalendar(schedule, coinIconSrc) {
+  const el = document.getElementById('dailyCalendar');
+  if (!el || !schedule) return;
+  el.innerHTML = schedule.map(d => {
+    const classes = ['daily-day'];
+    if (d.claimed) classes.push('claimed');
+    if (d.isToday) classes.push('today');
+    if (d.special) classes.push('day7');
+    return `<div class="${classes.join(' ')}">
+      <span class="dd-label">${d.isToday ? 'Today' : `D${d.cycleDay}`}</span>
+      <span class="dd-reward">${d.reward}<img src="${coinIconSrc}" alt="coins"></span>
+    </div>`;
+  }).join('');
+}
+
+function showDailyOverlay(reward, streak, totalCoins, schedule) {
   const profile = loadProfile();
   document.getElementById('dailyOverlayTitle').textContent =
     profile.totalSolved === 0 ? 'Hello!' : 'Welcome back!';
   document.getElementById('dailyOverlayStreak').textContent =
     streak > 1 ? `🔥 ${streak}-day streak` : '';
   document.getElementById('dailyOverlayBalance').textContent = totalCoins;
+
+  renderDailyCalendar(schedule, 'icons/coin.svg');
 
   const amountEl = document.getElementById('dailyOverlayAmount');
   amountEl.textContent = '0';
@@ -326,6 +343,13 @@ function undoMove(){
   candidateGrid[m.row][m.col]=m.prevCandidates;
   errorCells.delete(`${m.row},${m.col}`);
   renderCell(m.row,m.col);
+  // Restore peer pencil candidates auto-stripped on the original placement
+  if (m.peerPencilChanges) {
+    for (const change of m.peerPencilChanges) {
+      candidateGrid[change.r][change.c].add(change.num);
+      renderCell(change.r, change.c);
+    }
+  }
   updateUndoBtn();
   selectCell(m.row,m.col);
 }
@@ -413,15 +437,49 @@ function selectCell(row,col){
   const val=userGrid[row][col];
   if(val!==0) for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(userGrid[r][c]===val) getCellEl(r,c).classList.add('same-number');
   if(clueMap[row][col]){selectedCell=null;document.getElementById('picker').classList.remove('visible');}
-  else{selectedCell={row,col};document.getElementById('picker').classList.add('visible');}
+  else{selectedCell={row,col};document.getElementById('picker').classList.add('visible');updatePickerForCell(row,col);}
 }
 function getCellEl(r,c){return document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`);}
+
+/* ═══ PICKER CONSTRAINTS ═══
+   Dim digits that already appear in the selected cell's row, column, or
+   3×3 box. Pencil mode is always free input (no dimming). When the
+   autoDisable setting is OFF, no dimming either.
+*/
+function peersInSameUnit(r, c) {
+  const peers = [];
+  const br = Math.floor(r/3)*3, bc = Math.floor(c/3)*3;
+  for (let i = 0; i < 9; i++) {
+    if (i !== c) peers.push([r, i]);
+    if (i !== r) peers.push([i, c]);
+  }
+  for (let rr = br; rr < br+3; rr++) for (let cc = bc; cc < bc+3; cc++) {
+    if (rr !== r && cc !== c) peers.push([rr, cc]);
+  }
+  return peers;
+}
+
+function updatePickerForCell(row, col) {
+  const autoDisable = getSetting('sudoku', 'autoDisable');
+  const blocked = new Set();
+  if (!pencilMode && autoDisable) {
+    for (const [r, c] of peersInSameUnit(row, col)) {
+      const v = clueMap[r][c] ? puzzle[r][c] : userGrid[r][c];
+      if (v !== 0) blocked.add(v);
+    }
+  }
+  document.querySelectorAll('.picker-digits .num-btn[data-num]').forEach(btn => {
+    const n = parseInt(btn.dataset.num);
+    btn.classList.toggle('dimmed', blocked.has(n));
+  });
+}
 
 /* ═══ PENCIL MODE ═══ */
 function setPencilMode(on){
   pencilMode=on;
   const btn=document.getElementById('btnPencil');
   btn.classList.toggle('pencil-active', on);
+  if (selectedCell) updatePickerForCell(selectedCell.row, selectedCell.col);
 }
 function togglePencilMode(){ setPencilMode(!pencilMode); }
 
@@ -434,7 +492,8 @@ function placeNumber(num){
   undoStack.push({
     row, col,
     prevVal: userGrid[row][col],
-    prevCandidates: new Set(candidateGrid[row][col])
+    prevCandidates: new Set(candidateGrid[row][col]),
+    peerPencilChanges: []   // [{r,c,num}] for neighbour candidates auto-stripped
   });
   updateUndoBtn();
 
@@ -461,8 +520,25 @@ function placeNumber(num){
 
   renderCell(row,col);
 
+  /* Auto-clean pencil candidates of peers (row/col/box) — placing a real
+     number means that number can no longer go in those peers, so the
+     little pencilled-in copies are stale. Recorded for undo. */
+  if (num !== 0) {
+    const undoEntry = undoStack[undoStack.length - 1];
+    for (const [r, c] of peersInSameUnit(row, col)) {
+      if (candidateGrid[r][c].has(num)) {
+        candidateGrid[r][c].delete(num);
+        undoEntry.peerPencilChanges.push({ r, c, num });
+        renderCell(r, c);
+      }
+    }
+  }
+
   document.querySelectorAll('.cell').forEach(c=>c.classList.remove('same-number'));
   if(num!==0) for(let r=0;r<9;r++)for(let c=0;c<9;c++)if(userGrid[r][c]===num) getCellEl(r,c).classList.add('same-number');
+
+  /* Refresh picker so just-placed/erased value updates */
+  updatePickerForCell(row, col);
 
   const allFilled=userGrid.every(row=>row.every(v=>v!==0));
   if(allFilled) checkSolution();
@@ -549,11 +625,18 @@ function showModal(type){
   const modal=document.getElementById('modal'),icon=document.getElementById('modal-icon'),title=document.getElementById('modal-title'),text=document.getElementById('modal-text'),bestEl=document.getElementById('modal-best'),actions=document.getElementById('modal-actions');
   bestEl.style.display='none'; actions.innerHTML='';
   if(type==='success'){
-    const isNew=submitBestTime('sudoku',currentDifficulty,seconds);
+    const timerOn = loadSettings('sudoku').showTimer;
+    const isNew = timerOn ? submitBestTime('sudoku',currentDifficulty,seconds) : false;
+    if (!timerOn) {
+      // Still count solves for totalSolved/streak purposes
+      const profile = loadProfile();
+      profile.totalSolved = (profile.totalSolved || 0) + 1;
+      saveProfile(profile);
+    }
     const reward=COIN_REWARDS[currentDifficulty]||3;
     addCoins(reward);
     icon.textContent='✦'; icon.style.color='var(--pink)'; title.textContent='Brilliant!';
-    text.textContent=`Solved in ${fmt(seconds)}.`;
+    text.textContent = timerOn ? `Solved in ${fmt(seconds)}.` : 'Solved!';
     bestEl.style.display='block';
     bestEl.innerHTML=`<div class="coin-reward-row"><span class="coin-earned-label">+<span id="coinCountUp">0</span><img src="icons/coin.svg" class="coin-icon-img coin-icon-lg" alt="coins"> earned</span></div>${isNew?'<div class="new-best-line">★ New best time!</div>':''}`;
     actions.innerHTML=`<button class="btn-primary" onclick="closeModal();startGame('${currentDifficulty}')">Play Again</button><button class="btn-secondary" onclick="closeModal();doGoHome()">Home</button>`;
@@ -568,6 +651,29 @@ function showModal(type){
 }
 function closeModal(){document.getElementById('modal').classList.remove('active');}
 function resumeTimer(){timerInterval=setInterval(()=>{if(!paused){seconds++;updateTimer();}},1000);}
+
+/* ═══ SETTINGS ═══ */
+function openSettings() {
+  const s = loadSettings('sudoku');
+  document.getElementById('setAutoDisable').checked = s.autoDisable;
+  document.getElementById('setShowTimer').checked = s.showTimer;
+  document.getElementById('settingsModal').classList.add('active');
+}
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('active');
+}
+function onSettingChange(key, value) {
+  setSetting('sudoku', key, value);
+  applySettings();
+}
+function applySettings() {
+  const s = loadSettings('sudoku');
+  // Timer toggle: hide timer display when off
+  const timerEl = document.getElementById('timer');
+  if (timerEl) timerEl.style.display = s.showTimer ? '' : 'none';
+  // Auto-disable refresh — if a cell is selected, repaint picker
+  if (selectedCell) updatePickerForCell(selectedCell.row, selectedCell.col);
+}
 
 /* ═══ KEYBOARD ═══ */
 document.addEventListener('keydown',(e)=>{
@@ -584,9 +690,10 @@ buildHome();
 buildTutDots();
 buildTutVisuals();
 updateTutSlide();
+applySettings();
 
 const daily = claimDailyReward();
 if (daily.awarded) {
   updateCoinUI();
-  showDailyOverlay(daily.reward, daily.streak, daily.coins);
+  showDailyOverlay(daily.reward, daily.streak, daily.coins, daily.schedule);
 }

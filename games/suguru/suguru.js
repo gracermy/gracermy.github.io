@@ -144,13 +144,30 @@ function loadSavedGame() {
 }
 
 /* ── DAILY OVERLAY ── */
-function showDailyOverlay(reward, streak, totalCoins) {
+function renderDailyCalendar(schedule, coinIconSrc) {
+  const el = document.getElementById('dailyCalendar');
+  if (!el || !schedule) return;
+  el.innerHTML = schedule.map(d => {
+    const classes = ['daily-day'];
+    if (d.claimed) classes.push('claimed');
+    if (d.isToday) classes.push('today');
+    if (d.special) classes.push('day7');
+    return `<div class="${classes.join(' ')}">
+      <span class="dd-label">${d.isToday ? 'Today' : `D${d.cycleDay}`}</span>
+      <span class="dd-reward">${d.reward}<img src="${coinIconSrc}" alt="coins"></span>
+    </div>`;
+  }).join('');
+}
+
+function showDailyOverlay(reward, streak, totalCoins, schedule) {
   const profile = loadProfile();
   document.getElementById('dailyOverlayTitle').textContent =
     profile.totalSolved === 0 ? 'Hello!' : 'Welcome back!';
   document.getElementById('dailyOverlayStreak').textContent =
     streak > 1 ? `🔥 ${streak}-day streak` : '';
   document.getElementById('dailyOverlayBalance').textContent = totalCoins;
+
+  renderDailyCalendar(schedule, '../sudoku/icons/coin.svg');
 
   const amountEl = document.getElementById('dailyOverlayAmount');
   amountEl.textContent = '0';
@@ -438,23 +455,28 @@ function updatePickerForCell(r, c) {
   const cageId = cageMap[idx(r, c)];
   const cage = cages[cageId];
   const cageSize = cage.size;
+  const autoDisable = getSetting('suguru', 'autoDisable');
 
-  // Values already used in this cage (excluding the selected cell itself)
+  // Pencil mode: always free input (any valid-size digit is allowed).
+  // Answer mode + autoDisable OFF: also free.
+  // Answer mode + autoDisable ON: dim cage peers + 8-dir neighbours.
   const blocked = new Set();
-  for (const ci of cage.cells) {
-    const cr = Math.floor(ci / COLS), cc = ci % COLS;
-    if (cr === r && cc === c) continue;
-    const v = clueMap[cr][cc] ? solution[cr][cc] : userGrid[cr][cc];
-    if (v !== 0) blocked.add(v);
-  }
-
-  // Values held by any 8-directional neighbour (no-touch rule)
-  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-    if (dr === 0 && dc === 0) continue;
-    const nr = r + dr, nc = c + dc;
-    if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
-    const v = clueMap[nr][nc] ? solution[nr][nc] : userGrid[nr][nc];
-    if (v !== 0) blocked.add(v);
+  if (!pencilMode && autoDisable) {
+    // Values already used in this cage (excluding the selected cell itself)
+    for (const ci of cage.cells) {
+      const cr = Math.floor(ci / COLS), cc = ci % COLS;
+      if (cr === r && cc === c) continue;
+      const v = clueMap[cr][cc] ? solution[cr][cc] : userGrid[cr][cc];
+      if (v !== 0) blocked.add(v);
+    }
+    // Values held by any 8-directional neighbour (no-touch rule)
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const nr = r + dr, nc = c + dc;
+      if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+      const v = clueMap[nr][nc] ? solution[nr][nc] : userGrid[nr][nc];
+      if (v !== 0) blocked.add(v);
+    }
   }
 
   document.querySelectorAll('#pickerDigits .num-btn').forEach(btn => {
@@ -502,6 +524,8 @@ function selectCell(r, c) {
 function setPencilMode(on) {
   pencilMode = on;
   document.getElementById('btnPencil').classList.toggle('pencil-active', on);
+  // Picker dim rules differ between pencil and answer mode — refresh.
+  if (selectedCell) updatePickerForCell(selectedCell.row, selectedCell.col);
 }
 function togglePencilMode() { setPencilMode(!pencilMode); }
 
@@ -680,12 +704,18 @@ function showModal(type) {
   bestEl.style.display = 'none'; actions.innerHTML = '';
 
   if (type === 'success') {
-    const isNew = submitBestTime('suguru', currentDifficulty, seconds);
+    const timerOn = loadSettings('suguru').showTimer;
+    const isNew = timerOn ? submitBestTime('suguru', currentDifficulty, seconds) : false;
+    if (!timerOn) {
+      const profile = loadProfile();
+      profile.totalSolved = (profile.totalSolved || 0) + 1;
+      saveProfile(profile);
+    }
     const reward = COIN_REWARDS[currentDifficulty] || 4;
     addCoins(reward);
     icon.textContent = '✦'; icon.style.color = 'var(--pink)';
     title.textContent = 'Brilliant!';
-    text.textContent = `Solved in ${fmt(seconds)}.`;
+    text.textContent = timerOn ? `Solved in ${fmt(seconds)}.` : 'Solved!';
     bestEl.style.display = 'block';
     bestEl.innerHTML = `
       <div class="coin-reward-row">
@@ -807,6 +837,95 @@ function closeTutorial() {
   if (!wasPausedBefore && document.getElementById('game').classList.contains('active')) paused = false;
 }
 
+/* ── SETTINGS ── */
+function openSettings() {
+  const s = loadSettings('suguru');
+  document.getElementById('setAutoDisable').checked = s.autoDisable;
+  document.getElementById('setShowTimer').checked = s.showTimer;
+  document.getElementById('settingsModal').classList.add('active');
+}
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('active');
+}
+function onSettingChange(key, value) {
+  setSetting('suguru', key, value);
+  applySettings();
+}
+function applySettings() {
+  const s = loadSettings('suguru');
+  const timerEl = document.getElementById('timer');
+  if (timerEl) timerEl.style.display = s.showTimer ? '' : 'none';
+  if (selectedCell) updatePickerForCell(selectedCell.row, selectedCell.col);
+}
+
+/* ── HINT SHOP ── */
+const HINT_COST_RANDOM = 2;
+const HINT_COST_CHOSEN = 5;
+let hintWasPausedBefore = false;
+
+function openHintShop() {
+  if (revealed) return;
+  hintWasPausedBefore = paused;
+  document.getElementById('hintModalCoins').textContent = getCoins();
+  const hasSelected = selectedCell && !clueMap[selectedCell.row][selectedCell.col];
+  const canAffordRandom = getCoins() >= HINT_COST_RANDOM;
+  const canAffordChosen = getCoins() >= HINT_COST_CHOSEN;
+  document.getElementById('hintRandom').disabled = !canAffordRandom;
+  document.getElementById('hintChosen').disabled = !canAffordChosen || !hasSelected;
+  const chosenDesc = document.getElementById('hintChosen').querySelector('.hint-option-desc');
+  chosenDesc.textContent = hasSelected
+    ? 'Reveals the cell you have selected.'
+    : 'Select an empty cell first, then come back.';
+  paused = true;
+  document.getElementById('hintModal').classList.add('active');
+}
+function closeHintShop() {
+  document.getElementById('hintModal').classList.remove('active');
+  paused = hintWasPausedBefore;
+}
+function revealCell(row, col) {
+  const val = solution[row][col];
+  userGrid[row][col] = val;
+  candidateGrid[row][col].clear();
+  const el = getCellEl(row, col);
+  el.classList.remove('user-filled', 'error-cell', 'has-candidates');
+  el.innerHTML = '';
+  el.textContent = val;
+  el.classList.add('hint-revealed');
+  errorCells.delete(`${row},${col}`);
+  updateCoinUI();
+}
+function useRandomHint() {
+  if (!spendCoins(HINT_COST_RANDOM)) return;
+  closeHintShop();
+  const empty = [];
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    if (!clueMap[r][c] && userGrid[r][c] === 0) empty.push([r, c]);
+  }
+  if (empty.length === 0) return;
+  const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+  revealCell(r, c); selectCell(r, c);
+  // After hint, check if grid is full
+  let allFilled = true;
+  for (let rr = 0; rr < ROWS && allFilled; rr++)
+    for (let cc = 0; cc < COLS && allFilled; cc++)
+      if (!clueMap[rr][cc] && userGrid[rr][cc] === 0) allFilled = false;
+  if (allFilled) checkSolution();
+}
+function useChosenHint() {
+  if (!selectedCell) return;
+  if (clueMap[selectedCell.row][selectedCell.col]) return;
+  if (!spendCoins(HINT_COST_CHOSEN)) return;
+  closeHintShop();
+  const { row, col } = selectedCell;
+  revealCell(row, col); selectCell(row, col);
+  let allFilled = true;
+  for (let rr = 0; rr < ROWS && allFilled; rr++)
+    for (let cc = 0; cc < COLS && allFilled; cc++)
+      if (!clueMap[rr][cc] && userGrid[rr][cc] === 0) allFilled = false;
+  if (allFilled) checkSolution();
+}
+
 /* ── KEYBOARD ── */
 document.addEventListener('keydown', e => {
   if (paused || revealed) return;
@@ -829,9 +948,10 @@ buildHome();
 buildTutDots();
 buildTutVisuals();
 updateTutSlide();
+applySettings();
 
 const daily = claimDailyReward();
 if (daily.awarded) {
   updateCoinUI();
-  showDailyOverlay(daily.reward, daily.streak, daily.coins);
+  showDailyOverlay(daily.reward, daily.streak, daily.coins, daily.schedule);
 }

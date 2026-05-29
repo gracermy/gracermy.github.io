@@ -20,6 +20,7 @@
       <span class="daily-overlay-plus">+</span><span class="daily-overlay-amount" id="dailyOverlayAmount">0</span><img src="icons/coin.svg" class="daily-overlay-coin-img" alt="coins">
     </div>
     <div class="daily-overlay-balance">Balance: <span class="daily-overlay-balance-val" id="dailyOverlayBalance">0</span> <img src="icons/coin.svg" class="daily-overlay-coin-img daily-overlay-coin-sm" alt="coins"></div>
+    <div class="daily-calendar" id="dailyCalendar"></div>
     <button class="daily-overlay-btn" onclick="dismissDailyOverlay()">Let's play</button>
   </div>
 </div>
@@ -105,6 +106,9 @@
         <span class="coin-count" id="homeCoinCount">0</span>
       </div>
     </div>
+    <button class="btn-icon settings" onclick="openSettings()" title="Settings">
+      <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
     <button class="btn-icon info" onclick="openTutorial()" title="How to play">
       <img src="icons/info.svg" class="btn-svg" alt="info">
     </button>
@@ -152,15 +156,15 @@
   </div>
   <div class="number-picker" id="picker">
     <div class="picker-digits">
-      <button class="num-btn" onclick="placeNumber(1)">1</button>
-      <button class="num-btn" onclick="placeNumber(2)">2</button>
-      <button class="num-btn" onclick="placeNumber(3)">3</button>
-      <button class="num-btn" onclick="placeNumber(4)">4</button>
-      <button class="num-btn" onclick="placeNumber(5)">5</button>
-      <button class="num-btn" onclick="placeNumber(6)">6</button>
-      <button class="num-btn" onclick="placeNumber(7)">7</button>
-      <button class="num-btn" onclick="placeNumber(8)">8</button>
-      <button class="num-btn" onclick="placeNumber(9)">9</button>
+      <button class="num-btn" data-num="1" onclick="placeNumber(1)">1</button>
+      <button class="num-btn" data-num="2" onclick="placeNumber(2)">2</button>
+      <button class="num-btn" data-num="3" onclick="placeNumber(3)">3</button>
+      <button class="num-btn" data-num="4" onclick="placeNumber(4)">4</button>
+      <button class="num-btn" data-num="5" onclick="placeNumber(5)">5</button>
+      <button class="num-btn" data-num="6" onclick="placeNumber(6)">6</button>
+      <button class="num-btn" data-num="7" onclick="placeNumber(7)">7</button>
+      <button class="num-btn" data-num="8" onclick="placeNumber(8)">8</button>
+      <button class="num-btn" data-num="9" onclick="placeNumber(9)">9</button>
     </div>
     <div class="picker-tools">
       <button class="num-btn tool-btn" id="btnPencil" onclick="togglePencilMode()" title="Pencil mode (P)">
@@ -206,6 +210,38 @@
   </div>
 </div>
 <div class="modal-overlay" id="restartModal"><div class="modal"><div class="success-icon" style="font-size:2.2rem;color:var(--success);margin-bottom:10px;">↺</div><h3>Restart Puzzle?</h3><p>This will clear all your answers and reset the timer.</p><div class="modal-actions" style="margin-top:22px;"><button class="btn-primary" onclick="doRestart()">Restart</button><button class="btn-secondary" onclick="cancelAnyModal()">Cancel</button></div></div></div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal settings-modal">
+    <h3>Settings</h3>
+    <div class="settings-list">
+      <label class="setting-row">
+        <div class="setting-text">
+          <div class="setting-title">Auto-disable answers</div>
+          <div class="setting-desc">Dim picker buttons for numbers that can't go in the selected cell.</div>
+        </div>
+        <span class="toggle">
+          <input type="checkbox" id="setAutoDisable" onchange="onSettingChange('autoDisable', this.checked)">
+          <span class="toggle-slider"></span>
+        </span>
+      </label>
+      <label class="setting-row">
+        <div class="setting-text">
+          <div class="setting-title">Show timer</div>
+          <div class="setting-desc">Display the elapsed time during play. Turning it off disables time recording for this session.</div>
+        </div>
+        <span class="toggle">
+          <input type="checkbox" id="setShowTimer" onchange="onSettingChange('showTimer', this.checked)">
+          <span class="toggle-slider"></span>
+        </span>
+      </label>
+    </div>
+    <div class="modal-actions" style="margin-top:22px;">
+      <button class="btn-secondary" onclick="closeSettings()">Done</button>
+    </div>
+  </div>
+</div>
 
 <script src="/games/profile.js"></script>
 <script src="sudoku.js"></script>

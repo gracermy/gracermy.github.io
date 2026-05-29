@@ -4,6 +4,51 @@ A running record of major changes to gracermy.github.io — what we built, why, 
 
 ---
 
+## Phase 5 — Cross-game alignment: settings, hint shop, daily calendar, unified rewards
+**Date:** 2026-05-29
+
+Sync work to make Sudoku and Nettle (and future similar games) behave consistently.
+
+**Per-game settings (modal popup):**
+- New ⚙ settings button on the home screen of each game
+- Two toggles, both ON by default:
+  - **Auto-disable answers** — when ON, picker dims digits that can't go in the selected cell (Sudoku: row/col/box constraints; Nettle: cage + 8-dir neighbours). When OFF, picker is fully unrestricted. Pencil mode always free regardless of setting.
+  - **Show timer** — when OFF, timer is hidden AND time isn't recorded (best-time tracking skipped for that session). Win modal shows "Solved!" instead of "Solved in MM:SS."
+- Storage: `<game>_settings` localStorage, accessed via shared `loadSettings/saveSettings/getSetting/setSetting` in profile.js.
+
+**Sudoku changes for alignment:**
+- Constrained picker added (`updatePickerForCell` checks row/col/3×3 box, respects autoDisable setting + pencil mode)
+- Pencil candidates auto-clean on real-number placement — placing a real number strips that value from candidates in the same row, column, and 3×3 box (parity with Nettle's behaviour). Undo restores them.
+
+**Nettle changes for alignment:**
+- Picker dimming now respects the autoDisable setting and pencil mode (was always dimming previously). In pencil mode and autoDisable=OFF mode, all valid-size digits remain enabled — free input.
+- Hint shop added (parity with Sudoku): 💡 button in top bar, modal offers Random (2 coins) and Chosen (5 coins) hints.
+
+**Unified daily reward curve (replaces old `50 + min(streak-1,5)*10`):**
+| Day | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8+ |
+|---|---|---|---|---|---|---|---|---|
+| Reward | 50 | 60 | 70 | 80 | 90 | 100 | **200** | cycle back to 50 |
+
+Streak counter keeps growing even after the cycle wraps; the badge always shows the current `streak` value. Skipping a day resets streak to 1 but doesn't punish the user — they restart at 50.
+
+**Weekly calendar UI in daily reward overlay:**
+- 7 day chips, current day highlighted in gold gradient with subtle glow
+- Day 7 chip uses pink/violet gradient + small ★ corner marker (visible weekly milestone)
+- Reward amount displayed under each chip
+- Claimed days have a subtle gold tint to show progression
+
+**Profile reset (PROFILE_VERSION 1 → 2):**
+Every existing user gets a fresh start on next load — coins, streak, totalSolved, bestTimes, and lastVisitDate all reset. Acceptable because only Grace and a small testing group have any state.
+
+**New shared helpers in profile.js:**
+- `rewardForDay(streakDay)` — returns the coin reward for a given streak day
+- `dailyRewardSchedule(currentStreak)` — returns an array of 7 day descriptors for calendar rendering
+- `loadSettings`, `saveSettings`, `getSetting`, `setSetting` — per-game settings
+
+**How to apply this pattern to future games:** Include the settings modal markup verbatim from Sudoku/Nettle (toggles, descriptions, gear icon SVG). Call `applySettings()` on init and in `setPencilMode`. Add `updatePickerForCell()` that checks the game's specific constraints under `if (!pencilMode && getSetting(game, 'autoDisable'))`. For win, gate `submitBestTime()` on `showTimer` and increment `totalSolved` manually when timer is off.
+
+---
+
 ## Phase 4 — Wordle (endless mode)
 **Date:** 2026-05-28 → 2026-05-29
 

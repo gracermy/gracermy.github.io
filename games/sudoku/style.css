@@ -210,6 +210,7 @@ body::before {
 }
 .num-btn:hover { background: var(--number-hover); border-color: var(--pink); transform: scale(1.04); }
 .num-btn:active { transform: scale(0.95); }
+.num-btn.dimmed { opacity: 0.2; pointer-events: none; }
 
 /* tool buttons (pencil/erase) in the second row are wider, not square */
 .picker-tools .num-btn {
@@ -412,6 +413,65 @@ body::before {
 .daily-overlay-btn:hover  { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(250,204,21,0.4); }
 .daily-overlay-btn:active { transform: scale(0.98); }
 
+/* DAILY CALENDAR (weekly streak progression) */
+.daily-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin: 4px 0 24px;
+  width: 100%;
+}
+.daily-day {
+  position: relative;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 8px 4px 6px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-family: 'JetBrains Mono', monospace;
+  transition: all 0.2s;
+}
+.daily-day .dd-label {
+  font-size: 0.6rem; color: var(--text-dim); letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.daily-day .dd-reward {
+  font-size: 0.78rem; font-weight: 700; color: var(--text-dim);
+  display: flex; align-items: center; gap: 2px; line-height: 1;
+}
+.daily-day .dd-reward img { width: 11px; height: 11px; }
+.daily-day.claimed {
+  background: rgba(250,204,21,0.10);
+  border-color: rgba(250,204,21,0.30);
+}
+.daily-day.claimed .dd-reward { color: #facc15; }
+.daily-day.today {
+  background: linear-gradient(135deg, rgba(250,204,21,0.18), rgba(245,158,11,0.18));
+  border-color: rgba(250,204,21,0.55);
+  box-shadow: 0 0 14px rgba(250,204,21,0.25);
+  transform: scale(1.05);
+}
+.daily-day.today .dd-label { color: #facc15; }
+.daily-day.today .dd-reward { color: #facc15; }
+.daily-day.day7 {
+  background: linear-gradient(135deg, rgba(244,114,182,0.18), rgba(167,139,250,0.18));
+  border-color: rgba(244,114,182,0.55);
+}
+.daily-day.day7 .dd-reward { color: var(--pink); }
+.daily-day.day7::before {
+  content: '★';
+  position: absolute; top: 1px; right: 4px;
+  font-size: 0.55rem; color: var(--pink);
+  font-family: 'Outfit', sans-serif;
+}
+.daily-day.today.day7 {
+  background: linear-gradient(135deg, rgba(244,114,182,0.30), rgba(167,139,250,0.30));
+  border-color: var(--pink);
+  box-shadow: 0 0 18px rgba(244,114,182,0.40);
+}
+.daily-day.today.day7 .dd-label,
+.daily-day.today.day7 .dd-reward { color: var(--pink); }
+
 /* HOME STATS ROW */
 .home-stats { display: flex; align-items: center; gap: 8px; }
 .streak-badge {
@@ -436,6 +496,54 @@ body::before {
 .coin-display.compact .coin-icon-img { width: 16px; height: 16px; }
 .coin-display:not(.compact) .coin-icon-img { width: 20px; height: 20px; }
 .coin-display:not(.compact) .coin-count { font-size: 0.95rem; }
+
+/* ── SETTINGS BUTTON + MODAL + TOGGLES ── */
+.btn-icon.settings:hover { border-color: var(--blue); }
+.settings-modal { max-width: 420px; text-align: left; }
+.settings-modal h3 { text-align: center; }
+.settings-list { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; padding: 14px 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.setting-row:hover { border-color: rgba(96,165,250,0.35); background: rgba(96,165,250,0.04); }
+.setting-text { flex: 1; min-width: 0; }
+.setting-title { font-size: 0.93rem; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.setting-desc { font-size: 0.76rem; color: var(--text-dim); line-height: 1.45; font-weight: 300; }
+.toggle {
+  position: relative; flex-shrink: 0;
+  display: inline-block; width: 42px; height: 24px;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid var(--border-soft);
+  border-radius: 24px;
+  transition: background 0.2s, border-color 0.2s;
+  cursor: pointer;
+}
+.toggle-slider::before {
+  content: ''; position: absolute;
+  width: 16px; height: 16px;
+  left: 3px; top: 3px;
+  background: var(--text-dim);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+.toggle input:checked + .toggle-slider {
+  background: var(--pink-soft);
+  border-color: var(--pink);
+}
+.toggle input:checked + .toggle-slider::before {
+  transform: translateX(18px);
+  background: var(--pink);
+}
 
 /* Desktop: give the game screen more padding */
 @media (min-width: 600px) {

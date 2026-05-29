@@ -396,6 +396,136 @@ body::before {
 .daily-overlay-btn:hover { transform: translateY(-1px); }
 .daily-overlay-btn:active { transform: scale(0.98); }
 
+/* DAILY CALENDAR (weekly streak progression) */
+.daily-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin: 4px 0 24px;
+  width: 100%;
+}
+.daily-day {
+  position: relative;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 8px 4px 6px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-family: 'JetBrains Mono', monospace;
+  transition: all 0.2s;
+}
+.daily-day .dd-label {
+  font-size: 0.6rem; color: var(--text-dim); letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.daily-day .dd-reward {
+  font-size: 0.78rem; font-weight: 700; color: var(--text-dim);
+  display: flex; align-items: center; gap: 2px; line-height: 1;
+}
+.daily-day .dd-reward img { width: 11px; height: 11px; }
+.daily-day.claimed {
+  background: rgba(250,204,21,0.10);
+  border-color: rgba(250,204,21,0.30);
+}
+.daily-day.claimed .dd-reward { color: #facc15; }
+.daily-day.today {
+  background: linear-gradient(135deg, rgba(250,204,21,0.18), rgba(245,158,11,0.18));
+  border-color: rgba(250,204,21,0.55);
+  box-shadow: 0 0 14px rgba(250,204,21,0.25);
+  transform: scale(1.05);
+}
+.daily-day.today .dd-label { color: #facc15; }
+.daily-day.today .dd-reward { color: #facc15; }
+.daily-day.day7 {
+  background: linear-gradient(135deg, rgba(244,114,182,0.18), rgba(167,139,250,0.18));
+  border-color: rgba(244,114,182,0.55);
+}
+.daily-day.day7 .dd-reward { color: var(--pink); }
+.daily-day.day7::before {
+  content: '★';
+  position: absolute; top: 1px; right: 4px;
+  font-size: 0.55rem; color: var(--pink);
+  font-family: 'Outfit', sans-serif;
+}
+.daily-day.today.day7 {
+  background: linear-gradient(135deg, rgba(244,114,182,0.30), rgba(167,139,250,0.30));
+  border-color: var(--pink);
+  box-shadow: 0 0 18px rgba(244,114,182,0.40);
+}
+.daily-day.today.day7 .dd-label,
+.daily-day.today.day7 .dd-reward { color: var(--pink); }
+
+/* ── SETTINGS BUTTON + MODAL + TOGGLES ── */
+.btn-icon.settings:hover { border-color: var(--blue); }
+.btn-icon.hint:hover     { border-color: var(--success); }
+.settings-modal { max-width: 420px; text-align: left; }
+.settings-modal h3 { text-align: center; }
+.settings-list { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; padding: 14px 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.setting-row:hover { border-color: rgba(96,165,250,0.35); background: rgba(96,165,250,0.04); }
+.setting-text { flex: 1; min-width: 0; }
+.setting-title { font-size: 0.93rem; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.setting-desc { font-size: 0.76rem; color: var(--text-dim); line-height: 1.45; font-weight: 300; }
+.toggle { position: relative; flex-shrink: 0; display: inline-block; width: 42px; height: 24px; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid var(--border-soft);
+  border-radius: 24px;
+  transition: background 0.2s, border-color 0.2s; cursor: pointer;
+}
+.toggle-slider::before {
+  content: ''; position: absolute;
+  width: 16px; height: 16px; left: 3px; top: 3px;
+  background: var(--text-dim); border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+.toggle input:checked + .toggle-slider { background: var(--pink-soft); border-color: var(--pink); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(18px); background: var(--pink); }
+
+/* ── HINT SHOP MODAL ── */
+.hint-modal { max-width: 400px; text-align: left; }
+.hint-modal h3 { text-align: center; }
+.hint-modal-balance {
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+.hint-modal-balance img { vertical-align: middle; }
+.hint-options { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+.hint-option {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; padding: 14px 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  cursor: pointer; transition: all 0.15s;
+  font-family: 'Outfit', sans-serif; color: var(--text);
+}
+.hint-option:hover:not(:disabled) { border-color: var(--success); background: rgba(52,211,153,0.06); }
+.hint-option:disabled { opacity: 0.35; cursor: not-allowed; }
+.hint-option-left { text-align: left; flex: 1; }
+.hint-option-title { font-size: 0.95rem; font-weight: 600; margin-bottom: 3px; }
+.hint-option-desc { font-size: 0.75rem; color: var(--text-dim); font-weight: 300; }
+.hint-option-cost {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem; font-weight: 700; color: #facc15;
+  display: flex; align-items: center; gap: 4px;
+  white-space: nowrap;
+}
+.hint-option-cost img { width: 16px; height: 16px; }
+.cell.hint-revealed { color: var(--success) !important; font-weight: 700; }
+
 /* ── DESKTOP ── */
 @media (min-width: 600px) {
   #game { padding: 20px 24px; gap: 14px; }
