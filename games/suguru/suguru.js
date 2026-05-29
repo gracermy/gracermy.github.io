@@ -538,14 +538,33 @@ function placeNumber(num) {
   if (num !== 0) candidateGrid[row][col].clear();
   renderCell(row, col);
 
-  // Auto-clean pencil candidates of same-cage cells: if user placed a real
-  // number, remove that number from candidates of other cells in the cage.
+  // Auto-clean pencil candidates: if user placed a real number, remove that
+  // number from pencil candidates of any cell where it could no longer be
+  // valid — same-cage peers AND all 8-directional neighbours (no-touch rule).
   if (num !== 0) {
     const undoEntry = undoStack[undoStack.length - 1];
+    const visited = new Set();
+    const affected = [];
+
+    // Same-cage cells
     const cageId = cageMap[idx(row, col)];
     for (const ci of cages[cageId].cells) {
       const cr = Math.floor(ci / COLS), cc = ci % COLS;
       if (cr === row && cc === col) continue;
+      const key = cr * COLS + cc;
+      if (!visited.has(key)) { visited.add(key); affected.push([cr, cc]); }
+    }
+
+    // 8-directional neighbours
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const nr = row + dr, nc = col + dc;
+      if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+      const key = nr * COLS + nc;
+      if (!visited.has(key)) { visited.add(key); affected.push([nr, nc]); }
+    }
+
+    for (const [cr, cc] of affected) {
       if (candidateGrid[cr][cc].has(num)) {
         candidateGrid[cr][cc].delete(num);
         undoEntry.cagePencilChanges.push({ r: cr, c: cc, num });
