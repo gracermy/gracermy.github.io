@@ -216,6 +216,7 @@ body::before {
   display: flex; align-items: center; justify-content: center;
 }
 .key.wide { flex: 1.5 1 0; font-size: 0.7rem; letter-spacing: 0.04em; }
+.key[data-key="BACK"] { font-size: 1.35rem; }
 .key:hover { background: var(--key-hover); }
 .key:active { transform: scale(0.93); }
 .key.green  { background: var(--tile-green);  color: #fff; }
@@ -331,4 +332,5 @@ body::before {
   .board { max-width: 360px; }
   .key { height: 56px; font-size: 1.05rem; }
   .key.wide { font-size: 0.75rem; }
+  .key[data-key="BACK"] { font-size: 1.5rem; }
 }

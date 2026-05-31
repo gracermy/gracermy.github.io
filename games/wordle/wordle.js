@@ -313,7 +313,8 @@ function submitGuess() {
 
     if (result.every(r => r === 'green')) {
       gameOver = true;
-      showWinModal();
+      // Let the final tile's green be seen before the modal covers it.
+      setTimeout(showWinModal, 600);
       return;
     }
     currentRow++;
@@ -397,7 +398,11 @@ function shareResult() {
     lines.push(s);
   }
   const text = lines.join('\n');
-  if (navigator.clipboard) {
+
+  // Mobile: open the OS share sheet. Desktop: copy to clipboard.
+  if (navigator.share) {
+    navigator.share({ text }).catch(() => {/* user cancelled — ignore */});
+  } else if (navigator.clipboard) {
     navigator.clipboard.writeText(text).then(
       () => showToast('Copied to clipboard'),
       () => showToast('Could not copy')
