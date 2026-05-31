@@ -1,4 +1,4 @@
-name: Generate Suguru puzzles
+name: Generate puzzles
 
 on:
   schedule:
@@ -17,17 +17,20 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Generate puzzles
+      - name: Generate Suguru puzzles
         run: node scripts/generate-suguru.js
+
+      - name: Generate Nonogram puzzles
+        run: node scripts/generate-nonogram.js
 
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add games/suguru/puzzles/*.json
+          git add games/suguru/puzzles/*.json games/nonogram/puzzles/*.json
           if git diff --staged --quiet; then
             echo "No new puzzles to commit."
           else
-            git commit -m "Add more Suguru puzzles (automated monthly run)"
+            git commit -m "Add more puzzles (automated monthly run)"
             git push
           fi

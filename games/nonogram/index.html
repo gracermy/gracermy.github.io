@@ -2,49 +2,268 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Pixle · gracermy</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: #0d0f1a; color: #e8eaf0;
-    font-family: 'Outfit', sans-serif;
-    min-height: 100dvh; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 28px;
-    padding: 24px;
-  }
-  body::before {
-    content: ''; position: fixed; top: -50%; left: -50%; width: 200%; height: 200%;
-    background: radial-gradient(ellipse at 30% 20%, rgba(167,139,250,0.07) 0%, transparent 50%),
-                radial-gradient(ellipse at 70% 80%, rgba(96,165,250,0.05) 0%, transparent 50%);
-    pointer-events: none;
-  }
-  .back-link {
-    position: fixed; top: 14px; left: 16px;
-    font-size: 0.78rem; color: rgba(255,255,255,0.35); text-decoration: none;
-    transition: color 0.2s;
-  }
-  .back-link:hover { color: rgba(255,255,255,0.7); }
-  .icon { font-size: 3rem; line-height: 1; }
-  h1 {
-    font-family: 'DM Serif Display', serif; font-size: clamp(2.4rem, 7vw, 3.5rem);
-    background: linear-gradient(135deg, #a78bfa, #60a5fa);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-  }
-  p { font-size: 0.95rem; color: rgba(255,255,255,0.4); font-weight: 300; text-align: center; max-width: 300px; line-height: 1.6; }
-  .badge {
-    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.1em;
-    text-transform: uppercase; color: #a78bfa;
-    border: 1px solid rgba(167,139,250,0.35); border-radius: 20px; padding: 5px 14px;
-  }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <a href="/games/" class="back-link">← Games</a>
-<div class="icon">🟪</div>
-<h1>Pixle</h1>
-<span class="badge">Coming soon</span>
-<p>Use row and column number clues to paint a hidden pixel picture. Also called Picross.</p>
+
+<!-- DAILY REWARD OVERLAY -->
+<div class="daily-overlay" id="dailyOverlay">
+  <div class="daily-overlay-content">
+    <div class="daily-overlay-icon">✦</div>
+    <h2 class="daily-overlay-title" id="dailyOverlayTitle">Welcome back!</h2>
+    <div class="daily-overlay-streak" id="dailyOverlayStreak"></div>
+    <div class="daily-overlay-reward">
+      <span class="daily-overlay-plus">+</span><span class="daily-overlay-amount" id="dailyOverlayAmount">0</span><img src="../sudoku/icons/coin.svg" class="daily-overlay-coin-img" alt="coins">
+    </div>
+    <div class="daily-overlay-balance">Balance: <span class="daily-overlay-balance-val" id="dailyOverlayBalance">0</span> <img src="../sudoku/icons/coin.svg" class="daily-overlay-coin-img daily-overlay-coin-sm" alt="coins"></div>
+    <div class="daily-calendar" id="dailyCalendar"></div>
+    <button class="daily-overlay-btn" onclick="dismissDailyOverlay()">Let's play</button>
+  </div>
+</div>
+
+<div class="loading-overlay" id="loading"><div class="spinner"></div><p>Loading puzzle…</p></div>
+
+<!-- TUTORIAL -->
+<div class="tutorial-overlay" id="tutorial">
+  <div class="tut-panel">
+    <div class="tut-header">
+      <h2>How to Play</h2>
+      <div class="tut-header-row">
+        <div class="tut-counter" id="tutCounter">1 / 4</div>
+        <button class="tut-close-btn" onclick="closeTutorial()" title="Close">✕</button>
+      </div>
+    </div>
+    <div class="tut-slide-area">
+
+      <div class="tut-slide active" data-slide="0">
+        <div class="tut-visual" id="tutVis1"></div>
+        <div class="tut-text">
+          <h4>Read the Clues</h4>
+          <p>Numbers beside each row and above each column tell you the lengths of the filled runs in order. "2 1" means a block of 2, then a block of 1, with at least one gap between.</p>
+        </div>
+      </div>
+
+      <div class="tut-slide" data-slide="1">
+        <div class="tut-visual" id="tutVis2"></div>
+        <div class="tut-text">
+          <h4>Tap to Cycle</h4>
+          <p>Tap a cell to fill it. Tap again to mark it with ✕ (definitely blank — a memory aid). Tap once more to clear it.</p>
+        </div>
+      </div>
+
+      <div class="tut-slide" data-slide="2">
+        <div class="tut-visual" id="tutVis3"></div>
+        <div class="tut-text">
+          <h4>Drag to Paint</h4>
+          <p>Press and drag across a line to fill (or mark) several cells in one stroke. The first cell sets what the whole stroke does.</p>
+        </div>
+      </div>
+
+      <div class="tut-slide" data-slide="3">
+        <div class="tut-visual" id="tutVis4"></div>
+        <div class="tut-text">
+          <h4>Reveal the Picture</h4>
+          <p>Use the clues to deduce every filled cell. When the filled cells match the hidden picture, you win — no submit button needed.</p>
+        </div>
+      </div>
+
+    </div>
+    <div class="tut-footer">
+      <button class="tut-nav-btn tut-btn-prev" id="tutPrev" onclick="tutNav(-1)">Back</button>
+      <div class="tut-dots" id="tutDots"></div>
+      <button class="tut-nav-btn tut-btn-next" id="tutNext" onclick="tutNav(1)">Next</button>
+    </div>
+  </div>
+</div>
+
+<!-- HOME -->
+<div id="home" class="screen active">
+  <div class="home-actions">
+    <div class="home-stats">
+      <div class="streak-badge" id="streakBadge" style="display:none;"></div>
+      <div class="coin-display" id="homeCoinDisplay">
+        <img src="../sudoku/icons/coin.svg" class="coin-icon-img" alt="coins">
+        <span class="coin-count" id="homeCoinCount">0</span>
+      </div>
+    </div>
+    <button class="btn-icon settings" onclick="openSettings()" title="Settings">
+      <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+    <button class="btn-icon info" onclick="openTutorial()" title="How to play">
+      <img src="../sudoku/icons/info.svg" class="btn-svg" alt="info">
+    </button>
+  </div>
+  <div class="logo-cluster">
+    <h1>Pixle</h1>
+    <p>A picture logic puzzle</p>
+  </div>
+  <div class="resume-wrap" id="resumeWrap" style="display:none;"></div>
+  <div class="difficulty-select" id="diffSelect"></div>
+</div>
+
+<!-- GAME -->
+<div id="game" class="screen">
+  <div class="top-bar">
+    <div style="display:flex;align-items:center;">
+      <h2 class="game-title-btn" onclick="confirmHome()" title="Home">Pixle</h2>
+      <span class="diff-tag" id="diffTag"></span>
+    </div>
+    <div class="timer-group">
+      <div class="coin-display compact" id="gameCoinDisplay">
+        <img src="../sudoku/icons/coin.svg" class="coin-icon-img" alt="coins">
+        <span class="coin-count" id="gameCoinCount">0</span>
+      </div>
+      <div class="timer" id="timer">00:00</div>
+      <button class="btn-icon undo" id="btnUndo" onclick="undoMove()" title="Undo" disabled>
+        <img src="../sudoku/icons/undo.svg" class="btn-svg" alt="undo">
+      </button>
+      <button class="btn-icon restart" id="btnRestart" onclick="confirmRestart()" title="Restart">
+        <img src="../sudoku/icons/restart.svg" class="btn-svg" alt="restart">
+      </button>
+      <button class="btn-icon" onclick="togglePause()" title="Pause/Resume" id="btnPause">
+        <img src="../sudoku/icons/pause.svg" class="btn-svg" id="pauseIcon" alt="pause">
+      </button>
+      <button class="btn-icon hint" id="btnHint" onclick="openHintShop()" title="Hints">
+        <img src="../sudoku/icons/hint.svg" class="btn-svg" alt="hint">
+      </button>
+      <button class="btn-icon info" id="btnInfo" onclick="openTutorial()" title="How to play">
+        <img src="../sudoku/icons/info.svg" class="btn-svg" alt="info">
+      </button>
+      <button class="btn-icon give-up" onclick="confirmGiveUp()" title="Give Up" id="btnGiveUp">
+        <img src="../sudoku/icons/close.svg" class="btn-svg" alt="give up">
+      </button>
+    </div>
+  </div>
+
+  <div class="grid-wrapper" id="gridWrapper">
+    <div class="nono-board" id="board"></div>
+    <div class="pause-overlay" id="pauseOverlay">
+      <span>Paused</span>
+      <button class="btn-resume" onclick="togglePause()">Resume</button>
+    </div>
+  </div>
+
+  <p class="play-hint">Tap to fill · tap again to ✕ · drag to paint a line</p>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div id="modal-icon" class="success-icon"></div>
+    <h3 id="modal-title"></h3>
+    <p id="modal-text"></p>
+    <div id="modal-best" class="new-best" style="display:none;"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <div class="success-icon" style="font-size:2.2rem;color:var(--text-dim);margin-bottom:10px;">⚠</div>
+    <h3>Leave Game?</h3>
+    <p>Your progress is saved — you can continue from the home screen.</p>
+    <div class="modal-actions" style="margin-top:22px;">
+      <button class="btn-primary" onclick="doGoHome()">Leave</button>
+      <button class="btn-secondary" onclick="cancelAnyModal()">Stay</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="giveUpModal">
+  <div class="modal">
+    <div class="success-icon" style="font-size:2.2rem;color:var(--error);margin-bottom:10px;">⚑</div>
+    <h3>Give Up?</h3>
+    <p>This will reveal the picture. Your time won't be recorded.</p>
+    <div class="modal-actions" style="margin-top:22px;">
+      <button class="btn-primary" onclick="doGiveUp()">Reveal</button>
+      <button class="btn-secondary" onclick="cancelAnyModal()">Keep Trying</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="restartModal">
+  <div class="modal">
+    <div class="success-icon" style="font-size:2.2rem;color:var(--success);margin-bottom:10px;">↺</div>
+    <h3>Restart Puzzle?</h3>
+    <p>This will clear all your marks and reset the timer.</p>
+    <div class="modal-actions" style="margin-top:22px;">
+      <button class="btn-primary" onclick="doRestart()">Restart</button>
+      <button class="btn-secondary" onclick="cancelAnyModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal settings-modal">
+    <h3>Settings</h3>
+    <div class="settings-list">
+      <label class="setting-row">
+        <div class="setting-text">
+          <div class="setting-title">Auto-dim solved clues</div>
+          <div class="setting-desc">Fade a row or column's clue numbers once its filled cells match the clue.</div>
+        </div>
+        <span class="toggle">
+          <input type="checkbox" id="setAutoDisable" onchange="onSettingChange('autoDisable', this.checked)">
+          <span class="toggle-slider"></span>
+        </span>
+      </label>
+      <label class="setting-row">
+        <div class="setting-text">
+          <div class="setting-title">Show timer</div>
+          <div class="setting-desc">Display the elapsed time during play. Turning it off disables time recording for this session.</div>
+        </div>
+        <span class="toggle">
+          <input type="checkbox" id="setShowTimer" onchange="onSettingChange('showTimer', this.checked)">
+          <span class="toggle-slider"></span>
+        </span>
+      </label>
+    </div>
+    <div class="modal-actions" style="margin-top:22px;">
+      <button class="btn-secondary" onclick="closeSettings()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- HINT SHOP MODAL -->
+<div class="modal-overlay" id="hintModal">
+  <div class="modal hint-modal">
+    <h3>Need a Hint?</h3>
+    <p class="hint-modal-balance">
+      You have <span id="hintModalCoins">0</span>
+      <img src="../sudoku/icons/coin.svg" class="coin-icon-img coin-icon-lg" alt="coins">
+    </p>
+    <div class="hint-options">
+      <button class="hint-option" id="hintRandom" onclick="useRandomHint()">
+        <div class="hint-option-left">
+          <div class="hint-option-title">Random</div>
+          <div class="hint-option-desc">Resolves one random unsolved cell.</div>
+        </div>
+        <div class="hint-option-cost">
+          2 <img src="../sudoku/icons/coin.svg" class="coin-icon-img" alt="coins">
+        </div>
+      </button>
+      <button class="hint-option" id="hintChosen" onclick="useChosenHint()">
+        <div class="hint-option-left">
+          <div class="hint-option-title">Chosen</div>
+          <div class="hint-option-desc">Resolves the cell you have selected.</div>
+        </div>
+        <div class="hint-option-cost">
+          5 <img src="../sudoku/icons/coin.svg" class="coin-icon-img" alt="coins">
+        </div>
+      </button>
+    </div>
+    <div class="modal-actions" style="margin-top:22px;">
+      <button class="btn-secondary" onclick="closeHintShop()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="/games/profile.js"></script>
+<script src="nonogram.js"></script>
 </body>
 </html>

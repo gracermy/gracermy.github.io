@@ -4,6 +4,33 @@ A running record of major changes to gracermy.github.io — what we built, why, 
 
 ---
 
+## Phase 6 — Pixle (Nonogram) build
+**Date:** 2026-06-01
+
+**What:** First playable Pixle game at `/games/nonogram/` (display name "Pixle", URL slug `nonogram`). Picross/nonogram: fill cells to match row/column run-length clues and reveal a hidden picture.
+
+**Difficulties:** Easy 5×5, Medium 10×10, Hard 15×15. Coin rewards 4/8/14 (matching Nettle's scale).
+
+**Generation (puzzle-bank pattern, like Nettle):**
+- `scripts/generate-nonogram.js` runs offline. Generates a random filled grid at a target density, derives row/col clues, then **verifies uniqueness with a line-solver** (constraint propagation): if the clues don't fully determine the grid via line-solving alone, the puzzle is ambiguous and discarded. Only uniquely-solvable puzzles are kept.
+- Bundles to `games/nonogram/puzzles/{easy,medium,hard}.json` as `{"puzzles":[...]}`. Solution rows stored as bit-strings (`"10110"`) to keep JSON small (~152 KB for 150/150/100 = 400 puzzles). Generation takes <1s for the full bank.
+- Bank version key `nonogram_bank_version` + played-index migration, same as Nettle.
+- Added a Nonogram step to `.github/workflows/generate-puzzles.yml` (the workflow now generates both Suguru and Nonogram monthly; renamed from "Generate Suguru puzzles" to "Generate puzzles").
+
+**Gameplay:**
+- **Tap to cycle** empty → filled → ✕ (marked-blank) → empty.
+- **Drag to paint** — press and drag paints one target value across a line; the first cell's resulting value sets the stroke mode. Implemented via delegated `pointerdown`/`pointerover` on the board with `touch-action: none` so dragging doesn't scroll. One drag = one undo entry (batched changes).
+- **Lenient validation** (chosen up front): no mistake feedback mid-play. Win fires the instant the FILLED set matches the solution — ✕ marks are ignored.
+- **Auto-dim solved clues** is the game's `autoDisable` analog (gated on the shared setting): a row/col clue strip fades green once its filled cells match the clue.
+
+**Shared systems reused verbatim:** profile.js (coins, streak, daily calendar overlay with "Day N" labels, best times), settings modal (autoDisable + showTimer), hint shop (Random 2c / Chosen 5c — here a hint *resolves* a cell to its true filled/blank state), pause, undo, restart, give-up, tutorial, win modal (gates `submitBestTime` on showTimer).
+
+**Aesthetic:** Pixle's existing purple→blue identity (not Nettle's pink/blue). Filled cells use a purple→blue gradient; 5-cell block separators on the grid for readability.
+
+**Deferred:** Puzzles are currently random pictures. Recognizable-shape generation (curated/hand-authored grids) is a later pass now that UI + logic are proven.
+
+---
+
 ## Phase 5 — Cross-game alignment: settings, hint shop, daily calendar, unified rewards
 **Date:** 2026-05-29
 
