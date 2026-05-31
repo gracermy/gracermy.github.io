@@ -24,6 +24,7 @@ body {
   background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif;
   min-height: 100dvh; display: flex; flex-direction: column;
   align-items: center; justify-content: center; overflow-x: hidden; position: relative;
+  touch-action: manipulation; /* disable double-tap-to-zoom (iOS ignores user-scalable=no) */
 }
 body::before {
   content: ''; position: fixed; top: -50%; left: -50%; width: 200%; height: 200%;
@@ -124,7 +125,7 @@ body::before {
 .btn-icon:disabled { opacity: 0.25; pointer-events: none; }
 
 /* coin icon img used in badges */
-.coin-icon-img { width: 14px; height: 14px; opacity: 0.9; pointer-events: none; filter: invert(85%) sepia(50%) saturate(400%) hue-rotate(5deg) brightness(105%); }
+.coin-icon-img { width: 14px; height: 14px; opacity: 0.9; pointer-events: none; }
 .coin-icon-lg { width: 22px; height: 22px; vertical-align: middle; margin-left: 2px; }
 
 /* GRID */
@@ -432,8 +433,8 @@ body::before {
   transition: all 0.2s;
 }
 .daily-day .dd-label {
-  font-size: 0.6rem; color: var(--text-dim); letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 0.56rem; color: var(--text-dim); letter-spacing: 0.02em;
+  text-transform: uppercase; white-space: nowrap;
 }
 .daily-day .dd-reward {
   font-size: 0.78rem; font-weight: 700; color: var(--text-dim);

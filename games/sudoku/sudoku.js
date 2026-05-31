@@ -174,7 +174,7 @@ function renderDailyCalendar(schedule, coinIconSrc) {
     if (d.isToday) classes.push('today');
     if (d.special) classes.push('day7');
     return `<div class="${classes.join(' ')}">
-      <span class="dd-label">${d.isToday ? 'Today' : `D${d.cycleDay}`}</span>
+      <span class="dd-label">${d.isToday ? 'Today' : `Day ${d.cycleDay}`}</span>
       <span class="dd-reward">${d.reward}<img src="${coinIconSrc}" alt="coins"></span>
     </div>`;
   }).join('');

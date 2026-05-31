@@ -54,13 +54,30 @@ function updateCoinUI() {
 }
 
 /* ── DAILY OVERLAY (shared coin/streak system) ── */
-function showDailyOverlay(reward, streak, totalCoins) {
+function renderDailyCalendar(schedule, coinIconSrc) {
+  const el = document.getElementById('dailyCalendar');
+  if (!el || !schedule) return;
+  el.innerHTML = schedule.map(d => {
+    const classes = ['daily-day'];
+    if (d.claimed) classes.push('claimed');
+    if (d.isToday) classes.push('today');
+    if (d.special) classes.push('day7');
+    return `<div class="${classes.join(' ')}">
+      <span class="dd-label">${d.isToday ? 'Today' : `Day ${d.cycleDay}`}</span>
+      <span class="dd-reward">${d.reward}<img src="${coinIconSrc}" alt="coins"></span>
+    </div>`;
+  }).join('');
+}
+
+function showDailyOverlay(reward, streak, totalCoins, schedule) {
   const profile = loadProfile();
   document.getElementById('dailyOverlayTitle').textContent =
     profile.totalSolved === 0 ? 'Hello!' : 'Welcome back!';
   document.getElementById('dailyOverlayStreak').textContent =
     streak > 1 ? `🔥 ${streak}-day streak` : '';
   document.getElementById('dailyOverlayBalance').textContent = totalCoins;
+
+  renderDailyCalendar(schedule, '../sudoku/icons/coin.svg');
 
   const amountEl = document.getElementById('dailyOverlayAmount');
   amountEl.textContent = '0';
@@ -511,5 +528,5 @@ updateTutSlide();
 const daily = claimDailyReward();
 if (daily.awarded) {
   updateCoinUI();
-  showDailyOverlay(daily.reward, daily.streak, daily.coins);
+  showDailyOverlay(daily.reward, daily.streak, daily.coins, daily.schedule);
 }
