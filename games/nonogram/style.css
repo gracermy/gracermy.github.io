@@ -145,6 +145,26 @@ body::before {
 
 .play-hint { font-size: 0.72rem; color: var(--text-dim); text-align: center; flex-shrink: 0; font-weight: 300; letter-spacing: 0.02em; }
 
+/* ── FILL / MARK MODE TOGGLE ── */
+.mode-toggle { display: flex; gap: 8px; width: 100%; max-width: 320px; flex-shrink: 0; }
+.mode-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 0; border-radius: 12px;
+  border: 1.5px solid var(--border-soft); background: var(--bg-surface);
+  color: var(--text-dim); font-family: 'Outfit', sans-serif; font-size: 0.9rem; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.mode-btn:active { transform: scale(0.97); }
+.mode-btn.active { border-color: var(--purple); background: var(--purple-soft); color: var(--text); }
+.mode-swatch {
+  width: 16px; height: 16px; border-radius: 4px;
+  background: linear-gradient(135deg, var(--purple), var(--blue));
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.mode-btn.active .mode-swatch { box-shadow: 0 0 8px rgba(167,139,250,0.5); }
+.mode-x { font-size: 1rem; color: var(--text-dim); line-height: 1; }
+.mode-btn.active .mode-x { color: var(--text); }
+
 /* ── GRID ── */
 .grid-wrapper {
   width: min(100%, calc(100dvh - 200px));
@@ -181,8 +201,14 @@ body::before {
 }
 .row-clue { flex-direction: row; gap: clamp(3px, 1vw, 7px); padding-right: 6px; }
 .col-clue { flex-direction: column; justify-content: flex-end; gap: clamp(1px, 0.5vw, 4px); padding-bottom: 4px; }
-.row-clue span, .col-clue span { line-height: 1; }
-.row-clue.done, .col-clue.done { opacity: 0.3; color: var(--success); }
+.row-clue span, .col-clue span { line-height: 1; position: relative; }
+/* Satisfied line: strike through each clue number (kept legible, not dimmed). */
+.row-clue.done span, .col-clue.done span {
+  text-decoration: line-through;
+  text-decoration-color: var(--success);
+  text-decoration-thickness: 2px;
+  color: var(--text-dim); opacity: 0.7;
+}
 
 /* Cells */
 .nono-cell {
@@ -196,7 +222,7 @@ body::before {
 .nono-cell.block-left { border-left: 2px solid rgba(255,255,255,0.28); }
 .nono-cell.block-top  { border-top:  2px solid rgba(255,255,255,0.28); }
 .nono-cell.filled {
-  background: linear-gradient(135deg, var(--purple), var(--blue));
+  /* flat color set inline per cell from the puzzle's palette */
   border-color: rgba(255,255,255,0.12);
 }
 .nono-cell.marked .x-mark {

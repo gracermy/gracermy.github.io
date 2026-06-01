@@ -50,8 +50,8 @@
       <div class="tut-slide" data-slide="1">
         <div class="tut-visual" id="tutVis2"></div>
         <div class="tut-text">
-          <h4>Tap to Cycle</h4>
-          <p>Tap a cell to fill it. Tap again to mark it with ✕ (definitely blank — a memory aid). Tap once more to clear it.</p>
+          <h4>Fill or Mark</h4>
+          <p>Use the Fill / Mark toggle under the grid to choose your tool. In Fill mode a tap fills a cell; in Mark mode a tap places ✕ (definitely blank — a memory aid). Tap a cell again to clear it.</p>
         </div>
       </div>
 
@@ -147,7 +147,15 @@
     </div>
   </div>
 
-  <p class="play-hint">Tap to fill · tap again to ✕ · drag to paint a line</p>
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="modeFill" onclick="setInputMode(1)">
+      <span class="mode-swatch"></span> Fill
+    </button>
+    <button class="mode-btn" id="modeMark" onclick="setInputMode(2)">
+      <span class="mode-x">✕</span> Mark
+    </button>
+  </div>
+  <p class="play-hint">Tap or drag to paint · switch tool to mark ✕</p>
 </div>
 
 <!-- MODALS -->

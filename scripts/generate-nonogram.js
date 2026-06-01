@@ -20,10 +20,24 @@ const fs = require('fs');
 const path = require('path');
 
 const DIFFICULTIES = {
-  easy:   { rows: 5,  cols: 5,  density: 0.55 },
-  medium: { rows: 10, cols: 10, density: 0.50 },
-  hard:   { rows: 15, cols: 15, density: 0.48 },
+  easy:   { rows: 5,  cols: 5,  density: 0.55, palette: 1 },
+  medium: { rows: 10, cols: 10, density: 0.50, palette: 2 },
+  hard:   { rows: 15, cols: 15, density: 0.48, palette: 3 },
 };
+
+// Flat colors a filled cell can take. Each puzzle picks `palette` of these at
+// random; every filled cell is assigned one of the chosen colors. Mirrors how
+// real picture nonograms use only a few colors (subject + background, etc.).
+const COLOR_POOL = [
+  '#f472b6', // pink
+  '#60a5fa', // blue
+  '#a78bfa', // purple
+  '#34d399', // green
+  '#fbbf24', // amber
+  '#fb7185', // rose
+  '#22d3ee', // cyan
+  '#f97316', // orange
+];
 const DEFAULT_COUNTS = { easy: 150, medium: 150, hard: 100 };
 const OUT_DIR = path.join(__dirname, '..', 'games', 'nonogram', 'puzzles');
 
@@ -211,11 +225,22 @@ function generateOne(cfg) {
 
     if (lineSolve(rows, cols, rowClues, colClues) !== 'unique') continue;
 
+    // Pick this puzzle's palette and assign each filled cell a color index.
+    // Clues are based on filled/blank only (monochrome logic); color is purely
+    // decorative, so it doesn't affect solvability or uniqueness.
+    const palette = shuffle([...COLOR_POOL]).slice(0, cfg.palette);
+    // Per-cell color index as a single char ("." = blank). Palette size ≤ 8,
+    // so a single digit per cell is enough.
+    const colorRows = grid.map(row =>
+      row.map(v => v ? String(Math.floor(Math.random() * palette.length)) : '.').join(''));
+
     return {
       rows, cols,
       solution: grid.map(row => row.join('')),
       rowClues,
       colClues,
+      palette,
+      colors: colorRows,   // per-cell color index ("." = blank)
       createdAt: new Date().toISOString(),
     };
   }

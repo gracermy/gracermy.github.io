@@ -18,10 +18,13 @@ A running record of major changes to gracermy.github.io — what we built, why, 
 - Added a Nonogram step to `.github/workflows/generate-puzzles.yml` (the workflow now generates both Suguru and Nonogram monthly; renamed from "Generate Suguru puzzles" to "Generate puzzles").
 
 **Gameplay:**
-- **Tap to cycle** empty → filled → ✕ (marked-blank) → empty.
-- **Drag to paint** — press and drag paints one target value across a line; the first cell's resulting value sets the stroke mode. Implemented via delegated `pointerdown`/`pointerover` on the board with `touch-action: none` so dragging doesn't scroll. One drag = one undo entry (batched changes).
-- **Lenient validation** (chosen up front): no mistake feedback mid-play. Win fires the instant the FILLED set matches the solution — ✕ marks are ignored.
-- **Auto-dim solved clues** is the game's `autoDisable` analog (gated on the shared setting): a row/col clue strip fades green once its filled cells match the clue.
+- **Fill / Mark toggle** under the grid (the M key toggles too). Fill mode taps fill; Mark mode taps place ✕. Tapping a cell that's already in the active state clears it.
+- **Drag to paint** — press and drag paints one target value across a line; the first cell's resulting value sets the stroke mode. Delegated `pointerdown`/`pointerover` on the board with `touch-action: none` so dragging doesn't scroll. One drag = one undo entry (batched changes, including any auto-marks it triggers).
+- **Auto-mark**: when a row/column's filled cells match its clue (ANY arrangement, not just the true solution), the remaining empties auto-fill with ✕. If the line later stops matching, the auto-✕ are removed (manual ✕ are never touched). Tracked via an `autoMarked` grid; auto-changes fold into the triggering move's undo entry.
+- **Strikethrough clues**: a satisfied row/col clue's numbers get a green line-through (kept legible, not dimmed). Gated on the shared `autoDisable` setting.
+- **Lenient validation** (chosen up front): no mistake feedback mid-play. Win fires the instant the FILLED set matches the solution — ✕ marks ignored.
+
+**Colour:** Each puzzle carries a small flat-colour palette (Easy 1, Medium 2, Hard 3 colours, chosen at random from an 8-colour pool) and a per-cell colour index, both stored in the JSON (`palette`, `colors` — `.` = blank, one digit per filled cell). Filled cells render as a flat colour from the palette, mirroring how real picture nonograms use only a few colours (subject + background). Clues are still pure filled/blank logic — colour is decorative and doesn't affect solvability. Bank version bumped 1 → 2 for the colour data.
 
 **Shared systems reused verbatim:** profile.js (coins, streak, daily calendar overlay with "Day N" labels, best times), settings modal (autoDisable + showTimer), hint shop (Random 2c / Chosen 5c — here a hint *resolves* a cell to its true filled/blank state), pause, undo, restart, give-up, tutorial, win modal (gates `submitBestTime` on showTimer).
 

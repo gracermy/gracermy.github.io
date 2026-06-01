@@ -13,6 +13,7 @@ const DIFFICULTIES = {
   medium: { label: 'Medium', rows: 10, cols: 10, dot: 'medium' },
   hard:   { label: 'Hard',   rows: 15, cols: 15, dot: 'hard'   },
 };
+const DEFAULT_FILL = '#a78bfa'; // fallback if a puzzle has no palette data
 const COIN_REWARDS = { easy: 4, medium: 8, hard: 14 };
 const SAVE_KEY = 'nonogram_resume';
 
@@ -22,13 +23,17 @@ const EMPTY = 0, FILLED = 1, MARK = 2;
 /* ── STATE ── */
 let ROWS, COLS;
 let solution = [];        // ROWS×COLS of 0/1 (the answer)
+let colorMap = [];        // ROWS×COLS of palette index (-1 = blank) — decorative
+let palette = [];         // this puzzle's flat colors
 let rowClues = [], colClues = [];
 let userGrid = [];        // ROWS×COLS of EMPTY/FILLED/MARK
+let autoMarked = [];      // ROWS×COLS bool — true if an ✕ was placed automatically
 let selectedCell = null;
 let paused = false, revealed = false;
 let seconds = 0, timerInterval = null;
 let undoStack = [];
 let currentDifficulty = 'easy';
+let inputMode = FILLED;   // FILLED or MARK — the active tool (toggle)
 let wasPausedBefore = false;
 
 // Drag-paint state
@@ -44,7 +49,7 @@ function fmt(s) {
 /* ── PUZZLE BANK (pre-generated, fetched from JSON) ── */
 const PLAYED_KEY_PREFIX = 'nonogram_played_';
 const BANK_VERSION_KEY = 'nonogram_bank_version';
-const CURRENT_BANK_VERSION = 1; // bump when JSON banks are regenerated
+const CURRENT_BANK_VERSION = 2; // bump when JSON banks are regenerated
 const bankCache = {};
 
 (function migratePlayedLists() {
@@ -99,6 +104,9 @@ async function runGeneration(diff, callback) {
       solution: p.solution.map(s => s.split('').map(Number)),
       rowClues: p.rowClues,
       colClues: p.colClues,
+      palette: p.palette || [DEFAULT_FILL],
+      colors: (p.colors || p.solution.map(s => s.replace(/1/g, '0').replace(/0/g, '.')))
+        .map(s => s.split('').map(ch => ch === '.' ? -1 : Number(ch))),
     });
   } catch (err) {
     console.error('Nonogram puzzle load failed:', err);
@@ -121,7 +129,8 @@ function saveGameState() {
     difficulty: currentDifficulty,
     rows: ROWS, cols: COLS,
     solution, rowClues, colClues,
-    userGrid, seconds,
+    palette, colorMap,
+    userGrid, autoMarked, seconds,
   }));
 }
 function clearSavedGame() { localStorage.removeItem(SAVE_KEY); }
@@ -203,7 +212,7 @@ function buildHome() {
     const btn = document.createElement('button'); btn.className = 'diff-btn';
     const best = getBestTime('nonogram', k);
     const bs = best ? `<span class="best-badge">Best ${fmt(best)}</span>` : '';
-    btn.innerHTML = `<div class="diff-label"><span class="diff-dot ${cfg.dot}"></span>${cfg.label} · ${cfg.rows}×${cfg.cols}</div><div>${bs}</div>`;
+    btn.innerHTML = `<div class="diff-label"><span class="diff-dot ${cfg.dot}"></span>${cfg.label}</div><div>${bs}</div>`;
     btn.onclick = () => startGame(k);
     el.appendChild(btn);
   }
@@ -254,7 +263,9 @@ function confirmRestart() {
 function doRestart() {
   document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
   userGrid = Array.from({ length: ROWS }, () => new Array(COLS).fill(EMPTY));
+  autoMarked = Array.from({ length: ROWS }, () => new Array(COLS).fill(false));
   undoStack = []; selectedCell = null; revealed = false;
+  inputMode = FILLED; updateModeUI();
   updateUndoBtn(); buildGrid();
   clearInterval(timerInterval); startTimer();
   clearSavedGame();
@@ -278,13 +289,16 @@ function startGame(diff) {
   revealed = false; undoStack = []; selectedCell = null;
   document.getElementById('loading').classList.add('active');
 
-  runGeneration(diff, ({ solution: sol, rowClues: rc, colClues: cc }) => {
+  runGeneration(diff, ({ solution: sol, rowClues: rc, colClues: cc, palette: pal, colors: col }) => {
     try {
       const cfg = DIFFICULTIES[diff];
       ROWS = cfg.rows; COLS = cfg.cols;
       solution = sol;
       rowClues = rc; colClues = cc;
+      palette = pal; colorMap = col;
       userGrid = Array.from({ length: ROWS }, () => new Array(COLS).fill(EMPTY));
+      autoMarked = Array.from({ length: ROWS }, () => new Array(COLS).fill(false));
+      inputMode = FILLED; updateModeUI();
 
       const tag = document.getElementById('diffTag');
       tag.textContent = cfg.label; tag.className = 'diff-tag ' + diff;
@@ -312,9 +326,13 @@ function resumeGame() {
   ROWS = saved.rows; COLS = saved.cols;
   solution = saved.solution;
   rowClues = saved.rowClues; colClues = saved.colClues;
+  palette = saved.palette || [DEFAULT_FILL];
+  colorMap = saved.colorMap || solution.map(row => row.map(v => v ? 0 : -1));
   userGrid = saved.userGrid;
+  autoMarked = saved.autoMarked || userGrid.map(row => row.map(() => false));
   seconds = saved.seconds;
   revealed = false; paused = false; undoStack = []; selectedCell = null;
+  inputMode = FILLED; updateModeUI();
 
   const cfg = DIFFICULTIES[currentDifficulty];
   const tag = document.getElementById('diffTag');
@@ -401,10 +419,19 @@ function renderCell(r, c) {
   const el = getCellEl(r, c);
   if (!el) return;
   el.classList.remove('filled', 'marked', 'reveal-filled');
+  el.style.background = '';
   el.innerHTML = '';
   const v = userGrid[r][c];
-  if (v === FILLED) el.classList.add('filled');
-  else if (v === MARK) { el.classList.add('marked'); el.innerHTML = '<span class="x-mark">✕</span>'; }
+  if (v === FILLED) {
+    el.classList.add('filled');
+    // Use the cell's decorative color; if this cell isn't part of the picture
+    // (a wrong guess), fall back to the puzzle's first palette color.
+    const ci = colorMap[r] && colorMap[r][c] >= 0 ? colorMap[r][c] : 0;
+    el.style.background = palette[ci] || palette[0] || DEFAULT_FILL;
+  } else if (v === MARK) {
+    el.classList.add('marked');
+    el.innerHTML = '<span class="x-mark">✕</span>';
+  }
 }
 
 function renderAllCells() {
@@ -455,19 +482,29 @@ function refreshClueSatisfaction() {
   }
 }
 
-/* ── INPUT: tap to cycle, drag to paint ── */
-// Tap cycles EMPTY → FILLED → MARK → EMPTY.
-function cycleValue(v) {
-  if (v === EMPTY) return FILLED;
-  if (v === FILLED) return MARK;
-  return EMPTY;
+/* ── INPUT MODE (fill / mark toggle) ── */
+function setInputMode(mode) {
+  inputMode = mode;
+  updateModeUI();
+}
+function toggleInputMode() {
+  setInputMode(inputMode === FILLED ? MARK : FILLED);
+}
+function updateModeUI() {
+  const fillBtn = document.getElementById('modeFill');
+  const markBtn = document.getElementById('modeMark');
+  if (!fillBtn || !markBtn) return;
+  fillBtn.classList.toggle('active', inputMode === FILLED);
+  markBtn.classList.toggle('active', inputMode === MARK);
 }
 
+/* ── INPUT: tap toggles in current mode, drag paints ── */
 function applyCell(r, c, value, batch) {
   const prev = userGrid[r][c];
   if (prev === value) return false;
-  if (batch) batch.push({ r, c, prev });
+  if (batch) batch.push({ r, c, prev, prevAuto: autoMarked[r][c] });
   userGrid[r][c] = value;
+  autoMarked[r][c] = false; // any manual change clears the auto flag
   renderCell(r, c);
   return true;
 }
@@ -476,22 +513,18 @@ function pointerDownCell(r, c) {
   if (paused || revealed) return;
   dragging = true;
   dragChanges = [];
-  // First cell determines the drag mode: tapping cycles, but for a drag we
-  // paint a single target value derived from the first cell's NEW value.
-  const newVal = cycleValue(userGrid[r][c]);
+  // The active tool decides the value. Tapping a cell already in that state
+  // clears it (toggle); otherwise set it. The first cell fixes the drag target.
+  const newVal = (userGrid[r][c] === inputMode) ? EMPTY : inputMode;
   dragMode = newVal;
   applyCell(r, c, newVal, dragChanges);
-  afterCellChange(r, c);
 }
 
 function pointerEnterCell(r, c) {
   if (!dragging || paused || revealed) return;
   if (dragMode === null) return;
-  // While dragging, paint dragMode onto cells (but only overwrite cells that
-  // differ — and don't flip already-painted cells back and forth).
   if (userGrid[r][c] !== dragMode) {
     applyCell(r, c, dragMode, dragChanges);
-    afterCellChange(r, c);
   }
 }
 
@@ -499,6 +532,13 @@ function pointerUp() {
   if (!dragging) return;
   dragging = false;
   if (dragChanges && dragChanges.length > 0) {
+    // Auto-mark every row/col touched by this stroke, recording the ✕ it adds
+    // (or removes) into the SAME undo entry so one undo reverts everything.
+    const rowsTouched = new Set(dragChanges.map(ch => ch.r));
+    const colsTouched = new Set(dragChanges.map(ch => ch.c));
+    for (const r of rowsTouched) autoMarkRow(r, dragChanges);
+    for (const c of colsTouched) autoMarkCol(c, dragChanges);
+
     undoStack.push({ changes: dragChanges });
     updateUndoBtn();
     refreshClueSatisfaction();
@@ -508,17 +548,44 @@ function pointerUp() {
   dragMode = null;
 }
 
-// Light per-cell refresh during a drag (cheap); full check on pointer-up.
-function afterCellChange(r, c) {
-  const strip = document.querySelector(`.row-clue[data-row="${r}"]`);
-  if (strip && getSetting('nonogram', 'autoDisable')) {
-    strip.classList.toggle('done', lineMatchesClue(userGrid[r], rowClues[r]));
+/* ── AUTO-MARK ── */
+// When a line's FILLED cells match its clue (any arrangement, per spec), fill
+// the remaining EMPTY cells with ✕. If the line no longer matches, remove the
+// ✕ that WE placed automatically (manual ✕ are left alone). Changes are pushed
+// into `batch` so they undo together with the move that triggered them.
+function setCellAuto(r, c, value, isAuto, batch) {
+  const prev = userGrid[r][c];
+  const prevAuto = autoMarked[r][c];
+  if (prev === value && prevAuto === isAuto) return;
+  batch.push({ r, c, prev, prevAuto });
+  userGrid[r][c] = value;
+  autoMarked[r][c] = isAuto;
+  renderCell(r, c);
+}
+
+function autoMarkLine(cells, clue, batch) {
+  const values = cells.map(([r, c]) => userGrid[r][c]);
+  if (lineMatchesClue(values, clue)) {
+    // Fill every EMPTY cell with an auto ✕.
+    for (const [r, c] of cells) {
+      if (userGrid[r][c] === EMPTY) setCellAuto(r, c, MARK, true, batch);
+    }
+  } else {
+    // Line broke — strip any ✕ we auto-placed on this line.
+    for (const [r, c] of cells) {
+      if (autoMarked[r][c] && userGrid[r][c] === MARK) setCellAuto(r, c, EMPTY, false, batch);
+    }
   }
-  const cstrip = document.querySelector(`.col-clue[data-col="${c}"]`);
-  if (cstrip && getSetting('nonogram', 'autoDisable')) {
-    const col = userGrid.map(row => row[c]);
-    cstrip.classList.toggle('done', lineMatchesClue(col, colClues[c]));
-  }
+}
+function autoMarkRow(r, batch) {
+  const cells = [];
+  for (let c = 0; c < COLS; c++) cells.push([r, c]);
+  autoMarkLine(cells, rowClues[r], batch);
+}
+function autoMarkCol(c, batch) {
+  const cells = [];
+  for (let r = 0; r < ROWS; r++) cells.push([r, c]);
+  autoMarkLine(cells, colClues[c], batch);
 }
 
 /* ── UNDO ── */
@@ -526,8 +593,9 @@ function undoMove() {
   if (undoStack.length === 0 || paused || revealed) return;
   const m = undoStack.pop();
   for (let i = m.changes.length - 1; i >= 0; i--) {
-    const { r, c, prev } = m.changes[i];
+    const { r, c, prev, prevAuto } = m.changes[i];
     userGrid[r][c] = prev;
+    autoMarked[r][c] = prevAuto || false;
     renderCell(r, c);
   }
   updateUndoBtn();
@@ -649,14 +717,17 @@ function buildTutVisuals() {
       <div style="font-size:0.72rem;color:var(--text-dim);text-align:center;">Clue "2 1" → a run of 2, then a run of 1, with a gap between.</div>
     </div>`;
 
-  // Slide 2: tap to fill / mark
+  // Slide 2: fill vs mark tools
   document.getElementById('tutVis2').innerHTML = `
-    <div style="display:flex;align-items:center;gap:14px;">
-      ${miniGrid(['0'])}
-      <span style="color:var(--text-dim);">→</span>
-      ${miniGrid(['1'])}
-      <span style="color:var(--text-dim);">→</span>
-      ${miniGrid(['x'])}
+    <div style="display:flex;align-items:center;gap:20px;">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+        ${miniGrid(['1'])}
+        <div style="font-size:0.7rem;color:var(--text-dim);">Fill</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+        ${miniGrid(['x'])}
+        <div style="font-size:0.7rem;color:var(--text-dim);">Mark ✕</div>
+      </div>
     </div>`;
 
   // Slide 3: drag to paint
@@ -747,18 +818,25 @@ function closeHintShop() {
   document.getElementById('hintModal').classList.remove('active');
   paused = hintWasPausedBefore;
 }
+// Commit a single-cell change, run auto-mark for its row+col, and record it
+// all as ONE undo entry. Shared by keyboard input and hints.
+function commitSingle(r, c, value) {
+  const batch = [];
+  applyCell(r, c, value, batch);
+  autoMarkRow(r, batch);
+  autoMarkCol(c, batch);
+  if (batch.length > 0) {
+    undoStack.push({ changes: batch });
+    updateUndoBtn();
+  }
+  refreshClueSatisfaction();
+}
+
 // Resolve a cell to its TRUE value (filled or marked-blank) as a hint.
 function revealHintCell(r, c) {
   const want = solution[r][c] === 1 ? FILLED : MARK;
-  const prev = userGrid[r][c];
-  if (prev !== want) {
-    undoStack.push({ changes: [{ r, c, prev }] });
-    updateUndoBtn();
-  }
-  userGrid[r][c] = want;
-  renderCell(r, c);
+  commitSingle(r, c, want);
   getCellEl(r, c).classList.add('hint-cell');
-  refreshClueSatisfaction();
 }
 function useRandomHint() {
   if (getCoins() < HINT_COST_RANDOM) return;
@@ -818,21 +896,17 @@ function initPointerHandlers() {
 document.addEventListener('keydown', e => {
   if (paused || revealed) return;
   if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoMove(); return; }
+  if (e.key === 'm' || e.key === 'M') { toggleInputMode(); return; }
   if (!selectedCell) return;
   const { row, col } = selectedCell;
-  // Space / F fills, X marks, Backspace clears
+  // Space / F fills (toggle), X marks (toggle)
   if (e.key === ' ' || e.key === 'f' || e.key === 'F') {
     e.preventDefault();
-    const v = userGrid[row][col] === FILLED ? EMPTY : FILLED;
-    undoStack.push({ changes: [{ r: row, c: col, prev: userGrid[row][col] }] });
-    userGrid[row][col] = v; renderCell(row, col); updateUndoBtn();
-    refreshClueSatisfaction(); checkWin();
+    commitSingle(row, col, userGrid[row][col] === FILLED ? EMPTY : FILLED);
+    checkWin();
   }
   if (e.key === 'x' || e.key === 'X') {
-    const v = userGrid[row][col] === MARK ? EMPTY : MARK;
-    undoStack.push({ changes: [{ r: row, c: col, prev: userGrid[row][col] }] });
-    userGrid[row][col] = v; renderCell(row, col); updateUndoBtn();
-    refreshClueSatisfaction();
+    commitSingle(row, col, userGrid[row][col] === MARK ? EMPTY : MARK);
   }
   if (e.key === 'ArrowUp'    && row > 0)      { e.preventDefault(); setSelected(row-1, col); }
   if (e.key === 'ArrowDown'  && row < ROWS-1) { e.preventDefault(); setSelected(row+1, col); }
