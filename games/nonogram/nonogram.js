@@ -509,20 +509,46 @@ function applyCell(r, c, value, batch) {
   return true;
 }
 
+// A single TAP cycles the cell through three states, with the active tool
+// deciding which value comes first:
+//   tool = FILL:  blank → FILL → MARK → blank
+//   tool = MARK:  blank → MARK → FILL → blank
+// (i.e. tap1 = tool value, tap2 = the opposite, tap3 = reset to blank)
+function tapCycle(current) {
+  const opposite = inputMode === FILLED ? MARK : FILLED;
+  if (current === EMPTY) return inputMode;
+  if (current === inputMode) return opposite;
+  return EMPTY; // current === opposite → reset
+}
+
+// Track whether the pointer moved after going down, to tell a tap from a drag.
+let dragStart = null;     // { r, c } of the cell pressed
+let dragMoved = false;    // becomes true once we enter a different cell
+
 function pointerDownCell(r, c) {
   if (paused || revealed) return;
   dragging = true;
   dragChanges = [];
-  // The active tool decides the value. Tapping a cell already in that state
-  // clears it (toggle); otherwise set it. The first cell fixes the drag target.
-  const newVal = (userGrid[r][c] === inputMode) ? EMPTY : inputMode;
-  dragMode = newVal;
-  applyCell(r, c, newVal, dragChanges);
+  dragStart = { r, c };
+  dragMoved = false;
+  // Provisionally treat this as a tap → cycle the pressed cell. If a drag
+  // begins (pointer enters another cell), pointerEnterCell will convert the
+  // stroke to a paint of the active tool's value.
+  applyCell(r, c, tapCycle(userGrid[r][c]), dragChanges);
 }
 
 function pointerEnterCell(r, c) {
   if (!dragging || paused || revealed) return;
-  if (dragMode === null) return;
+  if (r === dragStart.r && c === dragStart.c) return;
+
+  if (!dragMoved) {
+    // First real movement → this is a drag, not a tap. A drag PAINTS the
+    // active tool's value (no 3-cycle). Reset the start cell to that value so
+    // the whole stroke is consistent.
+    dragMoved = true;
+    dragMode = inputMode;
+    applyCell(dragStart.r, dragStart.c, dragMode, dragChanges);
+  }
   if (userGrid[r][c] !== dragMode) {
     applyCell(r, c, dragMode, dragChanges);
   }
@@ -866,7 +892,19 @@ function useChosenHint() {
   checkWin();
 }
 
-/* ── POINTER WIRING (delegated on the board) ── */
+/* ── POINTER WIRING ── */
+// On touch, the pointer is implicitly captured by the element the touch began
+// on, so `pointerover`/`pointerenter` don't fire on the cells the finger moves
+// across. To make drag-paint work on phones we instead hit-test with
+// `elementFromPoint` on every `pointermove`.
+function cellFromPoint(x, y) {
+  const el = document.elementFromPoint(x, y);
+  if (!el) return null;
+  const cell = el.closest && el.closest('.nono-cell');
+  if (!cell) return null;
+  return { r: +cell.dataset.row, c: +cell.dataset.col };
+}
+
 function initPointerHandlers() {
   const board = document.getElementById('board');
 
@@ -876,15 +914,19 @@ function initPointerHandlers() {
     e.preventDefault();
     const r = +cell.dataset.row, c = +cell.dataset.col;
     setSelected(r, c);
-    // Don't capture on the board — capturing breaks pointerenter on siblings.
+    // Release implicit capture so elementFromPoint hit-testing drives the drag.
+    if (board.hasPointerCapture && board.hasPointerCapture(e.pointerId)) {
+      board.releasePointerCapture(e.pointerId);
+    }
     pointerDownCell(r, c);
   });
 
-  board.addEventListener('pointerover', e => {
+  // Drive the drag from pointermove + hit-testing (works for touch AND mouse).
+  document.addEventListener('pointermove', e => {
     if (!dragging) return;
-    const cell = e.target.closest('.nono-cell');
-    if (!cell) return;
-    pointerEnterCell(+cell.dataset.row, +cell.dataset.col);
+    e.preventDefault();
+    const hit = cellFromPoint(e.clientX, e.clientY);
+    if (hit) pointerEnterCell(hit.r, hit.c);
   });
 
   // End the drag anywhere.
