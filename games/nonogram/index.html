@@ -43,15 +43,15 @@
         <div class="tut-visual" id="tutVis1"></div>
         <div class="tut-text">
           <h4>Read the Clues</h4>
-          <p>Numbers beside each row and above each column tell you the lengths of the filled runs in order. "2 1" means a block of 2, then a block of 1, with at least one gap between.</p>
+          <p>Numbers beside each row and above each column give the lengths of the filled runs in order. Each number is tinted its run's colour. Same-colour runs have a gap between them; different colours may sit side by side.</p>
         </div>
       </div>
 
       <div class="tut-slide" data-slide="1">
         <div class="tut-visual" id="tutVis2"></div>
         <div class="tut-text">
-          <h4>Fill or Mark</h4>
-          <p>Use the Fill / Mark toggle under the grid to choose your tool. In Fill mode a tap fills a cell; in Mark mode a tap places ✕ (definitely blank — a memory aid). Tap a cell again to clear it.</p>
+          <h4>Pick a Tool</h4>
+          <p>Buttons under the grid choose your tool: a colour to fill with, or Mark (✕) for cells you know are blank. Colourful puzzles show one button per colour; simple ones just have Fill. Tap a cell to apply the tool, tap again for ✕, a third tap clears it.</p>
         </div>
       </div>
 
@@ -147,15 +147,7 @@
     </div>
   </div>
 
-  <div class="mode-toggle">
-    <button class="mode-btn active" id="modeFill" onclick="setInputMode(1)">
-      <span class="mode-swatch"></span> Fill
-    </button>
-    <button class="mode-btn" id="modeMark" onclick="setInputMode(2)">
-      <span class="mode-x">✕</span> Mark
-    </button>
-  </div>
-  <p class="play-hint">Tap or drag to paint · switch tool to mark ✕</p>
+  <div class="mode-toggle" id="modeToggle"><!-- Fill (per color) + Mark, built dynamically --></div>
 </div>
 
 <!-- MODALS -->
@@ -212,8 +204,8 @@
     <div class="settings-list">
       <label class="setting-row">
         <div class="setting-text">
-          <div class="setting-title">Auto-dim solved clues</div>
-          <div class="setting-desc">Fade a row or column's clue numbers once its filled cells match the clue.</div>
+          <div class="setting-title">Auto-mark blanks</div>
+          <div class="setting-desc">When a row or column's filled cells match its clue, automatically ✕ the remaining empty cells in that line.</div>
         </div>
         <span class="toggle">
           <input type="checkbox" id="setAutoDisable" onchange="onSettingChange('autoDisable', this.checked)">

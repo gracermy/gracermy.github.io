@@ -1,10 +1,13 @@
 /* ═══════════════════════════════════════════════════
-   NONOGRAM.JS  (Pixle)
-   Rules:
-   - Fill cells so each row/column matches its run-length clues.
-   - Cells cycle empty → filled → X (marked-blank) → empty on tap.
-   - Drag to paint a line; the first cell's action sets the drag mode.
-   - Win when the set of FILLED cells matches the solution (X marks ignored).
+   NONOGRAM.JS  (Pixle)  — COLORED nonograms
+   Cell value model:
+     EMPTY = 0
+     1..K  = filled with palette[value-1]
+     MARK  = -1  (✕, "definitely blank")
+   Clues are colored: each is [length, colorIdx]. Same-color runs need a gap;
+   different-color runs may touch. Win when every cell's color matches the
+   solution. Easy puzzles have 1 color (classic picross); medium/hard mix
+   1- and 2-color puzzles.
    ═══════════════════════════════════════════════════ */
 
 /* ── CONSTANTS ── */
@@ -17,29 +20,31 @@ const DEFAULT_FILL = '#a78bfa'; // fallback if a puzzle has no palette data
 const COIN_REWARDS = { easy: 4, medium: 8, hard: 14 };
 const SAVE_KEY = 'nonogram_resume';
 
-// Cell states
-const EMPTY = 0, FILLED = 1, MARK = 2;
+// Cell states. Colors are 1..K; EMPTY and MARK are sentinels.
+const EMPTY = 0, MARK = -1;
+function isColor(v) { return v >= 1; }
 
 /* ── STATE ── */
 let ROWS, COLS;
-let solution = [];        // ROWS×COLS of 0/1 (the answer)
-let colorMap = [];        // ROWS×COLS of palette index (-1 = blank) — decorative
-let palette = [];         // this puzzle's flat colors
-let rowClues = [], colClues = [];
-let userGrid = [];        // ROWS×COLS of EMPTY/FILLED/MARK
-let autoMarked = [];      // ROWS×COLS bool — true if an ✕ was placed automatically
+let solution = [];        // ROWS×COLS: 0 blank, 1..K color value
+let palette = [];         // this puzzle's flat colors (index = value-1)
+let rowClues = [], colClues = [];  // each clue = [[len, colorIdx], ...]
+let userGrid = [];        // ROWS×COLS of EMPTY / 1..K / MARK
+let autoMarked = [];      // ROWS×COLS bool — true if ✕ placed automatically
 let selectedCell = null;
 let paused = false, revealed = false;
 let seconds = 0, timerInterval = null;
 let undoStack = [];
 let currentDifficulty = 'easy';
-let inputMode = FILLED;   // FILLED or MARK — the active tool (toggle)
+let inputMode = 1;        // active tool: a color value 1..K, or MARK
 let wasPausedBefore = false;
 
 // Drag-paint state
 let dragging = false;
 let dragMode = null;      // target value applied during the drag
-let dragChanges = null;   // batch of {r,c,prev} for one undo entry
+let dragChanges = null;   // batch of {r,c,prev,prevAuto} for one undo entry
+let dragStart = null;
+let dragMoved = false;
 
 /* ── UTILS ── */
 function fmt(s) {
@@ -49,7 +54,7 @@ function fmt(s) {
 /* ── PUZZLE BANK (pre-generated, fetched from JSON) ── */
 const PLAYED_KEY_PREFIX = 'nonogram_played_';
 const BANK_VERSION_KEY = 'nonogram_bank_version';
-const CURRENT_BANK_VERSION = 2; // bump when JSON banks are regenerated
+const CURRENT_BANK_VERSION = 3; // bump when JSON banks are regenerated
 const bankCache = {};
 
 (function migratePlayedLists() {
@@ -101,12 +106,11 @@ async function runGeneration(diff, callback) {
     markPlayed(diff, index);
     const p = bank[index];
     callback({
+      // solution string: '0' blank, '1'..'K' color value
       solution: p.solution.map(s => s.split('').map(Number)),
-      rowClues: p.rowClues,
+      rowClues: p.rowClues,   // [[len, colorIdx], ...]
       colClues: p.colClues,
       palette: p.palette || [DEFAULT_FILL],
-      colors: (p.colors || p.solution.map(s => s.replace(/1/g, '0').replace(/0/g, '.')))
-        .map(s => s.split('').map(ch => ch === '.' ? -1 : Number(ch))),
     });
   } catch (err) {
     console.error('Nonogram puzzle load failed:', err);
@@ -129,7 +133,7 @@ function saveGameState() {
     difficulty: currentDifficulty,
     rows: ROWS, cols: COLS,
     solution, rowClues, colClues,
-    palette, colorMap,
+    palette,
     userGrid, autoMarked, seconds,
   }));
 }
@@ -265,7 +269,7 @@ function doRestart() {
   userGrid = Array.from({ length: ROWS }, () => new Array(COLS).fill(EMPTY));
   autoMarked = Array.from({ length: ROWS }, () => new Array(COLS).fill(false));
   undoStack = []; selectedCell = null; revealed = false;
-  inputMode = FILLED; updateModeUI();
+  inputMode = 1; buildToolbar();
   updateUndoBtn(); buildGrid();
   clearInterval(timerInterval); startTimer();
   clearSavedGame();
@@ -274,9 +278,9 @@ function doGiveUp() {
   document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
   clearInterval(timerInterval); revealed = true; paused = true;
   selectedCell = null;
-  // Reveal: show the true picture.
+  // Reveal: show the true picture (with colors).
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-    userGrid[r][c] = solution[r][c] ? FILLED : EMPTY;
+    userGrid[r][c] = solution[r][c]; // 0 blank, or color value
   }
   buildGrid();
   document.querySelectorAll('.nono-cell.filled').forEach(el => el.classList.add('reveal-filled'));
@@ -289,16 +293,16 @@ function startGame(diff) {
   revealed = false; undoStack = []; selectedCell = null;
   document.getElementById('loading').classList.add('active');
 
-  runGeneration(diff, ({ solution: sol, rowClues: rc, colClues: cc, palette: pal, colors: col }) => {
+  runGeneration(diff, ({ solution: sol, rowClues: rc, colClues: cc, palette: pal }) => {
     try {
       const cfg = DIFFICULTIES[diff];
       ROWS = cfg.rows; COLS = cfg.cols;
       solution = sol;
       rowClues = rc; colClues = cc;
-      palette = pal; colorMap = col;
+      palette = pal;
       userGrid = Array.from({ length: ROWS }, () => new Array(COLS).fill(EMPTY));
       autoMarked = Array.from({ length: ROWS }, () => new Array(COLS).fill(false));
-      inputMode = FILLED; updateModeUI();
+      inputMode = 1; buildToolbar();
 
       const tag = document.getElementById('diffTag');
       tag.textContent = cfg.label; tag.className = 'diff-tag ' + diff;
@@ -327,12 +331,11 @@ function resumeGame() {
   solution = saved.solution;
   rowClues = saved.rowClues; colClues = saved.colClues;
   palette = saved.palette || [DEFAULT_FILL];
-  colorMap = saved.colorMap || solution.map(row => row.map(v => v ? 0 : -1));
   userGrid = saved.userGrid;
   autoMarked = saved.autoMarked || userGrid.map(row => row.map(() => false));
   seconds = saved.seconds;
   revealed = false; paused = false; undoStack = []; selectedCell = null;
-  inputMode = FILLED; updateModeUI();
+  inputMode = 1; buildToolbar();
 
   const cfg = DIFFICULTIES[currentDifficulty];
   const tag = document.getElementById('diffTag');
@@ -369,17 +372,12 @@ function buildGrid() {
   corner.className = 'nono-corner';
   board.appendChild(corner);
 
-  // Column clue strips
+  // Column clue strips (each number tinted in its run's color)
   for (let c = 0; c < COLS; c++) {
     const strip = document.createElement('div');
     strip.className = 'col-clue';
     strip.dataset.col = c;
-    for (const n of colClues[c]) {
-      if (n === 0) continue;
-      const s = document.createElement('span');
-      s.textContent = n;
-      strip.appendChild(s);
-    }
+    appendClueNumbers(strip, colClues[c]);
     board.appendChild(strip);
   }
 
@@ -388,12 +386,7 @@ function buildGrid() {
     const strip = document.createElement('div');
     strip.className = 'row-clue';
     strip.dataset.row = r;
-    for (const n of rowClues[r]) {
-      if (n === 0) continue;
-      const s = document.createElement('span');
-      s.textContent = n;
-      strip.appendChild(s);
-    }
+    appendClueNumbers(strip, rowClues[r]);
     board.appendChild(strip);
 
     for (let c = 0; c < COLS; c++) {
@@ -411,6 +404,17 @@ function buildGrid() {
   refreshClueSatisfaction();
 }
 
+// Render a clue strip's numbers, each tinted with its run's color.
+function appendClueNumbers(strip, clue) {
+  for (const [len, colorIdx] of clue) {
+    const s = document.createElement('span');
+    s.textContent = len;
+    s.style.color = palette[colorIdx] || DEFAULT_FILL;
+    s.dataset.color = colorIdx;
+    strip.appendChild(s);
+  }
+}
+
 function getCellEl(r, c) {
   return document.querySelector(`.nono-cell[data-row="${r}"][data-col="${c}"]`);
 }
@@ -422,12 +426,9 @@ function renderCell(r, c) {
   el.style.background = '';
   el.innerHTML = '';
   const v = userGrid[r][c];
-  if (v === FILLED) {
+  if (isColor(v)) {
     el.classList.add('filled');
-    // Use the cell's decorative color; if this cell isn't part of the picture
-    // (a wrong guess), fall back to the puzzle's first palette color.
-    const ci = colorMap[r] && colorMap[r][c] >= 0 ? colorMap[r][c] : 0;
-    el.style.background = palette[ci] || palette[0] || DEFAULT_FILL;
+    el.style.background = palette[v - 1] || DEFAULT_FILL;
   } else if (v === MARK) {
     el.classList.add('marked');
     el.innerHTML = '<span class="x-mark">✕</span>';
@@ -446,56 +447,111 @@ function setSelected(r, c) {
   if (el) el.classList.add('selected');
 }
 
-/* ── CLUE SATISFACTION (autoDisable setting) ── */
-// When ON: a row/col clue strip dims once that line's FILLED cells exactly
-// match its clue. Purely a visual aid — no effect on win logic.
-function lineMatchesClue(values, clue) {
+/* ── CLUE SATISFACTION ── */
+// Compute the colored runs of a line: a new run starts on a color change or a
+// non-color cell (EMPTY/MARK both count as "blank" for run purposes).
+function lineRuns(values) {
   const runs = [];
-  let run = 0;
+  let len = 0, color = 0;
   for (const v of values) {
-    if (v === FILLED) run++;
-    else if (run > 0) { runs.push(run); run = 0; }
+    const col = isColor(v) ? v : 0;
+    if (col === 0) {
+      if (len > 0) runs.push([len, color - 1]);
+      len = 0; color = 0;
+    } else if (col === color) {
+      len++;
+    } else {
+      if (len > 0) runs.push([len, color - 1]);
+      len = 1; color = col;
+    }
   }
-  if (run > 0) runs.push(run);
-  const target = (clue.length === 1 && clue[0] === 0) ? [] : clue;
-  if (runs.length !== target.length) return false;
-  for (let i = 0; i < runs.length; i++) if (runs[i] !== target[i]) return false;
+  if (len > 0) runs.push([len, color - 1]);
+  return runs;
+}
+
+// A line matches its clue when its colored runs equal the clue in length AND
+// color sequence.
+function lineMatchesClue(values, clue) {
+  const runs = lineRuns(values);
+  if (runs.length !== clue.length) return false;
+  for (let i = 0; i < runs.length; i++) {
+    if (runs[i][0] !== clue[i][0] || runs[i][1] !== clue[i][1]) return false;
+  }
   return true;
 }
 
+// Per-number strikethrough: match the line's completed runs to the clue
+// numbers one-to-one, in order from the start (left for rows, top for cols).
+// The Nth run strikes the Nth clue number when their LENGTHS match; we stop at
+// the first mismatch. Each run claims exactly ONE number, so with a duplicate
+// clue like "1 1 1" a single run of 1 strikes only the first (top/left) one —
+// no double-counting from both ends. Color isn't required to strike.
+function struckClueFlags(values, clue) {
+  const runs = lineRuns(values);          // each run is already "closed"
+  const struck = new Array(clue.length).fill(false);
+  let i = 0;
+  while (i < clue.length && i < runs.length && runs[i][0] === clue[i][0]) {
+    struck[i] = true; i++;
+  }
+  return struck;
+}
+
+function applyStrikes(strip, values, clue) {
+  const flags = struckClueFlags(values, clue);
+  const spans = strip.querySelectorAll('span');
+  spans.forEach((sp, idx) => sp.classList.toggle('struck', !!flags[idx]));
+}
+
 function refreshClueSatisfaction() {
-  const on = getSetting('nonogram', 'autoDisable');
-  // Rows
+  // Strike individual clue numbers as their runs form (regardless of
+  // correctness); when the whole line matches, the strip also gets `done`
+  // (which the existing auto-mark already keys off via lineMatchesClue).
   for (let r = 0; r < ROWS; r++) {
     const strip = document.querySelector(`.row-clue[data-row="${r}"]`);
     if (!strip) continue;
-    const done = on && lineMatchesClue(userGrid[r], rowClues[r]);
-    strip.classList.toggle('done', done);
+    applyStrikes(strip, userGrid[r], rowClues[r]);
   }
-  // Cols
   for (let c = 0; c < COLS; c++) {
     const strip = document.querySelector(`.col-clue[data-col="${c}"]`);
     if (!strip) continue;
     const col = userGrid.map(row => row[c]);
-    const done = on && lineMatchesClue(col, colClues[c]);
-    strip.classList.toggle('done', done);
+    applyStrikes(strip, col, colClues[c]);
   }
 }
 
-/* ── INPUT MODE (fill / mark toggle) ── */
+/* ── TOOLBAR (per-color Fill buttons + Mark) ── */
+// Built dynamically from the puzzle's palette: one Fill button per color (just
+// "Fill" when monochrome), plus a Mark button. The active tool decides what a
+// tap/drag paints.
+function buildToolbar() {
+  const bar = document.getElementById('modeToggle');
+  if (!bar) return;
+  bar.innerHTML = '';
+  palette.forEach((color, i) => {
+    const val = i + 1;
+    const btn = document.createElement('button');
+    btn.className = 'mode-btn';
+    btn.dataset.mode = val;
+    btn.onclick = () => setInputMode(val);
+    btn.innerHTML = `<span class="mode-swatch" style="background:${color}"></span>`;
+    bar.appendChild(btn);
+  });
+  const markBtn = document.createElement('button');
+  markBtn.className = 'mode-btn';
+  markBtn.dataset.mode = MARK;
+  markBtn.onclick = () => setInputMode(MARK);
+  markBtn.innerHTML = `<span class="mode-x">✕</span>`;
+  bar.appendChild(markBtn);
+  updateModeUI();
+}
 function setInputMode(mode) {
   inputMode = mode;
   updateModeUI();
 }
-function toggleInputMode() {
-  setInputMode(inputMode === FILLED ? MARK : FILLED);
-}
 function updateModeUI() {
-  const fillBtn = document.getElementById('modeFill');
-  const markBtn = document.getElementById('modeMark');
-  if (!fillBtn || !markBtn) return;
-  fillBtn.classList.toggle('active', inputMode === FILLED);
-  markBtn.classList.toggle('active', inputMode === MARK);
+  document.querySelectorAll('#modeToggle .mode-btn').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.mode) === inputMode);
+  });
 }
 
 /* ── INPUT: tap toggles in current mode, drag paints ── */
@@ -509,21 +565,17 @@ function applyCell(r, c, value, batch) {
   return true;
 }
 
-// A single TAP cycles the cell through three states, with the active tool
-// deciding which value comes first:
-//   tool = FILL:  blank → FILL → MARK → blank
-//   tool = MARK:  blank → MARK → FILL → blank
-// (i.e. tap1 = tool value, tap2 = the opposite, tap3 = reset to blank)
+// A single TAP cycles the cell through three states. The active tool decides
+// the first value:
+//   tool = a color C:  blank → C → MARK → blank
+//   tool = MARK:        blank → MARK → (color 1) → blank
+// (tap1 = tool value, tap2 = the "opposite", tap3 = reset to blank)
 function tapCycle(current) {
-  const opposite = inputMode === FILLED ? MARK : FILLED;
+  const opposite = inputMode === MARK ? 1 : MARK;
   if (current === EMPTY) return inputMode;
   if (current === inputMode) return opposite;
-  return EMPTY; // current === opposite → reset
+  return EMPTY; // current === opposite (or anything else) → reset
 }
-
-// Track whether the pointer moved after going down, to tell a tap from a drag.
-let dragStart = null;     // { r, c } of the cell pressed
-let dragMoved = false;    // becomes true once we enter a different cell
 
 function pointerDownCell(r, c) {
   if (paused || revealed) return;
@@ -558,12 +610,9 @@ function pointerUp() {
   if (!dragging) return;
   dragging = false;
   if (dragChanges && dragChanges.length > 0) {
-    // Auto-mark every row/col touched by this stroke, recording the ✕ it adds
-    // (or removes) into the SAME undo entry so one undo reverts everything.
-    const rowsTouched = new Set(dragChanges.map(ch => ch.r));
-    const colsTouched = new Set(dragChanges.map(ch => ch.c));
-    for (const r of rowsTouched) autoMarkRow(r, dragChanges);
-    for (const c of colsTouched) autoMarkCol(c, dragChanges);
+    // Recompute auto-marks for the whole board, folding the resulting ✕ changes
+    // into THIS stroke's undo entry so one undo reverts everything together.
+    recomputeAutoMarks(dragChanges);
 
     undoStack.push({ changes: dragChanges });
     updateUndoBtn();
@@ -575,10 +624,15 @@ function pointerUp() {
 }
 
 /* ── AUTO-MARK ── */
-// When a line's FILLED cells match its clue (any arrangement, per spec), fill
-// the remaining EMPTY cells with ✕. If the line no longer matches, remove the
-// ✕ that WE placed automatically (manual ✕ are left alone). Changes are pushed
-// into `batch` so they undo together with the move that triggered them.
+// Rule: a cell gets an automatic ✕ when its row's filled cells match the row
+// clue OR its column's filled cells match the column clue. An auto-✕ is removed
+// when NEITHER its row nor its column matches any more. Manual ✕ (autoMarked
+// false) are never touched.
+//
+// We recompute the whole board after each move — at most 15×15 cells, so it's
+// cheap and avoids the cross-line edge cases (a row's ✕ being stripped because
+// the crossing column isn't done yet). Changes fold into `batch` so one undo
+// reverts the move plus all the auto-marks it caused.
 function setCellAuto(r, c, value, isAuto, batch) {
   const prev = userGrid[r][c];
   const prevAuto = autoMarked[r][c];
@@ -589,29 +643,34 @@ function setCellAuto(r, c, value, isAuto, batch) {
   renderCell(r, c);
 }
 
-function autoMarkLine(cells, clue, batch) {
-  const values = cells.map(([r, c]) => userGrid[r][c]);
-  if (lineMatchesClue(values, clue)) {
-    // Fill every EMPTY cell with an auto ✕.
-    for (const [r, c] of cells) {
-      if (userGrid[r][c] === EMPTY) setCellAuto(r, c, MARK, true, batch);
-    }
-  } else {
-    // Line broke — strip any ✕ we auto-placed on this line.
-    for (const [r, c] of cells) {
-      if (autoMarked[r][c] && userGrid[r][c] === MARK) setCellAuto(r, c, EMPTY, false, batch);
+function recomputeAutoMarks(batch) {
+  // Gated by the "Auto-mark blanks" setting. When OFF, strip any existing
+  // auto-✕ and do nothing further (manual ✕ untouched).
+  if (!getSetting('nonogram', 'autoDisable')) {
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (autoMarked[r][c] && userGrid[r][c] === MARK) setCellAuto(r, c, EMPTY, false, batch);
+    return;
+  }
+  // Which rows / cols currently satisfy their clue?
+  const rowDone = new Array(ROWS);
+  for (let r = 0; r < ROWS; r++) rowDone[r] = lineMatchesClue(userGrid[r], rowClues[r]);
+  const colDone = new Array(COLS);
+  for (let c = 0; c < COLS; c++) {
+    const col = userGrid.map(row => row[c]);
+    colDone[c] = lineMatchesClue(col, colClues[c]);
+  }
+
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const justified = rowDone[r] || colDone[c];
+      if (justified && userGrid[r][c] === EMPTY) {
+        setCellAuto(r, c, MARK, true, batch);          // place auto ✕
+      } else if (!justified && autoMarked[r][c] && userGrid[r][c] === MARK) {
+        setCellAuto(r, c, EMPTY, false, batch);        // remove orphaned auto ✕
+      }
     }
   }
-}
-function autoMarkRow(r, batch) {
-  const cells = [];
-  for (let c = 0; c < COLS; c++) cells.push([r, c]);
-  autoMarkLine(cells, rowClues[r], batch);
-}
-function autoMarkCol(c, batch) {
-  const cells = [];
-  for (let r = 0; r < ROWS; r++) cells.push([r, c]);
-  autoMarkLine(cells, colClues[c], batch);
 }
 
 /* ── UNDO ── */
@@ -651,15 +710,20 @@ function togglePause() {
 }
 
 /* ── WIN CHECK (lenient) ── */
-// Win when the FILLED set matches the solution exactly. X marks are ignored.
-// We never flag mistakes mid-play (lenient mode).
+// Win when every cell's COLOR matches the solution. A blank solution cell may
+// be EMPTY or MARK (✕ doesn't count as filled). We never flag mistakes
+// mid-play (lenient mode).
 function checkWin() {
   if (paused || revealed) return;
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      const wantFilled = solution[r][c] === 1;
-      const isFilled = userGrid[r][c] === FILLED;
-      if (wantFilled !== isFilled) return;
+      const want = solution[r][c];            // 0 blank, or color value
+      const have = userGrid[r][c];
+      if (want === 0) {
+        if (isColor(have)) return;            // should be blank but is colored
+      } else {
+        if (have !== want) return;            // wrong color (or empty/mark)
+      }
     }
   }
   clearInterval(timerInterval);
@@ -718,13 +782,14 @@ function closeModal() { document.getElementById('modal').classList.remove('activ
 const TUT_TOTAL = 4;
 let tutSlide = 0;
 
-function miniGrid(spec, accent) {
-  // spec: array of strings using '1' filled, '0' empty, 'x' mark
+// spec chars: '0' empty · 'x' mark · '1'/'2'/'3' filled with tutorial colors.
+const TUT_COLORS = { '1': '#f472b6', '2': '#60a5fa', '3': '#34d399' };
+function miniGrid(spec) {
   let h = `<div style="display:grid;grid-template-columns:repeat(${spec[0].length},26px);grid-template-rows:repeat(${spec.length},26px);gap:2px;">`;
   for (const row of spec) {
     for (const ch of row) {
       let bg = 'rgba(255,255,255,0.04)', content = '', color = 'var(--text-dim)';
-      if (ch === '1') bg = accent || 'var(--purple)';
+      if (TUT_COLORS[ch]) bg = TUT_COLORS[ch];
       if (ch === 'x') content = '✕';
       h += `<div style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:4px;background:${bg};border:1px solid rgba(255,255,255,0.06);font-size:0.7rem;color:${color};">${content}</div>`;
     }
@@ -733,14 +798,14 @@ function miniGrid(spec, accent) {
 }
 
 function buildTutVisuals() {
-  // Slide 1: clues describe runs
+  // Slide 1: colored clues describe runs
   document.getElementById('tutVis1').innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
       <div style="display:flex;align-items:center;gap:8px;">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:0.85rem;font-weight:700;color:var(--purple);display:flex;gap:6px;"><span>2</span><span>1</span></div>
-        ${miniGrid(['11010'])}
+        <div style="font-family:'JetBrains Mono',monospace;font-size:0.85rem;font-weight:700;display:flex;gap:6px;"><span style="color:${TUT_COLORS['1']}">2</span><span style="color:${TUT_COLORS['2']}">2</span></div>
+        ${miniGrid(['11220'])}
       </div>
-      <div style="font-size:0.72rem;color:var(--text-dim);text-align:center;">Clue "2 1" → a run of 2, then a run of 1, with a gap between.</div>
+      <div style="font-size:0.72rem;color:var(--text-dim);text-align:center;">"2 2" in pink then blue → the two colours may touch (different colours need no gap).</div>
     </div>`;
 
   // Slide 2: fill vs mark tools
@@ -818,7 +883,14 @@ function applySettings() {
   const s = loadSettings('nonogram');
   const timerEl = document.getElementById('timer');
   if (timerEl) timerEl.style.display = s.showTimer ? '' : 'none';
-  if (document.getElementById('board').childElementCount) refreshClueSatisfaction();
+  // Toggling auto-mark mid-game: apply it immediately (add or strip auto-✕),
+  // as one undoable step.
+  if (document.getElementById('board').childElementCount && !revealed) {
+    const batch = [];
+    recomputeAutoMarks(batch);
+    if (batch.length > 0) { undoStack.push({ changes: batch }); updateUndoBtn(); }
+    refreshClueSatisfaction();
+  }
 }
 
 /* ── HINT SHOP ── */
@@ -849,8 +921,7 @@ function closeHintShop() {
 function commitSingle(r, c, value) {
   const batch = [];
   applyCell(r, c, value, batch);
-  autoMarkRow(r, batch);
-  autoMarkCol(c, batch);
+  recomputeAutoMarks(batch);
   if (batch.length > 0) {
     undoStack.push({ changes: batch });
     updateUndoBtn();
@@ -858,21 +929,22 @@ function commitSingle(r, c, value) {
   refreshClueSatisfaction();
 }
 
-// Resolve a cell to its TRUE value (filled or marked-blank) as a hint.
+// Resolve a cell to its TRUE state as a hint: the solution's color if filled,
+// otherwise ✕ (definitely blank).
 function revealHintCell(r, c) {
-  const want = solution[r][c] === 1 ? FILLED : MARK;
+  const want = solution[r][c] === 0 ? MARK : solution[r][c]; // color value or ✕
   commitSingle(r, c, want);
   getCellEl(r, c).classList.add('hint-cell');
 }
 function useRandomHint() {
   if (getCoins() < HINT_COST_RANDOM) return;
-  // Find cells that are currently wrong (filled-state doesn't match solution).
+  // Find cells whose current state doesn't match the solution (wrong/blank).
   const wrong = [];
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-    const want = solution[r][c] === 1 ? FILLED : MARK;
-    const isFilledNow = userGrid[r][c] === FILLED;
-    const shouldFill = solution[r][c] === 1;
-    if (isFilledNow !== shouldFill) wrong.push([r, c, want]);
+    const want = solution[r][c];          // 0 blank, or color value
+    const have = userGrid[r][c];
+    const correct = want === 0 ? !isColor(have) : have === want;
+    if (!correct) wrong.push([r, c]);
   }
   if (wrong.length === 0) { closeHintShop(); return; }
   if (!spendCoins(HINT_COST_RANDOM)) return;
@@ -938,13 +1010,17 @@ function initPointerHandlers() {
 document.addEventListener('keydown', e => {
   if (paused || revealed) return;
   if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoMove(); return; }
-  if (e.key === 'm' || e.key === 'M') { toggleInputMode(); return; }
+  if (e.key === 'm' || e.key === 'M') { setInputMode(MARK); return; }
+  // Number keys 1..K pick a color tool.
+  const num = parseInt(e.key);
+  if (num >= 1 && num <= palette.length) { setInputMode(num); return; }
   if (!selectedCell) return;
   const { row, col } = selectedCell;
-  // Space / F fills (toggle), X marks (toggle)
+  // Space / F places the active color (toggle off if already that color).
   if (e.key === ' ' || e.key === 'f' || e.key === 'F') {
     e.preventDefault();
-    commitSingle(row, col, userGrid[row][col] === FILLED ? EMPTY : FILLED);
+    const color = isColor(inputMode) ? inputMode : 1;
+    commitSingle(row, col, userGrid[row][col] === color ? EMPTY : color);
     checkWin();
   }
   if (e.key === 'x' || e.key === 'X') {

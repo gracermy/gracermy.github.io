@@ -1,33 +1,47 @@
 #!/usr/bin/env node
 /**
- * Nonogram (Pixle) puzzle bank generator.
- * Generates puzzles for each difficulty and APPENDS them to existing JSON files.
+ * Nonogram (Pixle) puzzle bank generator — COLORED nonograms.
  *
- * A nonogram is "fair" only if its row/column clues yield exactly ONE solution.
- * We generate a random filled picture, derive its clues, then verify uniqueness
- * with a line-solver (constraint propagation). If propagation can't fully solve
- * the puzzle from the clues alone, it's ambiguous and we discard it.
+ * Each filled cell has a colour. A clue is an ordered list of [length, colour]
+ * runs. Colour rules (standard for colored nonograms):
+ *   - two SAME-colour runs need at least one blank gap between them;
+ *   - two DIFFERENT-colour runs may touch with no gap.
+ * A puzzle is kept only if its clues yield exactly ONE solution, verified by a
+ * colour-aware line-solver (constraint propagation). Ambiguous puzzles are
+ * discarded.
+ *
+ * Palette size varies by difficulty so puzzles range from monochrome to
+ * colourful:
+ *   easy   → always 1 colour (classic picross)
+ *   medium → 1–3 colours
+ *   hard   → 1–4 colours
  *
  * Usage:  node scripts/generate-nonogram.js
  *         node scripts/generate-nonogram.js --counts 50,50,30
  *
- * Storage format per puzzle:
- *   { id, rows, cols, solution: ["10110", ...], rowClues: [[..]], colClues: [[..]] }
- * Solution rows are stored as bit-strings ("1"=filled, "0"=blank) to keep JSON small.
+ * Storage per puzzle:
+ *   { id, rows, cols, palette: ["#..",..],
+ *     solution: ["0102","..."],   // per-cell: '0' blank, '1'=palette[0], '2'=palette[1] ...
+ *     rowClues: [[[len,colorIdx],...], ...],
+ *     colClues: [[[len,colorIdx],...], ...] }
+ * (colorIdx is 0-based into palette.)
  */
 
 const fs = require('fs');
 const path = require('path');
 
+// NOTE on colours: random colored nonograms are rarely UNIQUELY solvable as
+// the colour count rises (3-colour hard ≈ 0%). So the random bank caps colours
+// low and runs at a higher density (which boosts the unique-solution rate).
+// Richer 3+ colour puzzles will come from the designed-picture phase, where
+// uniqueness is controlled by hand rather than by chance.
 const DIFFICULTIES = {
-  easy:   { rows: 5,  cols: 5,  density: 0.55, palette: 1 },
-  medium: { rows: 10, cols: 10, density: 0.50, palette: 2 },
-  hard:   { rows: 15, cols: 15, density: 0.48, palette: 3 },
+  easy:   { rows: 5,  cols: 5,  density: 0.58, colorsMin: 1, colorsMax: 1 },
+  medium: { rows: 10, cols: 10, density: 0.65, colorsMin: 1, colorsMax: 2 },
+  hard:   { rows: 15, cols: 15, density: 0.65, colorsMin: 1, colorsMax: 2 },
 };
 
-// Flat colors a filled cell can take. Each puzzle picks `palette` of these at
-// random; every filled cell is assigned one of the chosen colors. Mirrors how
-// real picture nonograms use only a few colors (subject + background, etc.).
+// Palette pool — filled cells take one of the puzzle's chosen colours.
 const COLOR_POOL = [
   '#f472b6', // pink
   '#60a5fa', // blue
@@ -41,6 +55,9 @@ const COLOR_POOL = [
 const DEFAULT_COUNTS = { easy: 150, medium: 150, hard: 100 };
 const OUT_DIR = path.join(__dirname, '..', 'games', 'nonogram', 'puzzles');
 
+const BLANK = 0;   // cell with no colour
+const UNKNOWN = -1; // solver: not yet determined
+
 // ── helpers ──────────────────────────────────────────────────
 function shuffle(a) {
   for (let i = a.length - 1; i > 0; i--) {
@@ -50,152 +67,185 @@ function shuffle(a) {
   return a;
 }
 
-// Run-length clues for a single line of booleans. Empty line → [0].
+// Colour-aware run-length clues for a line of cell values (0 = blank,
+// 1..K = colour). Returns [[len, color], ...]; empty line → [].
+// A new run starts whenever colour changes (even with no blank between) or a
+// blank breaks the run.
 function lineClues(line) {
   const clues = [];
-  let run = 0;
+  let runLen = 0, runColor = BLANK;
   for (const v of line) {
-    if (v) run++;
-    else if (run > 0) { clues.push(run); run = 0; }
+    if (v === BLANK) {
+      if (runLen > 0) clues.push([runLen, runColor - 1]);
+      runLen = 0; runColor = BLANK;
+    } else if (v === runColor) {
+      runLen++;
+    } else {
+      if (runLen > 0) clues.push([runLen, runColor - 1]);
+      runLen = 1; runColor = v;
+    }
   }
-  if (run > 0) clues.push(run);
-  return clues.length ? clues : [0];
+  if (runLen > 0) clues.push([runLen, runColor - 1]);
+  return clues;
 }
 
-// ── random picture ───────────────────────────────────────────
-// Generate a grid at the target density, rejecting fully-empty rows/cols
-// (those make a "0" clue, which is fine, but an all-empty grid is a dud).
-function randomGrid(rows, cols, density) {
+// ── random colored picture ───────────────────────────────────
+function randomGrid(rows, cols, density, numColors) {
   const grid = [];
   let filled = 0;
   for (let r = 0; r < rows; r++) {
     const row = [];
     for (let c = 0; c < cols; c++) {
-      const on = Math.random() < density;
-      row.push(on ? 1 : 0);
-      if (on) filled++;
+      if (Math.random() < density) {
+        row.push(1 + Math.floor(Math.random() * numColors)); // colour 1..numColors
+        filled++;
+      } else {
+        row.push(BLANK);
+      }
     }
     grid.push(row);
   }
-  // Reject near-empty / near-full grids — they tend to be trivial or ugly.
   const total = rows * cols;
   if (filled < total * 0.25 || filled > total * 0.75) return null;
+  // Require every colour to actually appear, else the palette claim is a lie.
+  const seen = new Set();
+  for (const row of grid) for (const v of row) if (v !== BLANK) seen.add(v);
+  if (seen.size !== numColors) return null;
+  // Every row AND column must have at least one filled cell — no fully-blank
+  // (numberless) clue lines, which look broken in the UI.
+  for (let r = 0; r < rows; r++) {
+    if (grid[r].every(v => v === BLANK)) return null;
+  }
+  for (let c = 0; c < cols; c++) {
+    if (grid.every(row => row[c] === BLANK)) return null;
+  }
   return grid;
 }
 
-// ── line solver (constraint propagation) ─────────────────────
-// State per cell: -1 unknown, 0 blank, 1 filled.
-// Returns true if `clue` can be satisfied for `line`, and writes the cells
-// that are forced (same value in every valid placement) back into `line`.
-//
-// We enumerate valid placements of the clue's runs over the line, intersecting
-// with the known cells, then for each cell mark it filled/blank if ALL valid
-// placements agree. If no valid placement exists → contradiction (return false).
-function solveLine(line, clue) {
+// ── colour-aware line solver ─────────────────────────────────
+// Cell domain is a bitmask over {blank, colour1..K}. bit 0 = blank,
+// bit (k) = colour k. `line` holds either UNKNOWN or a concrete value (0..K).
+// We enumerate every valid placement of the clue's runs, honouring:
+//   - same-colour consecutive runs need ≥1 blank gap;
+//   - different-colour consecutive runs may be adjacent (gap optional).
+// For each cell we record which concrete values appear across ALL valid
+// placements; a cell is forced if only one value is possible.
+function solveLine(line, clue, numColors) {
   const n = line.length;
-  // Special case: clue [0] means the whole line is blank.
-  if (clue.length === 1 && clue[0] === 0) {
+
+  // possible[i] = Set of values (0..K) that cell i can take across placements
+  const possible = Array.from({ length: n }, () => new Set());
+  let anyValid = false;
+
+  const placement = new Array(n).fill(BLANK);
+
+  // Minimum cells needed for runs[ci..end], including mandatory same-colour gaps.
+  function minSpace(ci) {
+    let need = 0;
+    for (let k = ci; k < clue.length; k++) {
+      need += clue[k][0];
+      if (k > ci) {
+        // gap required only if this run and the previous are the same colour
+        if (clue[k][1] === clue[k - 1][1]) need += 1;
+      }
+    }
+    return need;
+  }
+
+  function place(ci, pos) {
+    if (ci === clue.length) {
+      for (let i = pos; i < n; i++) placement[i] = BLANK;
+      // validate against known cells
+      for (let i = 0; i < n; i++) {
+        if (line[i] !== UNKNOWN && line[i] !== placement[i]) return;
+      }
+      anyValid = true;
+      for (let i = 0; i < n; i++) possible[i].add(placement[i]);
+      return;
+    }
+    const [runLen, colorIdx] = clue[ci];
+    const colorVal = colorIdx + 1;
+    const need = minSpace(ci);
+    const lastStart = n - need;
+    for (let start = pos; start <= lastStart; start++) {
+      // [pos, start) blank
+      let ok = true;
+      for (let i = pos; i < start; i++) {
+        if (line[i] !== UNKNOWN && line[i] !== BLANK) { ok = false; break; }
+      }
+      if (!ok) continue;
+      // [start, start+runLen) this colour
+      for (let i = start; i < start + runLen; i++) {
+        if (line[i] !== UNKNOWN && line[i] !== colorVal) { ok = false; break; }
+      }
+      if (!ok) continue;
+      const after = start + runLen;
+      // Determine gap before next run.
+      let nextPos;
+      if (ci < clue.length - 1) {
+        const sameColor = clue[ci + 1][1] === colorIdx;
+        if (sameColor) {
+          // mandatory blank gap
+          if (after >= n) continue;
+          if (line[after] !== UNKNOWN && line[after] !== BLANK) continue;
+          nextPos = after + 1;
+        } else {
+          // different colour may touch; no forced gap
+          nextPos = after;
+        }
+      } else {
+        nextPos = after;
+      }
+      // commit
+      for (let i = pos; i < start; i++) placement[i] = BLANK;
+      for (let i = start; i < after; i++) placement[i] = colorVal;
+      if (ci < clue.length - 1 && clue[ci + 1][1] === colorIdx && after < n) {
+        placement[after] = BLANK;
+      }
+      place(ci + 1, nextPos);
+    }
+  }
+
+  // Empty clue → whole line blank.
+  if (clue.length === 0) {
     for (let i = 0; i < n; i++) {
-      if (line[i] === 1) return false;
-      line[i] = 0;
+      if (line[i] !== UNKNOWN && line[i] !== BLANK) return false;
+      line[i] = BLANK;
     }
     return true;
   }
 
-  // Accumulators: for each cell, can it be filled / can it be blank across
-  // all valid placements?
-  const canFill = new Array(n).fill(false);
-  const canBlank = new Array(n).fill(false);
-  let anyValid = false;
-
-  // Recursively place run `ci` starting at position `pos`.
-  const placement = new Array(n).fill(0); // 1=filled in this placement
-  function place(ci, pos) {
-    if (ci === clue.length) {
-      // Remaining cells are blank; validate against known line.
-      for (let i = pos; i < n; i++) placement[i] = 0;
-      // Check consistency with known cells
-      for (let i = 0; i < n; i++) {
-        if (line[i] === 1 && placement[i] !== 1) return;
-        if (line[i] === 0 && placement[i] !== 0) return;
-      }
-      anyValid = true;
-      for (let i = 0; i < n; i++) {
-        if (placement[i] === 1) canFill[i] = true; else canBlank[i] = true;
-      }
-      return;
-    }
-    const runLen = clue[ci];
-    // Remaining runs need at least sum+gaps space.
-    let need = 0;
-    for (let k = ci; k < clue.length; k++) need += clue[k];
-    need += clue.length - 1 - ci; // gaps between remaining runs
-    const lastStart = n - need;
-    for (let start = pos; start <= lastStart; start++) {
-      // Cells [pos, start) are blank, [start, start+runLen) filled.
-      let ok = true;
-      for (let i = pos; i < start; i++) {
-        if (line[i] === 1) { ok = false; break; }
-      }
-      if (!ok) continue;
-      for (let i = start; i < start + runLen; i++) {
-        if (line[i] === 0) { ok = false; break; }
-      }
-      if (!ok) continue;
-      // Gap cell after the run (if any) must be blankable.
-      const after = start + runLen;
-      if (ci < clue.length - 1 && after < n && line[after] === 1) {
-        // need a gap here but it's known filled → invalid
-        continue;
-      }
-      // Commit this run into placement
-      for (let i = pos; i < start; i++) placement[i] = 0;
-      for (let i = start; i < after; i++) placement[i] = 1;
-      const nextPos = after + (ci < clue.length - 1 ? 1 : 0);
-      if (after < n && ci < clue.length - 1) placement[after] = 0;
-      place(ci + 1, nextPos);
-    }
-  }
   place(0, 0);
-
   if (!anyValid) return false;
 
   for (let i = 0; i < n; i++) {
-    if (canFill[i] && !canBlank[i]) {
-      if (line[i] === 0) return false;
-      line[i] = 1;
-    } else if (canBlank[i] && !canFill[i]) {
-      if (line[i] === 1) return false;
-      line[i] = 0;
+    if (possible[i].size === 1) {
+      const v = [...possible[i]][0];
+      if (line[i] !== UNKNOWN && line[i] !== v) return false;
+      line[i] = v;
     }
   }
   return true;
 }
 
-// Try to solve the whole puzzle from clues alone via iterative line solving.
-// Returns 'unique' if fully solved, 'ambiguous' if it stalls with unknowns,
-// 'contradiction' if a line can't be satisfied.
-function lineSolve(rows, cols, rowClues, colClues) {
-  const grid = Array.from({ length: rows }, () => new Array(cols).fill(-1));
+function lineSolve(rows, cols, rowClues, colClues, numColors) {
+  const grid = Array.from({ length: rows }, () => new Array(cols).fill(UNKNOWN));
 
-  let changed = true;
-  let guard = 0;
+  let changed = true, guard = 0;
   while (changed) {
-    if (++guard > rows * cols * 4 + 50) break; // safety
+    if (++guard > rows * cols * 4 + 50) break;
     changed = false;
 
-    // Rows
     for (let r = 0; r < rows; r++) {
       const before = grid[r].join(',');
-      if (!solveLine(grid[r], rowClues[r])) return 'contradiction';
+      if (!solveLine(grid[r], rowClues[r], numColors)) return 'contradiction';
       if (grid[r].join(',') !== before) changed = true;
     }
-    // Cols
     for (let c = 0; c < cols; c++) {
       const col = new Array(rows);
       for (let r = 0; r < rows; r++) col[r] = grid[r][c];
       const before = col.join(',');
-      if (!solveLine(col, colClues[c])) return 'contradiction';
+      if (!solveLine(col, colClues[c], numColors)) return 'contradiction';
       if (col.join(',') !== before) {
         changed = true;
         for (let r = 0; r < rows; r++) grid[r][c] = col[r];
@@ -205,42 +255,38 @@ function lineSolve(rows, cols, rowClues, colClues) {
 
   for (let r = 0; r < rows; r++)
     for (let c = 0; c < cols; c++)
-      if (grid[r][c] === -1) return 'ambiguous';
+      if (grid[r][c] === UNKNOWN) return 'ambiguous';
   return 'unique';
 }
 
 // ── generate a single puzzle ─────────────────────────────────
-function generateOne(cfg) {
+// `wantColors` (optional) forces a specific colour count for this puzzle, so
+// the caller can deliberately mix mono and colourful puzzles in the bank
+// rather than letting the easier mono case dominate.
+function generateOne(cfg, wantColors) {
   const { rows, cols, density } = cfg;
-  for (let attempt = 0; attempt < 200; attempt++) {
-    const grid = randomGrid(rows, cols, density);
+  for (let attempt = 0; attempt < 300; attempt++) {
+    const numColors = wantColors || (cfg.colorsMin +
+      Math.floor(Math.random() * (cfg.colorsMax - cfg.colorsMin + 1)));
+    const grid = randomGrid(rows, cols, density, numColors);
     if (!grid) continue;
 
     const rowClues = grid.map(lineClues);
     const colClues = [];
     for (let c = 0; c < cols; c++) {
-      const col = grid.map(row => row[c]);
-      colClues.push(lineClues(col));
+      colClues.push(lineClues(grid.map(row => row[c])));
     }
 
-    if (lineSolve(rows, cols, rowClues, colClues) !== 'unique') continue;
+    if (lineSolve(rows, cols, rowClues, colClues, numColors) !== 'unique') continue;
 
-    // Pick this puzzle's palette and assign each filled cell a color index.
-    // Clues are based on filled/blank only (monochrome logic); color is purely
-    // decorative, so it doesn't affect solvability or uniqueness.
-    const palette = shuffle([...COLOR_POOL]).slice(0, cfg.palette);
-    // Per-cell color index as a single char ("." = blank). Palette size ≤ 8,
-    // so a single digit per cell is enough.
-    const colorRows = grid.map(row =>
-      row.map(v => v ? String(Math.floor(Math.random() * palette.length)) : '.').join(''));
+    const palette = shuffle([...COLOR_POOL]).slice(0, numColors);
 
     return {
       rows, cols,
-      solution: grid.map(row => row.join('')),
+      palette,
+      solution: grid.map(row => row.join('')), // '0' blank, '1'..'K' colour idx+1
       rowClues,
       colClues,
-      palette,
-      colors: colorRows,   // per-cell color index ("." = blank)
       createdAt: new Date().toISOString(),
     };
   }
@@ -287,10 +333,16 @@ function main() {
     let generated = 0, failed = 0;
     const t0 = Date.now();
     while (generated < target) {
-      const p = generateOne(cfg);
+      // Alternate the requested colour count so the bank gets a real mix
+      // instead of defaulting to the easy-to-generate mono case. Roughly half
+      // mono, half at the difficulty's max colours.
+      const wantColors = cfg.colorsMax > 1
+        ? (generated % 2 === 0 ? 1 : cfg.colorsMax)
+        : 1;
+      const p = generateOne(cfg, wantColors);
       if (!p) {
         failed++;
-        if (failed > 500) { console.error(`  too many failures (${failed}), stopping early`); break; }
+        if (failed > 2000) { console.error(`  too many failures (${failed}), stopping early`); break; }
         continue;
       }
       p.id = startCount + generated;

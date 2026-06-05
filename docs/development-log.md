@@ -4,6 +4,29 @@ A running record of major changes to gracermy.github.io — what we built, why, 
 
 ---
 
+## Phase 7 — Pixle goes colored
+**Date:** 2026-06-02
+
+**What:** Reworked Pixle from monochrome-with-decorative-color into a **true colored nonogram**. The Phase-6 "random decorative color" looked broken (meaningless red/purple noise) because color carried no logic. Now color is part of the puzzle.
+
+**Clue model:** a clue is an ordered list of `[length, colorIdx]`. Colour rules: two **same-colour** runs need ≥1 blank gap; two **different-colour** runs may touch with no gap. Clue numbers render tinted in their run's colour.
+
+**Generator + solver rework (`generate-nonogram.js`):** the random picture assigns each filled cell a colour; clues are derived as coloured runs. The line-solver is now colour-aware (enumerates placements honouring the same/different-colour gap rules) and still verifies a unique solution. Bank stores `palette`, a coloured `solution` string (`0` blank, `1..K` colour value), and coloured `rowClues`/`colClues`.
+
+**Colour count by difficulty — and why it's capped:** probing showed random *coloured* puzzles are rarely uniquely solvable as colours rise (3-colour 15×15 ≈ 0%). So the random bank caps low and runs at higher density (~0.65) to lift the unique-solution rate: **easy = 1 colour always; medium & hard = a 50/50 mix of 1- and 2-colour puzzles** (the generator deliberately alternates the requested colour count so the bank isn't all-mono). Richer 3+ colour puzzles are deferred to the designed-picture phase, where uniqueness is hand-controlled rather than left to chance. Bank regenerated (400 puzzles, ~290 KB); bank version 1→3.
+
+**Game changes:** cell value model is now `EMPTY | 1..K (color) | MARK`. Toolbar is built dynamically from the puzzle's palette — one **Fill** button per colour (plus **Mark ✕**); a mono puzzle just shows "Fill". Tap cycles colour → ✕ → blank; drag paints the active tool; number keys 1..K pick a colour, M picks mark. Auto-mark, win-check, and clue-satisfaction all compare colour sequences, not just lengths.
+
+**Verified:** all 400 puzzles pass independent checks — derived clues match the solution, the colour-aware solver recovers the unique solution, and the game's own win-check + clue-match logic accept the solved grid.
+
+**Follow-up tweaks (same day):**
+- Generator now rejects any puzzle with a fully-blank row/column, so there are no empty (numberless) clue strips.
+- Toolbar buttons are icon-only — a large colour swatch or a large ✕, no text labels — and the under-grid hint sentence was removed.
+- **Per-number clue strikethrough:** each clue number strikes through as its run is formed (matched by length from each end of the line), regardless of correctness — not only when the whole line matches. When every number in a line is struck, the existing auto-mark fills the rest with ✕.
+- The settings toggle (formerly the no-op "auto-dim clues") now controls **Auto-mark blanks** — turning it off strips auto-✕ and stops auto-marking; toggling mid-game applies immediately as one undoable step. Per-number strikes always show regardless.
+
+---
+
 ## Phase 6 — Pixle (Nonogram) build
 **Date:** 2026-06-01
 
