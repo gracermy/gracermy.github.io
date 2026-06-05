@@ -469,6 +469,27 @@ function lineRuns(values) {
   return runs;
 }
 
+// Like lineRuns but also records each run's start index (for position-aware
+// strike binding). Returns [{len, color, start, end}, ...].
+function lineRunsPos(values) {
+  const runs = [];
+  let len = 0, color = 0, start = -1;
+  for (let i = 0; i < values.length; i++) {
+    const col = isColor(values[i]) ? values[i] : 0;
+    if (col === 0) {
+      if (len > 0) runs.push({ len, color: color - 1, start, end: i - 1 });
+      len = 0; color = 0; start = -1;
+    } else if (col === color) {
+      len++;
+    } else {
+      if (len > 0) runs.push({ len, color: color - 1, start, end: i - 1 });
+      len = 1; color = col; start = i;
+    }
+  }
+  if (len > 0) runs.push({ len, color: color - 1, start, end: values.length - 1 });
+  return runs;
+}
+
 // A line matches its clue when its colored runs equal the clue in length AND
 // color sequence.
 function lineMatchesClue(values, clue) {
@@ -480,18 +501,41 @@ function lineMatchesClue(values, clue) {
   return true;
 }
 
-// Per-number strikethrough: match the line's completed runs to the clue
-// numbers one-to-one, in order from the start (left for rows, top for cols).
-// The Nth run strikes the Nth clue number when their LENGTHS match; we stop at
-// the first mismatch. Each run claims exactly ONE number, so with a duplicate
-// clue like "1 1 1" a single run of 1 strikes only the first (top/left) one —
-// no double-counting from both ends. Color isn't required to strike.
+// Per-number strikethrough — position-anchored, both directions.
+// We match the line's completed runs to clue numbers from BOTH ends:
+//   • Left pass:  the i-th run from the left strikes the i-th clue number when
+//     their lengths match, stopping at the first mismatch.
+//   • Right pass: the j-th run from the right strikes the j-th clue number from
+//     the right, stopping at the first mismatch — but it never re-claims a run
+//     the left pass already used.
+// A run thus binds to exactly ONE clue number (no double-count). A run sitting
+// at the right end strikes a right-end number; a floating/left-anchored run
+// defaults to left-first. Color isn't required to strike.
 function struckClueFlags(values, clue) {
-  const runs = lineRuns(values);          // each run is already "closed"
+  const n = values.length;
+  const runs = lineRunsPos(values);
   const struck = new Array(clue.length).fill(false);
+  const usedRun = new Array(runs.length).fill(false);
+
+  // A run "leans left" if it sits in the left half of the line (its start is
+  // closer to the left edge than its end is to the right edge). Left-leaning
+  // runs are matched from the left first; right-leaning from the right first.
+  const leansLeft = run => run.start <= (n - 1 - run.end);
+
+  // Left pass: run i ↔ clue i, only consuming left-leaning runs in order.
   let i = 0;
-  while (i < clue.length && i < runs.length && runs[i][0] === clue[i][0]) {
-    struck[i] = true; i++;
+  while (i < clue.length && i < runs.length &&
+         runs[i].len === clue[i][0] && leansLeft(runs[i])) {
+    struck[i] = true; usedRun[i] = true; i++;
+  }
+  // Right pass: run (R-1-j) ↔ clue (C-1-j), skipping runs the left pass took.
+  let j = 0;
+  while (j < clue.length && j < runs.length) {
+    const ri = runs.length - 1 - j;
+    const ci = clue.length - 1 - j;
+    if (usedRun[ri]) break;               // already claimed from the left
+    if (runs[ri].len !== clue[ci][0]) break;
+    struck[ci] = true; usedRun[ri] = true; j++;
   }
   return struck;
 }
