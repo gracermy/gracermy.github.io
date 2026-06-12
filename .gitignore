@@ -1,0 +1,12 @@
+# macOS Finder metadata
+.DS_Store
+
+# Private: reserved daily-puzzle answers + authoring tooling.
+# Kept out of this public repo; lives in a private dev repo instead.
+games/nonogram/puzzles/special/
+scripts/author-pictures.js
+scripts/review-banked-pictures.js
+scripts/apply-bank-review.js
+scripts/merge-pictures.js
+scripts/kept-pictures.json
+scripts/discarded-pictures.json
