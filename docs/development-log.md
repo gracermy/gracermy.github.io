@@ -17,6 +17,15 @@ The Suguru/Nonogram pattern (random-fill → keep if uniquely solvable) **fails 
 
 **Conclusion / next step:** Medium & hard need the **inverse algorithm — solve-while-building**: co-construct puzzle + solution incrementally, running the logic solver in the loop and only keeping forced placements. That is a separate, substantial generator build (the genuine "hard part"). Easy (5×5) generates fine with the current code. Options on the table: (a) build the constructive generator, or (b) ship `kakuro.js` on the working easy bank so Crossum is playable now, medium/hard as follow-up. `kakuro.js` (the game logic) is **not yet built**.
 
+**ROOT CAUSE found (deeper R&D session, 2026-06-13) — "SWAPS":**
+Traced the medium/hard non-uniqueness to a single mechanism. A Kakuro has multiple solutions almost entirely because of **swaps**: two (or more) white cells whose values can be exchanged while *every* crossing run stays satisfied. Caught a concrete 2-cell example — cells (6,2),(6,3) = `8,9` in one solution and `9,8` in the other; they share a horizontal run (sum 17 either way) and both vertical runs tolerate the exchange, so the clues cannot distinguish them. Findings, all measured:
+- Swaps are pervasive at 7×7: **0 of 2000** dense random fills were swap-free.
+- Walling a differing cell does NOT fix a swap (both cells remain; the swap persists or moves). Watched a puzzle sit at exactly 2 solutions across 30 wall-flips.
+- Higher density does NOT help — short 2-cell runs are the *most* swappable.
+- **Decisive:** trying 30 DISTINCT solutions on a fixed 7×7 layout → still 0 unique. So **uniqueness is a property of the LAYOUT, not the fill** — swap-prone layouts admit *no* unique filling; the rare 5×5 successes come from structurally swap-resistant layouts. (`buildLayout` produces too-regular, swap-prone structures.)
+
+**Therefore the next design direction is: construct/select SWAP-RESISTANT layouts** (varied run lengths, irregular crossing structure so no two cells can mutually exchange), then fill + verify. Repairing fills is a dead end; the lever is the layout. Prototypes for this R&D live in `/tmp/proto-*.js` (not committed). The committed generator still produces correct EASY puzzles.
+
 ---
 
 ## Phase 9 — Crossum (Kakuro) build plan
