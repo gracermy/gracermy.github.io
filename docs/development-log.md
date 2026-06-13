@@ -4,6 +4,58 @@ A running record of major changes to gracermy.github.io — what we built, why, 
 
 ---
 
+## Phase 10 — Crossum build started; Kakuro generation R&D
+**Date:** 2026-06-12 → 2026-06-13 — *UI + easy generator done; medium/hard generation blocked*
+
+**Built:**
+- **`games/kakuro/index.html`** — full Crossum shell, replacing the coming-soon stub. Lifted from `suguru/index.html`: daily-reward overlay, 5-slide tutorial (rewritten for Kakuro sums/no-repeat rules), loading overlay, home, game screen, all modals (leave/giveup/restart/settings/hint). Picker is digits **1–9** + Pencil + Erase. Loads shared `/games/profile.js`.
+- **`games/kakuro/style.css`** — suguru CSS recolored to the amber/orange identity (`--amber #fbbf24`, `--orange #f97316`, warm-dark bg). New Kakuro-specific cell styles: `.cell.wall` (black), `.cell.wall.has-clue::after` (diagonal slash), `.clue-sum.down`/`.clue-sum.right` (corner sum numbers), `.cell.white`, run-highlight, candidates 3×3 grid.
+- **`scripts/generate-kakuro.js`** — generator with: constructive layout carver (carve interior walls from a solid start, keep if no isolated cell; `splitLongRuns` enforces maxRun), a backtracking fill (`solveOne`), a brute uniqueness counter (`solveCount`, node-budgeted), and a **correct logical-propagation solver** (`logicSolvable`) using 9-bit candidate masks + a precomputed `COMBOS[len][sum]` table + per-run combination filtering + naked-singles. JSON entry: `{ rows, cols, cells:[{t:'wall',down,right}|{t:'cell'}], solution, id }`.
+
+**KEY FINDING — generate-then-verify does NOT scale for Kakuro (documented so we don't repeat it):**
+The Suguru/Nonogram pattern (random-fill → keep if uniquely solvable) **fails for Kakuro above 5×5**. Measured logic-solvable (⇒ unique) rate by grid size: **5×5 ≈ 0.5%** (works only because retries are cheap), **6×6 = 0%, 7×7 = 0%, 8×8/9×9 = 0%** — a hard cliff right after 5×5. Verified across density 20–70% walls, run lengths 2–5, interlock on/off, and pattern lattices; confirmed by BOTH the logic solver and brute-force `solveCount` ground truth (so it is not a solver weakness — the logic solver correctly accepts all known-unique easy puzzles). Even a 7×7 with only ~11 white cells yields 0 unique. **Reason:** a randomly-filled Kakuro almost never has clue-sums that force a single solution; uniqueness probability decays exponentially with size.
+
+**Conclusion / next step:** Medium & hard need the **inverse algorithm — solve-while-building**: co-construct puzzle + solution incrementally, running the logic solver in the loop and only keeping forced placements. That is a separate, substantial generator build (the genuine "hard part"). Easy (5×5) generates fine with the current code. Options on the table: (a) build the constructive generator, or (b) ship `kakuro.js` on the working easy bank so Crossum is playable now, medium/hard as follow-up. `kakuro.js` (the game logic) is **not yet built**.
+
+---
+
+## Phase 9 — Crossum (Kakuro) build plan
+**Date:** 2026-06-12 — *planned, superseded by Phase 10*
+
+**What:** Approved plan to build **Crossum** (Kakuro), the last unbuilt game from the Phase-1 scaffold. Kakuro = a crossword filled with digits 1–9: black clue cells hold a down-sum and/or right-sum, and each white run must add to that sum using each digit at most once. The amber/orange "coming soon" stub already exists at `games/kakuro/index.html` (URL slug `kakuro`, display name **Crossum**, theme bg `#1a140d`, gradient `#fbbf24→#f97316`).
+
+**Grid sizes (decided):** Easy **5×5**, Medium **7×7**, Hard **9×9** (compact, mobile-friendly, in line with Nettle).
+
+**Reuse strategy — the core of "match my style":** Crossum is the number-logic cousin of **Nettle (Suguru)**, so ~70% of `suguru.js` is lifted near-verbatim: puzzle-bank loader + played-set tracking, coin UI, save/resume (`kakuro_resume`), daily overlay, home/screen helpers, timer, undo, win modal, hint shop, tutorial, keyboard input, number picker, pencil mode. Shared `profile.js`, the `../sudoku/icons/coin.svg`, fonts, and overlays used unchanged. Coin rewards `{ easy:4, medium:8, hard:14 }` to match the arcade.
+
+**Kakuro-specific (~30%, the real work):**
+1. **Data model** — a cell is a *wall* (black, optional `{down, right}` sums) or a *fillable* white cell. (Different from Suguru's cage model.)
+2. **Grid render** — black clue cells with the diagonal split + sum numbers; white cells as inputs. Most visually distinct piece.
+3. **Validation** — per run: digits unique **and** sum to the clue.
+4. **Hint logic** — reveal a correct digit / flag a broken run (adapt Suguru's hint shop).
+5. **Generator** — `scripts/generate-kakuro.js`, modeled on `generate-suguru.js` (borrow its solver + uniqueness-check scaffolding). **The hard part** — Kakuro generation with guaranteed-unique solutions is the trickiest piece. Emits `games/kakuro/puzzles/{easy,medium,hard}.json` (150/150/100). Bump a `kakuro_bank_version`. Add a step to `.github/workflows/generate-puzzles.yml`.
+
+**Build order (phased, each independently testable):** 1) Shell (copy+recolor suguru index/css, wire profile/home/daily/screens) → 2) Render + input (hand-author 2–3 JSON puzzles) → 3) Rules + win (validation, win, reward, undo, timer) → 4) Hints + 5-slide tutorial → 5) Generator + banks → 6) Add Crossum tile to `games/index.html` (replace coming-soon) + mobile touch test.
+
+**Proposed JSON format (final shape locked when building the generator):** `{ "puzzles": [ { "rows", "cols", "cells": [{wall, down, right} | {wall:false}], "solution": [[0|digit]], "id" } ] }`.
+
+---
+
+## Phase 8 — Pixle picture authoring + interaction polish; repo privacy
+**Date:** 2026-06-05 → 2026-06-12
+
+**Pixle interaction polish (commits):** fill/mark toggle + auto-mark refinements; **3-tap cell cycle** (color → ✕ → blank) with working **touch drag-paint**; true colored nonograms with **per-number clue strikethrough**, then **position-aware** strikethrough — each clue number binds by which end of the run it sits, so strikes track the correct number as a line fills from either side.
+
+**Picture authoring + curation pipeline (`scripts/`, kept PRIVATE — see below):** `author-pictures.js` (~936 lines) authors recognizable-shape picture puzzles (the Phase-6 "deferred designed-picture phase"). `review-banked-pictures.js` / `apply-bank-review.js` / `merge-pictures.js` drive a keep/discard curation workflow; `kept-pictures.json` / `discarded-pictures.json` record the decisions. This produced **243 curated named puzzles** (easy +117, medium +78, hard +48) on top of the original random banks.
+
+**Reserved bank for the daily feature:** The 243 curated puzzles were split out of the live banks into `games/nonogram/puzzles/special/{easy,medium,hard}.json` — a tree the game does **not** fetch — so they stay hidden from random play until the (still-deferred) daily-puzzle feature serves them deliberately. Discriminator: curated puzzles carry a `name`; the original published puzzles do not. Live `easy/medium/hard.json` left byte-identical to before, so players saw zero change.
+
+**Repo privacy decision:** Repo stays **public** (free GitHub Pages only serves public repos; a web game ships its source to the browser anyway, so a private repo hides little). The genuinely-spoilable content — the reserved `special/` answers and the authoring tooling — was **scrubbed from public git history** (force-push) and `.gitignore`d, kept locally only, destined for a separate **private dev repo** (free; unlimited private repos — only *Pages-from-private* costs money). Backup at `~/pixle-private-backup/`. Also added `.gitignore` (`.DS_Store` + the private paths).
+
+**"Make it an app" path (for reference, deferred):** Rung 1 = shareable link (have it). **Rung 2 = PWA** (manifest + service worker → "Add to Home Screen", offline, free, reuses current code) — the recommended next "it's an app!" step. Rung 3 = app stores (Google Play ~$25 once, Apple $99/yr; gain = discoverability/search + store trust + built-in payments, not capability). Rung 4 = native rewrite — irrelevant, skip. User chose to furnish game features first before PWA.
+
+---
+
 ## Phase 7 — Pixle goes colored
 **Date:** 2026-06-02
 
@@ -201,7 +253,7 @@ Every existing user gets a fresh start on next load — coins, streak, totalSolv
 ## Architectural patterns worth remembering
 
 ### Shared profile system
-All games load `/games/profile.js` before their own JS. It manages a single localStorage profile with coins, streak, daily reward, best times keyed as `"<game>_<difficulty>"`. Daily reward formula: `50 + min(streak-1, 5)*10`.
+All games load `/games/profile.js` before their own JS. It manages a single localStorage profile with coins, streak, daily reward, best times keyed as `"<game>_<difficulty>"`. Daily reward curve (Phase 5, replaced the old `50 + min(streak-1,5)*10`): days 1–7 = 50/60/70/80/90/100/**200**, then cycles back to 50 while the streak counter keeps growing. Helpers: `rewardForDay()`, `dailyRewardSchedule()`.
 
 ### Puzzle bank pattern (for games with slow/unreliable live generation)
 1. Write `scripts/generate-<game>.js` (Node, runs offline)
