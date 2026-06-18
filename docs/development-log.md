@@ -26,6 +26,11 @@ Traced the medium/hard non-uniqueness to a single mechanism. A Kakuro has multip
 
 **Therefore the next design direction is: construct/select SWAP-RESISTANT layouts** (varied run lengths, irregular crossing structure so no two cells can mutually exchange), then fill + verify. Repairing fills is a dead end; the lever is the layout. Prototypes for this R&D live in `/tmp/proto-*.js` (not committed). The committed generator still produces correct EASY puzzles.
 
+**SOLVED (2026-06-17) — reveal GIVENS to force uniqueness.**
+Web research found a working open-source generator ([ChrisMoutsos/kakuro](https://github.com/ChrisMoutsos/kakuro)) whose `generateBoard()` has the missing step: **you can't get uniqueness from clue-sums alone above ~5×5 — real Kakuro pre-fills a few cells as GIVENS.** Algorithm ("Phase 3"): after building a valid filled board, run the logic solver; while it can't finish, take the unsolved cell with the FEWEST candidates and FIX it to its true value as a given; re-propagate; repeat until logic solves it completely ⇒ guaranteed unique. The givens pin one cell of each swap, killing it.
+
+Implemented in `generate-kakuro.js`: refactored the logic solver into `propagate()` (returns `{ok, solved, cand}`, accepts a `givens` map) wrapped by `logicSolvable()`; `generateOne()` runs the Phase-3 loop and caps givens at ~18% of interior cells. **Result: full banks generated in <2s — easy 150, medium 150, hard 100, ALL independently verified to have exactly one solution.** Given-counts: easy 0–3 (avg 2.6), medium 3–6 (avg 5.4), hard 8–12 (avg 11.4). JSON cell model gained `given: digit` on pre-filled white cells; bank entries carry `givens` (count). **kakuro.js must render given cells as fixed/locked (non-editable, distinct style).** Generation is no longer a blocker; remaining work is the game UI (`kakuro.js`) + wiring the Crossum tile into `games/index.html`.
+
 ---
 
 ## Phase 9 — Crossum (Kakuro) build plan

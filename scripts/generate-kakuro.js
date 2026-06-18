@@ -309,13 +309,19 @@ const COMBOS = (() => {
 })();
 const popcount = m => { let n = 0; while (m) { m &= m - 1; n++; } return n; };
 
-/* Returns true if the puzzle (layout + run targets) is solvable by pure logic
-   (⇒ unique). `runs` carry .cells; `targets[ri]` is the run's sum. */
-function logicSolvable(R, C, wall, runs, targets) {
+/* Run constraint propagation to fixpoint. `givens` is an optional Map cellKey->digit
+   of pre-revealed cells. Returns { ok, solved, cand }:
+     ok=false   ⇒ contradiction (a cell ran out of candidates) — puzzle is broken
+     solved     ⇒ every white cell has exactly one candidate (⇒ unique)
+     cand       ⇒ final cellKey->9-bit candidate mask (for picking a cell to fix) */
+function propagate(R, C, wall, runs, targets, givens) {
   const key = (r, c) => r * C + c;
-  const cand = new Map();        // cellKey -> 9-bit mask
+  const cand = new Map();
   const isW = (r, c) => !wall[r][c];
-  for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) if (isW(r, c)) cand.set(key(r, c), 0x1FF);
+  for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) if (isW(r, c)) {
+    const k = key(r, c);
+    cand.set(k, (givens && givens.has(k)) ? (1 << (givens.get(k) - 1)) : 0x1FF);
+  }
 
   const runInfo = runs.map((run, ri) => ({
     cells: run.cells.map(([r, c]) => key(r, c)),
@@ -328,34 +334,21 @@ function logicSolvable(R, C, wall, runs, targets) {
     changed = false;
     for (const run of runInfo) {
       const combos = COMBOS[run.len][run.sum];
-      if (!combos) return false; // impossible run
-      // current candidate masks for this run's cells
+      if (!combos) return { ok: false };
       const cellMasks = run.cells.map(k => cand.get(k));
-      // a digit at position i is allowed only if some valid combo can place the run's
-      // digit-set consistent with every cell's candidates. Compute, per cell, the OR of
-      // all combos consistent with current masks; then a combo is consistent if each of
-      // its digits can be assigned to distinct cells whose masks allow them.
-      // For run sizes <= maxRun (small), do an exact assignment check per combo.
       let allowedPerCell = run.cells.map(() => 0);
       for (const combo of combos) {
-        // digits in combo
         const digits = [];
         for (let d = 1; d <= 9; d++) if (combo & (1 << (d - 1))) digits.push(d);
-        // can these `len` distinct digits be placed into the cells (each cell's mask
-        // must allow its digit)? bipartite matching; len is tiny so brute permute.
-        if (assignable(digits, cellMasks)) {
-          // mark, per cell, which digits are reachable under SOME valid assignment
-          markReachable(digits, cellMasks, allowedPerCell);
-        }
+        if (assignable(digits, cellMasks)) markReachable(digits, cellMasks, allowedPerCell);
       }
       for (let i = 0; i < run.cells.length; i++) {
         const k = run.cells[i];
         const nm = cand.get(k) & allowedPerCell[i];
-        if (nm === 0) return false;
+        if (nm === 0) return { ok: false };
         if (nm !== cand.get(k)) { cand.set(k, nm); changed = true; }
       }
     }
-    // naked singles: propagate fixed cells into run-mates (no-repeat)
     for (const run of runInfo) {
       for (const k of run.cells) {
         const m = cand.get(k);
@@ -365,9 +358,15 @@ function logicSolvable(R, C, wall, runs, targets) {
       }
     }
   }
-  // solved iff every cell is a single candidate
-  for (const m of cand.values()) if (popcount(m) !== 1) return false;
-  return true;
+  let solved = true;
+  for (const m of cand.values()) if (popcount(m) !== 1) { solved = false; break; }
+  return { ok: true, solved, cand };
+}
+
+/* True if the puzzle is fully solvable by pure logic given `givens` (⇒ unique). */
+function logicSolvable(R, C, wall, runs, targets, givens) {
+  const res = propagate(R, C, wall, runs, targets, givens);
+  return res.ok && res.solved;
 }
 
 // can distinct `digits` be placed into cells (cellMasks) one-each, mask-consistent?
@@ -419,14 +418,37 @@ function generateOne(cfg) {
 
     // derive targets from the solution
     const targets = runs.map(run => run.cells.reduce((s, [r, c]) => s + sol[r][c], 0));
+    const key = (r, c) => r * C + c;
 
-    // uniqueness via logical solvability — a puzzle a human can deduce step-by-step
-    // is uniquely solvable by construction (and pleasant to play).
-    if (!logicSolvable(R, C, wall, runs, targets)) { dbg.notUnique++; continue; }
+    // ── PHASE THREE: force a UNIQUE solution by revealing as few cells as possible. ──
+    // (Technique from real Kakuro generators, e.g. ChrisMoutsos/kakuro.) Sums alone
+    // almost never determine a 7×7+ grid (swaps), so we run the logic solver and,
+    // while it can't finish, FIX the unsolved cell with the fewest candidates to its
+    // true value as a GIVEN. Re-propagate. Repeat until logic fully solves it ⇒ unique.
+    const givens = new Map();   // cellKey -> digit
+    let solvedUnique = false;
+    for (let step = 0; step < R * C; step++) {
+      const res = propagate(R, C, wall, runs, targets, givens);
+      if (!res.ok) break;                       // contradiction (shouldn't happen)
+      if (res.solved) { solvedUnique = true; break; }
+      // pick the unsolved white cell with the fewest candidates (>1)
+      let bestK = -1, bestN = 99;
+      for (const [k, m] of res.cand) {
+        const n = popcount(m);
+        if (n > 1 && n < bestN) { bestN = n; bestK = k; }
+      }
+      if (bestK === -1) break;
+      const r = (bestK / C) | 0, c = bestK % C;
+      givens.set(bestK, sol[r][c]);             // reveal its true value
+    }
+    if (!solvedUnique) { dbg.notUnique++; continue; }
 
-    // build output cells
+    // Cap how many givens we tolerate so puzzles aren't half-filled. Scales with size.
+    const maxGivens = Math.max(2, Math.round((R - 1) * (C - 1) * 0.18));
+    if (givens.size > maxGivens) { dbg.notUnique++; continue; }
+
+    // build output cells (white cells that are givens carry `given: digit`)
     const cells = [];
-    // map run head+type -> sum
     const rightSum = {}, downSum = {};
     runs.forEach((run, ri) => {
       const [hr, hc] = run.head;
@@ -434,15 +456,17 @@ function generateOne(cfg) {
       else downSum[hr * C + hc] = targets[ri];
     });
     for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+      const k = key(r, c);
       if (wall[r][c]) {
-        const k = r * C + c;
         cells.push({ t: 'wall', down: downSum[k] ?? null, right: rightSum[k] ?? null });
+      } else if (givens.has(k)) {
+        cells.push({ t: 'cell', given: givens.get(k) });
       } else {
         cells.push({ t: 'cell' });
       }
     }
     const solution = sol.map(row => row.slice());
-    return { rows: R, cols: C, cells, solution, createdAt: new Date().toISOString() };
+    return { rows: R, cols: C, cells, solution, givens: givens.size, createdAt: new Date().toISOString() };
   }
   return null;
 }
