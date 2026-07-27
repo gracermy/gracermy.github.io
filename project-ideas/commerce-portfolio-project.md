@@ -132,12 +132,46 @@ the live link is an optional add-on, never a trap.**
 
 ---
 
-## DEVELOPMENT ROADMAP — big picture
+## DEVELOPMENT ROADMAP — big picture (BOTH halves sequenced)
 
-The store (Shopify Path B) is the immediate focus; the POS is the later companion.
-Each phase is independently demoable. All of Phase 0–6 is FREE.
+This project has TWO deliverables: the **Shopify store** and the **from-scratch POS**.
+Both are in scope. This roadmap sequences them.
 
-### PART ONE — Shopify custom-theme store (Path B)
+### Which to build first — and WHY (decision)
+**STAGE A = Shopify store FIRST. STAGE B = POS SECOND.** Reasoning:
+- The store is the **gentler on-ramp** (closest to my existing HTML/CSS/JS skills — just add
+  Liquid), so I get a finished, demoable artifact fast and build momentum. Starting with the
+  harder from-scratch POS risks stalling before I have anything to show.
+- Building the store first teaches me the **commerce vocabulary** (products, variants, SKUs,
+  inventory, orders, line items) concretely. The POS data model then **mirrors** that structure —
+  and "both systems speak the same commerce language" is itself an impressive portfolio detail.
+- They're **independent artifacts** (two repos, two skill stories) — no technical dependency
+  forces the order; this is purely about momentum + learning sequence.
+- **Do now even though POS is second:** sketch the shared data model early so the POS deliberately
+  echoes the store's shape instead of diverging.
+
+### Full picture at a glance
+```
+STAGE A — Shopify store (Path B)          [FIRST]
+  Phase 0  Accounts & scaffold
+  Phase 1  Base theme + dev loop
+  Phase 2  Store content & config   <- learn the commerce vocabulary here
+  Phase 3  Liquid customization (core coding)
+  Phase 4  Polish + portfolio capture
+  -- store is a finished, showable artifact --
+
+STAGE B — From-scratch POS                [SECOND, reuses A's vocabulary]
+  Phase 5  POS data model + scaffold (React + SQLite/Prisma)
+           mirror the store's product/inventory/order shape
+  Phase 6  POS core: item grid -> cart -> tender -> change -> receipt
+  Phase 7  Inventory decrements + order history
+  Phase 8  Polish + portfolio capture (screens, README, deploy free)
+
+OPTIONAL (anytime after A) — go live (Option 2) for a job-hunt link
+```
+Each phase is independently demoable. Stages A (0–4) and B (5–8) are FREE.
+
+### STAGE A — Shopify custom-theme store (Path B)
 
 **Phase 0 — Accounts & scaffold (setup, ~1 sitting).**
 - Create free **Shopify Partner account** (browser — I do it; Claude gives click-by-click).
@@ -175,14 +209,31 @@ Each phase is independently demoable. All of Phase 0–6 is FREE.
 - Write a strong **README** in the theme repo (what it is, stack, what I built, screenshots,
   link-on-request note). This README + code IS the portfolio piece.
 
-**Phase 5 (OPTIONAL, later) — go live for a job hunt (Option 2).**
-- Upgrade the same dev store to a paid plan for a public clickable URL. Take down when done.
+*(Going live = the OPTIONAL Option 2 step; can happen anytime after Stage A. Upgrade the same
+dev store to a paid plan for a public clickable URL, take down when done. See cost section above.)*
 
-### PART TWO — From-scratch POS (companion, deferred)
+### STAGE B — From-scratch POS (the engineering half — build SECOND)
 
-**Phase 6+ — separate build.** My own POS app (React + real DB, e.g. SQLite/Prisma),
-staff-facing ring-up flow, framed as the engineering companion to the Shopify store.
-Tackle after Part One is in good shape. (Details in the POS section above.)
+Own code, own repo. Staff-facing. Stack: **React + real DB (SQLite via Prisma)**, deployed free
+(Vercel/GitHub). Deliberately mirrors the store's commerce vocabulary from Stage A.
+
+**Phase 5 — POS data model + scaffold.**
+- Scaffold the React app + DB. Design the schema to **mirror the Shopify store**: Product
+  (name, price, SKU, variant), InventoryItem (stock count), Order + OrderLineItem.
+- Seed with demo products echoing the store's catalog.
+
+**Phase 6 — POS core ring-up flow (the signature demo).**
+- Item grid / fast lookup → add to a **cart/ticket** → adjust qty → subtotal + tax →
+  **tender** (cash/card) → **change due** → **receipt**. Optimized for SPEED (staff, not shopper).
+
+**Phase 7 — Inventory + order history.**
+- Completing a sale **decrements inventory**; low-stock indicator.
+- **Order history** list + reprint/view a past receipt. This is the "real system" proof.
+
+**Phase 8 — Polish + portfolio capture.**
+- Responsive (tablet/register feel), keyboard-fast interactions.
+- Screenshots + screen-recording of a full sale; strong **README** framing it as the engineering
+  companion to the Shopify store. Deploy free for a live link.
 
 ---
 
