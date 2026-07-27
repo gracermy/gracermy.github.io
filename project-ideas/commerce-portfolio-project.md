@@ -95,6 +95,29 @@ back into the from-scratch build.)
 **Bottom line: the project is always showable. The repo never disappears and costs nothing;
 the live link is an optional add-on, never a trap.**
 
+### How long can I hold it free? (confirmed)
+- **Partner account + theme-building + creating dev stores = free FOREVER, no time limit.** Stable.
+- **A dev store persists indefinitely** — there is NO hard "X days then deleted" clock on it
+  (that ~3-day clock is the *paid-plan free trial*, a different thing). Caveats: it stays
+  password-protected, can't take real orders, and Shopify may pause it after long inactivity.
+- **For Option 1 this doesn't matter:** the real artifact is the theme code in GitHub, and a
+  dev store is a re-creatable workbench — if one ever gets paused/deleted, spin up a fresh dev
+  store and re-upload the theme from GitHub in ~10 min. So effectively I can hold it **as long as
+  I want**. (Verify exact terms on Shopify Partner docs — Shopify changes them periodically.)
+
+### Option 1 → Option 2 is a SWITCH, not a rebuild (confirmed)
+- Going live later = **upgrade/transfer the SAME dev store to a paid plan.** No migration.
+- Theme code, products, collections, settings ALL stay; the password wall just drops and the
+  store becomes a public clickable URL.
+- Lifecycle: **(1)** build free on dev store + push code to GitHub → **(2)** during job hunt,
+  upgrade that same store to paid (grab ~$1/mo promo if live) for a public link → **(3)** cancel
+  when done; GitHub code + recordings stay forever, and the link can be re-lit anytime by
+  upgrading again.
+- Caveat: the Partner "transfer to paid" step is a menu click, not engineering — walk through
+  the exact button at that time. Capability is core Shopify behavior; promo pricing drifts.
+- **Decision locked:** START with Option 1. Keep Option 2 in back pocket. Nothing built now is
+  thrown away in the switch.
+
 ---
 
 ## The POS half — from scratch (companion project)
@@ -109,21 +132,75 @@ the live link is an optional add-on, never a trap.**
 
 ---
 
-## NEXT STEPS (where we left off)
+## DEVELOPMENT ROADMAP — big picture
 
-Immediate, all free, commit to nothing:
+The store (Shopify Path B) is the immediate focus; the POS is the later companion.
+Each phase is independently demoable. All of Phase 0–6 is FREE.
 
-1. **Create a free Shopify Partner account** (in browser — needs my email/verification;
-   Claude can't create it, but will give click-by-click steps).
-2. **Spin up a development store** (free coding sandbox).
-3. **Create a public GitHub repo** for the theme code (permanent portfolio home).
-4. **Start building the custom theme in Liquid.**
+### PART ONE — Shopify custom-theme store (Path B)
 
-Claude offered to: write out the click-by-click Partner-account + dev-store setup, AND
-scaffold the local project folder + GitHub repo structure for the theme (can do the local
-scaffolding in parallel while I do the browser signup).
+**Phase 0 — Accounts & scaffold (setup, ~1 sitting).**
+- Create free **Shopify Partner account** (browser — I do it; Claude gives click-by-click).
+- Spin up a **development store** (free sandbox).
+- Install the **Shopify CLI** locally (the tool that connects my code editor to the store —
+  lets me pull/push theme code and live-preview edits).
+- Create a **public GitHub repo** for the theme code (the permanent portfolio artifact).
+- Pick a **store niche** for demo content (affects products/imagery/copy).
 
-### Open questions still to confirm when I resume
-- Project/repo name for the Shopify theme.
-- Whether to scaffold the local theme repo now vs. after the dev store exists.
-- What kind of store to theme (product niche) — affects demo content.
+**Phase 1 — Base theme + local dev loop working.**
+- Start from Shopify's free reference theme **"Dawn"** (`shopify theme init`) so I have a
+  working, well-structured base to customize — NOT a blank page.
+- Get `shopify theme dev` running: edit a `.liquid` file locally → see it live-reload in the
+  browser against my dev store. Proving this loop works is the milestone.
+- Commit the base theme to GitHub.
+
+**Phase 2 — Store content & config (the "ops/PM" skill).**
+- Add demo **products** (photos, descriptions, prices, variants, SKUs, stock).
+- Group into **collections** (e.g. featured / sale / by category).
+- Configure **navigation menus**, shipping/tax basics, store info.
+- This is what proves the "can operate a real store" signal.
+
+**Phase 3 — Customize the theme in Liquid (the "coding" skill — the core work).**
+- Restyle to my own visual identity (colors, fonts, spacing) — reuse HTML/CSS/JS instincts
+  from the games site.
+- Customize key templates: **homepage** (hero, featured collection), **product page**,
+  **collection/listing page**, **cart**, **header/footer**.
+- Build **theme settings / sections** so the store is editable in Shopify's visual editor
+  (shows I understand how themes are meant to be configured, not just hardcoded).
+- Add a bit of custom **JS interaction** for polish.
+
+**Phase 4 — Polish + portfolio capture.**
+- Responsive/mobile check, accessibility pass, performance sanity.
+- **Capture proof:** screenshots + a short **screen-recorded walkthrough** of the live dev store.
+- Write a strong **README** in the theme repo (what it is, stack, what I built, screenshots,
+  link-on-request note). This README + code IS the portfolio piece.
+
+**Phase 5 (OPTIONAL, later) — go live for a job hunt (Option 2).**
+- Upgrade the same dev store to a paid plan for a public clickable URL. Take down when done.
+
+### PART TWO — From-scratch POS (companion, deferred)
+
+**Phase 6+ — separate build.** My own POS app (React + real DB, e.g. SQLite/Prisma),
+staff-facing ring-up flow, framed as the engineering companion to the Shopify store.
+Tackle after Part One is in good shape. (Details in the POS section above.)
+
+---
+
+## WHERE I BEGIN (next action)
+
+**Start at Phase 0.** Concretely, the very first steps, in order:
+1. Create the free **Shopify Partner account** in the browser (Claude provides click-by-click).
+2. Create a **development store** from the Partner dashboard.
+3. Install **Shopify CLI** + confirm **Node** is present (Claude helps / checks locally).
+4. Create the **public GitHub repo** for the theme (Claude can scaffold the local folder in
+   parallel while I do the browser signup).
+
+### Open questions to answer at kickoff
+- **Repo/theme name?** (e.g. `shopify-store-demo`, or something branded to the niche.)
+- **Store niche?** — what does the demo shop sell? (Affects products, imagery, copy, styling.
+  Pick something I find fun and can source free stock images for.)
+- **Where does the theme repo live?** — its own new folder outside the games site (recommended),
+  e.g. `~/my github/<theme-repo-name>/`.
+- Scaffold local theme folder now, or wait until the dev store + Dawn theme exist? (Slight lean:
+  create the dev store first so Dawn gives us the real file structure to commit, rather than
+  guessing it.)
