@@ -77,6 +77,8 @@
     const keyIn = el("input", { placeholder: "eyJ… (anon public key)", value: existing.SUPABASE_ANON_KEY && !existing.SUPABASE_ANON_KEY.includes("YOUR-ANON") ? existing.SUPABASE_ANON_KEY : "" });
     const passIn = el("input", { placeholder: "invite passkey", value: existing.INVITE_PASSKEY && existing.INVITE_PASSKEY !== "change-me-to-a-secret-phrase" ? existing.INVITE_PASSKEY : "" });
     const curIn = currencySelect(existing.BASE_CURRENCY || "HKD");
+    const aiIn = el("input", { type: "checkbox", style: "width:auto;margin:0" });
+    if (existing.AI_STATEMENTS) aiIn.checked = true;
     const err = el("div", { class: "error-msg" });
     const saveBtn = el("button", { class: "btn", style: "width:100%" }, "Save & continue");
 
@@ -85,7 +87,7 @@
       const url = urlIn.value.trim(), key = keyIn.value.trim();
       if (!/^https:\/\/.+\.supabase\.co/.test(url)) { err.textContent = "Enter your Supabase Project URL (https://…​.supabase.co)."; return; }
       if (key.length < 20) { err.textContent = "Enter your anon public key (a long string starting with eyJ)."; return; }
-      const c = db.saveConfig({ SUPABASE_URL: url, SUPABASE_ANON_KEY: key, INVITE_PASSKEY: passIn.value, BASE_CURRENCY: curIn.value, AI_STATEMENTS: !!existing.AI_STATEMENTS });
+      const c = db.saveConfig({ SUPABASE_URL: url, SUPABASE_ANON_KEY: key, INVITE_PASSKEY: passIn.value, BASE_CURRENCY: curIn.value, AI_STATEMENTS: aiIn.checked });
       if (!c) { err.textContent = "Those values didn't work. Double-check the URL and key."; return; }
       boot(); // re-run startup with the new config
     });
@@ -104,6 +106,10 @@
             el("div", { class: "field" }, el("label", {}, "Invite passkey"), passIn),
             el("div", { class: "field" }, el("label", {}, "Base currency"), curIn)
           ),
+          el("hr", { class: "divider" }),
+          el("label", { style: "display:flex;align-items:center;gap:9px;cursor:pointer;margin-bottom:4px" },
+            aiIn, el("span", {}, "Enable AI statement reading")),
+          el("div", { class: "section-hint", style: "margin-bottom:0" }, "Only turn this on if the parse-statement Edge Function is deployed and your Claude API key is set. Adds an 'upload a statement' option that drafts your numbers for you to confirm."),
           saveBtn, err
         )
       )
