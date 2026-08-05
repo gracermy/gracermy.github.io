@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bloom · gracermy</title>
+<meta name="robots" content="noindex, nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Source+Sans+3:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas id="blossom-canvas"></canvas>
+
+<nav>
+  <div class="container">
+    <div class="nav-left">
+      <a href="/" class="nav-logo">gracermy</a>
+      <div class="nav-links" id="navRight">
+        <a href="#" data-route="dashboard" class="active">Dashboard</a>
+        <a href="#" data-route="history">History</a>
+        <a href="#" data-route="accounts">Accounts</a>
+        <button id="signOutBtn" title="Sign out">Sign out</button>
+      </div>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle dark/light mode">
+      <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/>
+        <line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/>
+        <line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    </button>
+  </div>
+</nav>
+
+<main>
+  <div class="container">
+    <div id="app"><!-- rendered by app.js --></div>
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <p>Bloom · made with love by @gracermy</p>
+  </div>
+</footer>
+
+<!-- Theme toggle (shared with the rest of the site) -->
+<script src="/theme.js"></script>
+<!-- Falling-blossom background (shared) -->
+<script src="/blossom.js"></script>
+
+<!-- Supabase JS SDK (public CDN; fine on a normal hosted page) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<!-- App config: copy config.sample.js -> config.js and fill in your values.
+     config.sample.js is only a template and is NOT loaded here. If config.js
+     is missing, the app shows a setup screen. -->
+<script src="config.js" onerror="window.__noConfig=true"></script>
+
+<!-- App modules -->
+<script src="supabase.js"></script>
+<script src="snapshot.js"></script>
+<script src="charts.js"></script>
+<script src="statements.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

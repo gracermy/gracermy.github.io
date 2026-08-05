@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bloom · preview (sample data)</title>
+<meta name="robots" content="noindex, nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Source+Sans+3:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- ⚠️ PREVIEW ONLY: this page uses fake sample data and a mock database so you
+     can click through the logged-in UI without an account. It writes nothing.
+     The real app is index.html. Safe to delete this file anytime. -->
+<canvas id="blossom-canvas"></canvas>
+<nav>
+  <div class="container">
+    <div class="nav-left">
+      <a href="/" class="nav-logo">gracermy</a>
+      <div class="nav-links" id="navRight">
+        <a href="#" data-route="dashboard" class="active">Dashboard</a>
+        <a href="#" data-route="history">History</a>
+        <a href="#" data-route="accounts">Accounts</a>
+        <button id="signOutBtn" title="Sign out">Sign out</button>
+      </div>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">
+      <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/></svg>
+    </button>
+  </div>
+</nav>
+<main><div class="container">
+  <div style="margin-top:24px;padding:10px 14px;border-radius:10px;background:var(--accent-soft);color:var(--accent);font-size:0.82rem;font-family:'JetBrains Mono',monospace">
+    PREVIEW MODE · sample data · nothing is saved · click the nav to explore
+  </div>
+  <div id="app"></div>
+</div></main>
+<footer><div class="container"><p>Bloom · made with love by @gracermy</p></div></footer>
+
+<script>
+function applyTheme(t){document.documentElement.setAttribute('data-theme',t);document.body.style.background=t==='dark'?'#120810':'#f5e8ea';localStorage.setItem('theme',t);}
+function toggleTheme(){applyTheme((localStorage.getItem('theme')||'light')==='dark'?'light':'dark');}
+applyTheme(localStorage.getItem('theme')||'light');
+
+// ── Sample data ──
+const ACCOUNTS=[
+  {id:'a1',name:'HSBC Savings',type:'liquid',currency:'HKD',sort_order:0},
+  {id:'a2',name:'Mox',type:'liquid',currency:'HKD',sort_order:1},
+  {id:'a3',name:'Octopus',type:'liquid',currency:'HKD',sort_order:2},
+  {id:'a4',name:'Cash',type:'liquid',currency:'HKD',sort_order:3},
+  {id:'a5',name:'US Broker',type:'liquid',currency:'USD',sort_order:4},
+  {id:'a6',name:'MPF (SuperTrust)',type:'illiquid',currency:'HKD',sort_order:5},
+  {id:'a7',name:'HK Stocks',type:'illiquid',currency:'HKD',sort_order:6},
+  {id:'a8',name:'Mox Credit Card',type:'liability',currency:'HKD',sort_order:7},
+];
+const SNAPS=[
+  {id:'s1',period_year:2026,period_month:6,base_currency:'HKD',note:'',updated_at:'2026-07-02T10:00:00Z'},
+  {id:'s2',period_year:2026,period_month:7,base_currency:'HKD',note:'summer',updated_at:'2026-08-01T10:00:00Z'},
+  {id:'s3',period_year:2026,period_month:8,base_currency:'HKD',note:'',updated_at:'2026-09-03T10:00:00Z'},
+];
+const BALANCES=[
+  {id:'b1',snapshot_id:'s1',account_id:'a1',amount:30337.19,currency:'HKD',exchange_rate:1},
+  {id:'b2',snapshot_id:'s1',account_id:'a3',amount:450,currency:'HKD',exchange_rate:1},
+  {id:'b3',snapshot_id:'s1',account_id:'a4',amount:800,currency:'HKD',exchange_rate:1},
+  {id:'b4',snapshot_id:'s2',account_id:'a1',amount:36066.75,currency:'HKD',exchange_rate:1},
+  {id:'b5',snapshot_id:'s2',account_id:'a3',amount:500,currency:'HKD',exchange_rate:1},
+  {id:'b6',snapshot_id:'s2',account_id:'a4',amount:1200,currency:'HKD',exchange_rate:1},
+  {id:'b7',snapshot_id:'s2',account_id:'a5',amount:9.28,currency:'USD',exchange_rate:7.8418},
+  {id:'b8',snapshot_id:'s2',account_id:'a8',amount:4424.55,currency:'HKD',exchange_rate:1},
+  {id:'b9',snapshot_id:'s3',account_id:'a1',amount:41200,currency:'HKD',exchange_rate:1},
+  {id:'b10',snapshot_id:'s3',account_id:'a3',amount:380,currency:'HKD',exchange_rate:1},
+  {id:'b11',snapshot_id:'s3',account_id:'a4',amount:600,currency:'HKD',exchange_rate:1},
+  {id:'b12',snapshot_id:'s3',account_id:'a5',amount:120,currency:'USD',exchange_rate:7.84},
+  {id:'b13',snapshot_id:'s3',account_id:'a8',amount:2100,currency:'HKD',exchange_rate:1},
+];
+const MOVES=[
+  {id:'m1',snapshot_id:'s1',account_id:'a6',direction:'in',amount:33500,currency:'HKD',exchange_rate:1},
+  {id:'m2',snapshot_id:'s1',account_id:'a7',direction:'in',amount:20000,currency:'HKD',exchange_rate:1},
+  {id:'m3',snapshot_id:'s2',account_id:'a6',direction:'in',amount:2440.41,currency:'HKD',exchange_rate:1},
+  {id:'m4',snapshot_id:'s2',account_id:'a7',direction:'in',amount:2200,currency:'HKD',exchange_rate:1},
+  {id:'m5',snapshot_id:'s3',account_id:'a6',direction:'in',amount:1500,currency:'HKD',exchange_rate:1},
+];
+const INCOME=[
+  {id:'i1',snapshot_id:'s1',kind:'fixed',label:'Salary',amount:19950,currency:'HKD',exchange_rate:1},
+  {id:'i2',snapshot_id:'s2',kind:'fixed',label:'Salary',amount:19950,currency:'HKD',exchange_rate:1},
+  {id:'i3',snapshot_id:'s2',kind:'side',label:'From mom',amount:2000,currency:'HKD',exchange_rate:1},
+  {id:'i4',snapshot_id:'s3',kind:'fixed',label:'Salary',amount:19950,currency:'HKD',exchange_rate:1},
+];
+const EXPENSES=[
+  {id:'e1',snapshot_id:'s2',category:'rent',label:'Rent',amount:6000},
+  {id:'e2',snapshot_id:'s2',category:'food',label:'Groceries + dining',amount:4200},
+  {id:'e3',snapshot_id:'s2',category:'shopping',label:'UNIQLO + Taobao',amount:1500},
+  {id:'e4',snapshot_id:'s2',category:'other',label:'Everything else',amount:2800},
+];
+const INCOME_DEFAULTS={user_id:'u1',fixed_amount:19950,currency:'HKD',auto_route_illiquid_account_id:'a6',auto_route_amount:1500};
+const TABLES={accounts:ACCOUNTS,snapshots:SNAPS,balances:BALANCES,illiquid_moves:MOVES,income:INCOME,expense_lines:EXPENSES,transactions:[],income_defaults:[INCOME_DEFAULTS]};
+
+function makeQuery(table){
+  const api={_rows:(TABLES[table]||[]).slice(),
+    select(){return api;}, eq(c,v){api._rows=api._rows.filter(r=>r[c]===v);return api;}, order(){return api;},
+    maybeSingle(){return Promise.resolve({data:api._rows[0]||null,error:null});},
+    single(){return Promise.resolve({data:api._rows[0]||null,error:null});},
+    insert(){return {select:()=>({single:()=>Promise.resolve({data:{id:'new'},error:null})}),then:(f)=>f({error:null})};},
+    update(){return {eq:()=>Promise.resolve({error:null})};},
+    delete(){return {eq:()=>Promise.resolve({error:null})};},
+    upsert(){return Promise.resolve({error:null});},
+    then(f){return Promise.resolve({data:api._rows,error:null}).then(f);}};
+  return api;
+}
+window.FinanceDB={
+  getClient(){return {auth:{getSession(){return Promise.resolve({data:{session:{user:{id:'u1',email:'you@example.com'}}}});},
+    onAuthStateChange(){return {data:{subscription:{unsubscribe(){}}}};}, signOut(){return Promise.resolve({});}},
+    from(t){return makeQuery(t);}};},
+  getConfigError(){return null;}, baseCurrency(){return 'HKD';}, invitePasskey(){return 'preview';},
+  functionsUrl(){return 'mock';}, aiEnabled(){return true;},
+};
+// Mock the statement parser so the upload widget is fully clickable in preview.
+window.__mockDraft = {
+  statement_kind:'asset', period_month:8, period_year:2026,
+  balances:[
+    {name:'HSBC Savings', amount:41200, currency:'HKD', exchange_rate_to_hkd:1},
+    {name:'US Broker', amount:120, currency:'USD', exchange_rate_to_hkd:7.84},
+  ],
+  liabilities:[{name:'Mox Credit Card', amount:2100, currency:'HKD'}],
+  illiquid_balances:[{name:'MPF (SuperTrust)', amount:35940.41, currency:'HKD'}],
+  transactions:[
+    {date:'2026-08-05', description:'Keeta', amount:108.3, currency:'HKD', category:'food', is_transfer:false},
+    {date:'2026-08-06', description:'UNIQLO', amount:208, currency:'HKD', category:'shopping', is_transfer:false},
+    {date:'2026-08-07', description:'OCTOPUS top-up', amount:500, currency:'HKD', category:'transport', is_transfer:true},
+    {date:'2026-08-08', description:'ClassPass', amount:158, currency:'HKD', category:'fitness', is_transfer:false},
+  ],
+};
+</script>
+<script>
+// optional deep-link for screenshots: ?route=accounts|history|snapshot&snap=s2
+const _q=new URLSearchParams(location.search);
+if(_q.get('theme')==='dark')applyTheme('dark');
+window.__pvRoute=_q.get('route');window.__pvSnap=_q.get('snap')||'s2';
+</script>
+<script src="snapshot.js"></script>
+<script src="charts.js"></script>
+<script src="statements.js"></script>
+<script>
+// In preview, make the statement parser return mock data (no real network call).
+if(window.BloomStatements){
+  window.BloomStatements.parseStatement = async () => {
+    await new Promise(r=>setTimeout(r,400));
+    return JSON.parse(JSON.stringify(window.__mockDraft));
+  };
+}
+</script>
+<script src="app.js"></script>
+<script>
+if(window.__pvRoute){setTimeout(()=>{ if(window.__financeRoute){
+  if(window.__pvRoute==='newmonth') window.__financeRoute('snapshot');
+  else if(window.__pvRoute==='snapshot') window.__financeRoute('snapshot',window.__pvSnap);
+  else window.__financeRoute(window.__pvRoute);
+}},700);}
+</script>
+</body>
+</html>
