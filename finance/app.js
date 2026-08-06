@@ -41,11 +41,22 @@
       renderConfigNeeded(cfgErr);
       return;
     }
+    // Arrived via the email confirmation link? Greet, then let them sign in.
+    // (Supabase may also drop a token in the URL hash and create a session; we
+    // sign that transient session out so the user logs in fresh on our page.)
+    const params = new URLSearchParams(location.search);
+    const isConfirm = params.get("confirmed") === "1" || /(\b|#)(type=signup|token_hash=)/.test(location.hash + location.search);
+    if (isConfirm) {
+      try { await sb.auth.signOut(); } catch {}
+      renderConfirmed();
+      // still wire the listener below in case they sign in from here
+    }
+
     const { data } = await sb.auth.getSession();
-    if (data.session) {
+    if (data.session && !isConfirm) {
       user = data.session.user;
       await enterApp();
-    } else {
+    } else if (!isConfirm) {
       renderAuth();
     }
     sb.auth.onAuthStateChange((_evt, session) => {
@@ -162,10 +173,13 @@
             errBox.textContent = "Invalid invite passkey. Ask the owner for the current one.";
             submitBtn.disabled = false; return;
           }
-          const { data, error } = await sb.auth.signUp({ email, password });
+          // Send the confirmation link back to THIS app (not Supabase's
+          // localhost default) with ?confirmed=1 so we can greet + redirect.
+          const redirectTo = location.origin + location.pathname + "?confirmed=1";
+          const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo } });
           if (error) throw error;
-          if (data.session) { /* auto signed in */ }
-          else { okBox.textContent = "Account created. If email confirmation is on, check your inbox, then sign in."; }
+          if (data.session) { /* auto signed in — confirmation off */ }
+          else { renderCheckInbox(email); return; }
         }
       } catch (e) {
         errBox.textContent = e.message || "Something went wrong.";
@@ -191,6 +205,42 @@
         )
       )
     );
+  }
+
+  // ── "Check your inbox" screen (after signup) ──
+  function renderCheckInbox(email) {
+    setNav(false);
+    const app = $("#app");
+    app.innerHTML = "";
+    app.append(el("div", { class: "auth-wrap fade-up fd1" },
+      el("div", { class: "page-header-shell", style: "margin-top:0" },
+        el("h1", {}, "Almost there"),
+        el("p", {}, "We sent a confirmation link to your email.")),
+      el("div", { class: "shell" },
+        el("div", { class: "section-hint", style: "margin-bottom:14px" },
+          "Open the email we just sent to ", el("strong", {}, email || "your address"),
+          " and tap the confirmation link. You can do this on any device. Once confirmed, you'll be able to sign in."),
+        el("div", { class: "section-hint", style: "margin-bottom:14px" },
+          "Don't see it? Check spam, and give it a minute."),
+        el("button", { class: "btn btn-ghost", onClick: () => renderAuth() }, "Back to sign in")
+      )
+    ));
+  }
+
+  // ── "You're confirmed" screen (arrived back via the email link) ──
+  function renderConfirmed() {
+    setNav(false);
+    const app = $("#app");
+    app.innerHTML = "";
+    app.append(el("div", { class: "auth-wrap fade-up fd1" },
+      el("div", { class: "page-header-shell", style: "margin-top:0" },
+        el("h1", {}, "You're in 🌸"),
+        el("p", {}, "Your email is confirmed. Welcome to Bloom.")),
+      el("div", { class: "shell" },
+        el("div", { class: "section-hint", style: "margin-bottom:14px" }, "Sign in with the email and password you just created."),
+        el("button", { class: "btn", style: "width:100%", onClick: () => { history.replaceState(null, "", location.pathname); renderAuth(); } }, "Go to sign in")
+      )
+    ));
   }
 
   // ── Enter app (loads accounts + defaults, shows dashboard) ──
