@@ -116,6 +116,20 @@ create table if not exists public.income_defaults (
 );
 
 -- ─────────────────────────────────────────────────────────────
+-- AUTO ROUTES: fixed monthly slices of income that are auto-recorded as
+-- contributions into an illiquid account. One row per route; a user can have
+-- several (e.g. 1000 -> MPF, 500 -> stocks). Pre-filled into each new month.
+-- ─────────────────────────────────────────────────────────────
+create table if not exists public.auto_routes (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  account_id  uuid not null references public.accounts(id) on delete cascade,
+  amount      numeric not null default 0,
+  currency    text not null default 'HKD',
+  created_at  timestamptz not null default now()
+);
+
+-- ─────────────────────────────────────────────────────────────
 -- EXPENSE LINES: big-picture breakdown per snapshot (editable)
 -- These are descriptive only; the total expense is derived from net worth.
 -- ─────────────────────────────────────────────────────────────
@@ -155,7 +169,7 @@ declare t text;
 begin
   foreach t in array array[
     'accounts','snapshots','balances','illiquid_moves',
-    'income','income_defaults','expense_lines','transactions'
+    'income','income_defaults','expense_lines','transactions','auto_routes'
   ] loop
     execute format('alter table public.%I enable row level security;', t);
     -- drop old policy if present, then create a single all-actions policy
@@ -176,3 +190,4 @@ create index if not exists idx_illiquid_snapshot   on public.illiquid_moves(snap
 create index if not exists idx_income_snapshot     on public.income(snapshot_id);
 create index if not exists idx_expense_snapshot    on public.expense_lines(snapshot_id);
 create index if not exists idx_txn_snapshot        on public.transactions(snapshot_id);
+create index if not exists idx_autoroutes_user      on public.auto_routes(user_id);

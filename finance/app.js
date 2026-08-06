@@ -25,6 +25,7 @@
   let user = null;      // current auth user
   let accounts = [];    // cached accounts
   let incomeDefaults = null;
+  let autoRoutes = [];
 
   const CURRENCIES = [
     "HKD", "USD", "EUR", "GBP", "JPY", "CNY", "AUD", "SGD", "IDR",
@@ -233,7 +234,7 @@
       el("div", { class: "shell" },
         el("div", { class: "section-hint", style: "margin-bottom:14px" },
           "Open the email we just sent to ", el("strong", {}, email || "your address"),
-          " and tap the confirmation link. You can do this on any device. Once confirmed, you'll be able to sign in."),
+          " and tap the confirmation link. Once confirmed, you'll be able to sign in."),
         el("div", { class: "section-hint", style: "margin-bottom:14px" },
           "Don't see it? Check spam, and give it a minute."),
         el("button", { class: "btn btn-ghost", onClick: () => renderAuth() }, "Back to sign in")
@@ -262,6 +263,7 @@
     setNav(true);
     await loadAccounts();
     await loadIncomeDefaults();
+    await loadAutoRoutes();
     routeTo("dashboard");
   }
 
@@ -272,6 +274,10 @@
   async function loadIncomeDefaults() {
     const { data } = await sb.from("income_defaults").select("*").eq("user_id", user.id).maybeSingle();
     incomeDefaults = data || null;
+  }
+  async function loadAutoRoutes() {
+    const { data } = await sb.from("auto_routes").select("*").eq("user_id", user.id);
+    autoRoutes = data || [];
   }
   const acctById = (id) => accounts.find((a) => a.id === id);
 
@@ -419,23 +425,50 @@
           if (groups[type].length === 0) continue;
           listShell.append(el("div", { class: "section-hint", style: "margin-top:12px;margin-bottom:6px" }, label));
           const wrap = el("div", { class: "line-list" });
-          for (const a of groups[type]) {
-            wrap.append(el("div", { class: "line-item" },
-              el("span", { class: "li-name" }, a.name),
-              el("span", { class: "tag" }, a.currency),
-              el("button", { class: "btn-icon", title: "Delete", onClick: () => deleteAccount(a) }, "✕")
-            ));
-          }
+          for (const a of groups[type]) wrap.append(accountRow(a));
           listShell.append(wrap);
         }
       }
+    }
+
+    // One account row, with inline rename (✎) and delete (✕).
+    function accountRow(a) {
+      const row = el("div", { class: "line-item" });
+      function viewMode() {
+        row.innerHTML = "";
+        row.append(
+          el("span", { class: "li-name" }, a.name),
+          el("span", { class: "tag" }, a.currency),
+          el("button", { class: "btn-icon", title: "Rename", onClick: editMode }, "✎"),
+          el("button", { class: "btn-icon", title: "Delete", onClick: () => deleteAccount(a) }, "✕")
+        );
+      }
+      function editMode() {
+        row.innerHTML = "";
+        const inp = el("input", { value: a.name, style: "flex:1" });
+        const save = async () => {
+          const name = inp.value.trim();
+          if (!name || name === a.name) { viewMode(); return; }
+          const { error } = await sb.from("accounts").update({ name }).eq("id", a.id);
+          if (!error) { a.name = name; await loadAccounts(); }
+          viewMode();
+        };
+        inp.addEventListener("keydown", (e) => { if (e.key === "Enter") save(); if (e.key === "Escape") viewMode(); });
+        row.append(inp,
+          el("button", { class: "btn btn-sm", onClick: save }, "Save"),
+          el("button", { class: "btn-icon", title: "Cancel", onClick: viewMode }, "✕"));
+        inp.focus();
+      }
+      viewMode();
+      return row;
     }
 
     async function deleteAccount(a) {
       if (!confirm(`Delete "${a.name}"? Its balance lines in past months will also be removed.`)) return;
       await sb.from("accounts").delete().eq("id", a.id);
       await loadAccounts();
-      renderList();
+      await loadAutoRoutes(); // a deleted illiquid account cascades its routes away
+      routeTo("accounts");
     }
 
     const nameIn = el("input", { placeholder: "e.g. HSBC Savings" });
@@ -460,7 +493,7 @@
       if (error) { addErr.textContent = error.message; return; }
       nameIn.value = "";
       await loadAccounts();
-      renderList();
+      routeTo("accounts"); // rebuild so auto-route dropdowns pick up a new illiquid account
     });
 
     const addShell = el("div", { class: "shell fade-up fd3" },
@@ -484,69 +517,76 @@
     return s;
   }
 
-  // Income defaults editor (fixed salary + optional auto-route to illiquid)
-  function incomeDefaultsShell() {
+  // Income defaults editor (fixed salary + optional MULTIPLE auto-routes).
+  // `refresh` re-renders the whole accounts view so newly-added illiquid
+  // accounts appear in the route dropdowns without a page refresh.
+  function incomeDefaultsShell(refresh) {
     const amtIn = el("input", { type: "number", step: "0.01", placeholder: "0", value: incomeDefaults ? incomeDefaults.fixed_amount : "" });
     const curSel = currencySelect(incomeDefaults ? incomeDefaults.currency : base());
     const illiquidAccts = accounts.filter((a) => a.type === "illiquid");
+    const noIlliquid = illiquidAccts.length === 0;
     const msg = el("div", { class: "ok-msg" });
 
-    // Auto-route state: present if defaults already have one set.
-    const hasRoute = !!(incomeDefaults && incomeDefaults.auto_route_illiquid_account_id && Number(incomeDefaults.auto_route_amount) > 0);
-    const routeSel = el("select", {});
-    illiquidAccts.forEach((a) => routeSel.append(el("option", { value: a.id, ...(incomeDefaults && incomeDefaults.auto_route_illiquid_account_id === a.id ? { selected: "" } : {}) }, a.name)));
-    const routeAmt = el("input", { type: "number", step: "0.01", placeholder: "0", value: incomeDefaults ? incomeDefaults.auto_route_amount : "" });
-
-    // Info explanation as a popover with its own close (✕) button.
+    // Info popover (unchanged wording, updated for "routes").
     const infoClose = el("button", { class: "info-close", type: "button", title: "Close" }, "✕");
     const infoPop = el("div", { class: "info-pop hidden" },
       infoClose,
       el("span", { html:
         "<strong>Auto-route</strong> takes a slice of your <strong>fixed income</strong> and records it as a contribution into an illiquid account (for example, part of your salary that goes straight into MPF).<br><br>" +
-        "It does <strong>not</strong> add to your income. Your total income stays the same; the slice is just logged so your illiquid holdings grow correctly each month." }));
+        "It does <strong>not</strong> add to your income. Your total income stays the same; the slice is just logged so your illiquid holdings grow correctly each month. You can add one route per illiquid account." }));
     infoClose.addEventListener("click", () => infoPop.classList.add("hidden"));
     const infoBtn = el("button", { class: "info-btn", type: "button", title: "What is auto-route?",
       onClick: () => infoPop.classList.toggle("hidden") }, "i");
     const infoAnchor = el("span", { class: "info-anchor" }, infoBtn, infoPop);
 
-    // The auto-route field block (shown only when active)
-    const routeBlock = el("div", { class: hasRoute ? "" : "hidden" },
-      el("div", { class: "field-row" },
-        el("div", { class: "field" }, el("label", {}, "Route into"), routeSel),
-        el("div", { class: "field" }, el("label", {}, "Amount routed"), routeAmt)
-      )
-    );
-    // Add / remove buttons
-    const addRouteBtn = el("button", { class: "btn btn-ghost btn-sm", type: "button", ...(hasRoute ? { class: "btn btn-ghost btn-sm hidden" } : {}) }, "+ Add auto-route");
-    const removeRouteBtn = el("button", { class: "btn-icon", type: "button", title: "Remove auto-route", ...(hasRoute ? {} : { class: "btn-icon hidden" }) }, "✕ remove");
-    let routeActive = hasRoute;
-    if (illiquidAccts.length === 0) { addRouteBtn.disabled = true; addRouteBtn.title = "Add an illiquid account first"; }
-    addRouteBtn.addEventListener("click", () => {
-      routeActive = true; routeBlock.classList.remove("hidden");
-      addRouteBtn.classList.add("hidden"); removeRouteBtn.classList.remove("hidden");
-    });
-    removeRouteBtn.addEventListener("click", () => {
-      routeActive = false; routeBlock.classList.add("hidden");
-      removeRouteBtn.classList.add("hidden"); addRouteBtn.classList.remove("hidden");
-    });
+    // Dynamic list of route rows. Each row = a dropdown (illiquid account) + amount.
+    const routesWrap = el("div", { class: "line-list" });
+    function routeSelect(selectedId) {
+      const s = el("select", {});
+      if (noIlliquid) { s.append(el("option", { value: "" }, "no illiquid accounts yet")); s.disabled = true; }
+      else { illiquidAccts.forEach((a) => s.append(el("option", { value: a.id, ...(a.id === selectedId ? { selected: "" } : {}) }, a.name))); }
+      return s;
+    }
+    function addRouteRow(data) {
+      const sel = routeSelect(data ? data.account_id : null);
+      const amt = el("input", { type: "number", step: "0.01", placeholder: "amount", value: data ? data.amount : "", style: "max-width:130px" });
+      const row = el("div", { class: "line-item route-row" },
+        el("div", { class: "li-inputs" }, sel, amt),
+        el("button", { class: "btn-icon", type: "button", title: "Remove", onClick: () => row.remove() }, "✕"));
+      row._read = () => ({ account_id: sel.value || null, amount: Number(amt.value) || 0 });
+      routesWrap.append(row);
+    }
+    autoRoutes.forEach((r) => addRouteRow(r));
+
+    const addRouteBtn = el("button", { class: "btn btn-ghost btn-sm", type: "button" }, "+ Add auto-route");
+    addRouteBtn.addEventListener("click", () => addRouteRow(null));
+    if (noIlliquid) { addRouteBtn.disabled = true; addRouteBtn.title = "Add an illiquid account first, then it appears here."; }
 
     const saveBtn = el("button", { class: "btn" }, "Save defaults");
     saveBtn.addEventListener("click", async () => {
       msg.textContent = "";
       saveBtn.disabled = true;
-      const row = {
-        user_id: user.id,
-        fixed_amount: Number(amtIn.value) || 0,
-        currency: curSel.value,
-        auto_route_illiquid_account_id: routeActive ? (routeSel.value || null) : null,
-        auto_route_amount: routeActive ? (Number(routeAmt.value) || 0) : 0,
-        updated_at: new Date().toISOString(),
-      };
-      const { error } = await sb.from("income_defaults").upsert(row, { onConflict: "user_id" });
-      saveBtn.disabled = false;
-      if (error) { msg.className = "error-msg"; msg.textContent = error.message; return; }
-      await loadIncomeDefaults();
-      msg.className = "ok-msg"; msg.textContent = "Saved. New months will pre-fill this.";
+      try {
+        // Save fixed income
+        const { error: e1 } = await sb.from("income_defaults").upsert({
+          user_id: user.id, fixed_amount: Number(amtIn.value) || 0, currency: curSel.value,
+          auto_route_illiquid_account_id: null, auto_route_amount: 0, // legacy cols kept null
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id" });
+        if (e1) throw e1;
+        // Replace all auto_routes with the current rows (only valid ones).
+        const rows = $$(".route-row", routesWrap).map((r) => r._read()).filter((r) => r.account_id && r.amount > 0)
+          .map((r) => ({ user_id: user.id, account_id: r.account_id, amount: r.amount, currency: curSel.value }));
+        await sb.from("auto_routes").delete().eq("user_id", user.id);
+        if (rows.length) { const { error: e2 } = await sb.from("auto_routes").insert(rows); if (e2) throw e2; }
+        await loadIncomeDefaults();
+        await loadAutoRoutes();
+        msg.className = "ok-msg"; msg.textContent = "Saved. New months will pre-fill this.";
+      } catch (e) {
+        msg.className = "error-msg"; msg.textContent = e.message || "Could not save.";
+      } finally {
+        saveBtn.disabled = false;
+      }
     });
 
     return el("div", { class: "shell fade-up fd3" },
@@ -557,11 +597,12 @@
         el("div", { class: "field" }, el("label", {}, "Currency"), curSel)
       ),
       el("hr", { class: "divider" }),
-      el("div", { style: "display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px" },
-        el("label", { style: "margin-bottom:0;display:inline-flex;align-items:center" }, "Auto-route", infoAnchor),
-        el("div", { class: "btn-row", style: "margin-top:0" }, addRouteBtn, removeRouteBtn)
-      ),
-      routeBlock,
+      el("label", { style: "display:inline-flex;align-items:center;margin-bottom:6px" }, "Auto-routes", infoAnchor),
+      noIlliquid
+        ? el("div", { class: "section-hint", style: "margin-bottom:8px" }, "Add an illiquid account above (MPF, stocks, deposit) and it will appear here to route into.")
+        : el("div", { class: "section-hint", style: "margin-bottom:8px" }, "Route slices of your fixed income into illiquid accounts. Add one per account."),
+      routesWrap,
+      el("div", { class: "btn-row" }, addRouteBtn),
       el("hr", { class: "divider" }),
       saveBtn, msg
     );
@@ -647,9 +688,11 @@
     const err = el("div", { class: "error-msg" });
     const saveBtn = el("button", { class: "btn" }, editing ? "Save changes" : "Save snapshot");
 
-    // Auto-route preview note
-    const autoRouteNote = (!editing && incomeDefaults && incomeDefaults.auto_route_illiquid_account_id && Number(incomeDefaults.auto_route_amount) > 0)
-      ? el("div", { class: "section-hint" }, `A slice of ${incomeDefaults.auto_route_amount} ${incomeDefaults.currency} of your fixed income will be recorded as a contribution into ${(acctById(incomeDefaults.auto_route_illiquid_account_id) || {}).name || "illiquid"}.`)
+    // Auto-route preview note (lists all routes that will pre-fill).
+    const activeRoutes = (!editing) ? autoRoutes.filter((r) => r.account_id && Number(r.amount) > 0) : [];
+    const autoRouteNote = activeRoutes.length
+      ? el("div", { class: "section-hint" }, "These slices of your fixed income will be recorded as illiquid contributions: " +
+          activeRoutes.map((r) => `${r.amount} ${r.currency} → ${(acctById(r.account_id) || {}).name || "illiquid"}`).join(", ") + ".")
       : null;
 
     saveBtn.addEventListener("click", () => saveSnapshot());
@@ -696,14 +739,16 @@
           .map((r) => ({ snapshot_id: sid, account_id: r.account_id, amount: r.amount, currency: r.currency, exchange_rate: r.exchange_rate }));
         if (balPayload.length) { const { error } = await sb.from("balances").insert(balPayload); if (error) throw error; }
 
-        // illiquid moves (+ auto-route on new snapshots)
+        // illiquid moves (+ auto-routes on new snapshots)
         const movePayload = $$(".move-row", movesWrap).map((r) => r._read()).filter((r) => r && r.amount > 0)
           .map((r) => ({ snapshot_id: sid, ...r }));
-        if (!editing && incomeDefaults && incomeDefaults.auto_route_illiquid_account_id && Number(incomeDefaults.auto_route_amount) > 0) {
-          movePayload.push({
-            snapshot_id: sid, account_id: incomeDefaults.auto_route_illiquid_account_id,
-            direction: "in", amount: Number(incomeDefaults.auto_route_amount),
-            currency: incomeDefaults.currency, exchange_rate: rateFor(incomeDefaults.currency),
+        if (!editing) {
+          autoRoutes.filter((r) => r.account_id && Number(r.amount) > 0).forEach((r) => {
+            movePayload.push({
+              snapshot_id: sid, account_id: r.account_id, direction: "in",
+              amount: Number(r.amount), currency: r.currency || base(),
+              exchange_rate: (r.currency || base()) === base() ? 1 : 1,
+            });
           });
         }
         if (movePayload.length) { const { error } = await sb.from("illiquid_moves").insert(movePayload); if (error) throw error; }

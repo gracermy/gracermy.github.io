@@ -92,8 +92,12 @@ const EXPENSES=[
   {id:'e3',snapshot_id:'s2',category:'shopping',label:'UNIQLO + Taobao',amount:1500},
   {id:'e4',snapshot_id:'s2',category:'other',label:'Everything else',amount:2800},
 ];
-const INCOME_DEFAULTS={user_id:'u1',fixed_amount:19950,currency:'HKD',auto_route_illiquid_account_id:'a6',auto_route_amount:1500};
-const TABLES={accounts:ACCOUNTS,snapshots:SNAPS,balances:BALANCES,illiquid_moves:MOVES,income:INCOME,expense_lines:EXPENSES,transactions:[],income_defaults:[INCOME_DEFAULTS]};
+const INCOME_DEFAULTS={user_id:'u1',fixed_amount:19950,currency:'HKD',auto_route_illiquid_account_id:null,auto_route_amount:0};
+const AUTO_ROUTES=[
+  {id:'ar1',user_id:'u1',account_id:'a6',amount:1500,currency:'HKD'},
+  {id:'ar2',user_id:'u1',account_id:'a7',amount:800,currency:'HKD'},
+];
+const TABLES={accounts:ACCOUNTS,snapshots:SNAPS,balances:BALANCES,illiquid_moves:MOVES,income:INCOME,expense_lines:EXPENSES,transactions:[],income_defaults:[INCOME_DEFAULTS],auto_routes:AUTO_ROUTES};
 
 function makeQuery(table){
   const api={_rows:(TABLES[table]||[]).slice(),
