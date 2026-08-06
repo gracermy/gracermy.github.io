@@ -136,6 +136,8 @@
 
     const emailIn = el("input", { type: "email", placeholder: "you@example.com", autocomplete: "email" });
     const passIn = el("input", { type: "password", placeholder: "••••••••", autocomplete: "current-password" });
+    const pass2In = el("input", { type: "password", placeholder: "re-enter password", autocomplete: "new-password" });
+    const pass2Field = el("div", { class: "field hidden" }, el("label", {}, "Confirm password"), pass2In);
     const inviteIn = el("input", { type: "text", placeholder: "invite passkey", autocomplete: "off" });
     const inviteField = el("div", { class: "field hidden" }, el("label", {}, "Invite passkey"), inviteIn,
       el("div", { class: "section-hint", style: "margin-top:4px;margin-bottom:0" }, "Ask the owner for this. Required to create a new account."));
@@ -151,6 +153,8 @@
       signupTab.classList.toggle("active", m === "signup");
       submitBtn.textContent = m === "signin" ? "Sign in" : "Create account";
       inviteField.classList.toggle("hidden", m !== "signup");
+      pass2Field.classList.toggle("hidden", m !== "signup");
+      passIn.setAttribute("autocomplete", m === "signup" ? "new-password" : "current-password");
       errBox.textContent = ""; okBox.textContent = "";
     }
     signinTab.addEventListener("click", () => setMode("signin"));
@@ -167,6 +171,15 @@
           const { error } = await sb.auth.signInWithPassword({ email, password });
           if (error) throw error;
         } else {
+          // Passwords must match and be a sensible length (Supabase min is 6).
+          if (password.length < 6) {
+            errBox.textContent = "Password must be at least 6 characters.";
+            submitBtn.disabled = false; return;
+          }
+          if (password !== pass2In.value) {
+            errBox.textContent = "Passwords don't match. Please re-enter them.";
+            submitBtn.disabled = false; return;
+          }
           // Invite passkey gate (browser-checked casual gate).
           const expected = db.invitePasskey();
           if (expected && inviteIn.value.trim() !== expected) {
@@ -200,6 +213,7 @@
           el("div", { class: "auth-tabs" }, signinTab, signupTab),
           el("div", { class: "field" }, el("label", {}, "Email"), emailIn),
           el("div", { class: "field" }, el("label", {}, "Password"), passIn),
+          pass2Field,
           inviteField,
           submitBtn, errBox, okBox
         )
