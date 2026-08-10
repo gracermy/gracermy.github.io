@@ -29,9 +29,20 @@ function isPlaceholder(cfg) {
     !cfg.SUPABASE_ANON_KEY || cfg.SUPABASE_ANON_KEY.includes("YOUR-ANON");
 }
 
+// SAFETY: a Supabase key is a JWT whose payload names its role. The service_role
+// key BYPASSES Row Level Security — it must NEVER ship in client code. If someone
+// pastes it by mistake, refuse to run rather than expose everyone's data.
+function isServiceRoleKey(key) {
+  try {
+    const payload = JSON.parse(atob(String(key).split(".")[1] || ""));
+    return payload && payload.role === "service_role";
+  } catch { return false; }
+}
+
 function initSupabase() {
   const cfg = config();
   if (isPlaceholder(cfg)) { configError = "missing-config"; return null; }
+  if (isServiceRoleKey(cfg.SUPABASE_ANON_KEY)) { configError = "service-role-key"; return null; }
   if (!window.supabase || !window.supabase.createClient) { configError = "sdk-not-loaded"; return null; }
   client = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
     auth: { persistSession: true, autoRefreshToken: true },

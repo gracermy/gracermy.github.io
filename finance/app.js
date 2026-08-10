@@ -84,6 +84,13 @@
       return;
     }
 
+    if (kind === "service-role-key") {
+      app.append(el("div", { class: "page-header-shell fade-up fd1" },
+        el("h1", {}, "Wrong key"),
+        el("p", {}, "That looks like the service_role key, which must never be used in a website. Use the anon public key instead (Supabase → Project Settings → API).")));
+      return;
+    }
+
     const existing = db.config();
     const urlIn = el("input", { placeholder: "https://xxxx.supabase.co", value: existing.SUPABASE_URL && !existing.SUPABASE_URL.includes("YOUR-PROJECT") ? existing.SUPABASE_URL : "" });
     const keyIn = el("input", { placeholder: "eyJ… (anon public key)", value: existing.SUPABASE_ANON_KEY && !existing.SUPABASE_ANON_KEY.includes("YOUR-ANON") ? existing.SUPABASE_ANON_KEY : "" });
