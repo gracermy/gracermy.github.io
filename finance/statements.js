@@ -143,13 +143,14 @@ const Statements = (() => {
         reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" }, "This is the current market value, not your cost. It's shown separately and does not affect your derived expense. Delete any you don't want to record."));
         draft.illiquid_balances.forEach((b) => reviewWrap.append(reviewRow(b, ["name", "amount", "currency"], () => { arrRemove(draft.illiquid_balances, b); renderReview(); })));
       }
-      // Spending breakdown from this statement (a rough "where it went" split).
-      // Your authoritative total is still income − net-worth change; this is only
-      // a category hint. Clear merchants get a label; anything unclear → "other".
+      // Spending from this statement: a real total (money that left, excl. self
+      // transfers/income), split by category. Clear merchants labeled; the rest
+      // → "other". Your MONTHLY total still comes from net-worth change; these
+      // per-statement lines are the breakdown of where it went.
       if (draft._total > 0 || draft._categories.length) {
-        reviewWrap.append(groupHeader(`Spending breakdown from this statement (~${Math.round(draft._total).toLocaleString()})`));
+        reviewWrap.append(groupHeader(`Spending from this statement: ${Math.round(draft._total).toLocaleString()}`));
         reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" },
-          "A rough split of where this statement's spending went. Clear shops are labeled; transfers and unclear items go to 'other'. This is a breakdown only — your real total expense still comes from your net-worth change. Edit or delete any line."));
+          "Money that left this account (transfers and self-moves excluded, salary not counted). Clear shops are labeled; transfers and unclear items go to 'other' — so a transfer-heavy bank statement is mostly 'other', but still a real total. Edit or delete any line."));
         draft._categories.forEach((c) => reviewWrap.append(catRow(c, () => { arrRemove(draft._categories, c); renderReview(); })));
       }
 

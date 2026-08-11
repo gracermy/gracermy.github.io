@@ -58,14 +58,16 @@ Return an object with these fields:
   ]
 }
 
-HOW TO COMPUTE spending_total (this must be STABLE and must NOT depend on how you label individual transactions):
-- For a bank/asset statement, use the balance identity and remove non-spending flows:
+HOW TO COMPUTE spending_total — it is MONEY THAT LEFT and did NOT come back. It must be STABLE (not depend on how you label lines). It is NOT reduced by salary/income.
+- EVERY statement (bank OR card) has a spending_total — it is essentially never zero if money went out. A transfer-heavy bank account still has real spending (fees, payments, transfers out); those all count, most as category "other".
+- Formula for ALL statements:
     spending_total = total_out - self_transfer_out
-  Where total_out is every debit, and self_transfer_out is the debits that are round-trips or moves between your own pockets (see the field description). This way, cash you withdrew and re-deposited, or money you moved out and back, contributes 0 — because that debit is inside self_transfer_out.
-  Sanity check against balances: opening_balance + (all credits) - (all debits) should ≈ closing_balance. Use the printed opening/closing to check your arithmetic. Because it's tied to the printed balances, the same statement always yields the same spending_total.
-- For a credit-card/spending statement:
-    spending_total = total new PURCHASES only (exclude bill payments into the card, refunds, reversals, wallet top-ups, and cash advances repaid). Put those exclusions in self_transfer_out.
-- If you genuinely cannot determine the numbers, set spending_total to null and the app will fall back to its own derived figure.
+  where:
+    total_out = the sum of ALL debits / withdrawals / money leaving the account (fees, purchases, transfers to people, ATM, everything out).
+    self_transfer_out = ONLY the debits that are genuinely NOT spending: cash you withdrew that came back in the same statement, money moved to your own other account/wallet, paying your OWN credit-card bill, and any debit whose exact matching credit also appears (round-trips). If in doubt whether an outgoing transfer to a person is spending, TREAT IT AS SPENDING (do not put it in self_transfer_out) and categorize it as "other".
+  Do NOT subtract salary or incoming money from spending_total — income is separate. Someone earning 20000 salary and spending 14000 has spending_total 14000, not -6000.
+- Sanity check using the printed balances: opening_balance + (all credits including salary) - (all debits) should ≈ closing_balance. Use this to make sure you captured the debits correctly, so the same statement always yields the same spending_total.
+- Set spending_total to null ONLY if you truly cannot read the debits; then the app falls back to its own figure.
 
 category_breakdown rules — THE GUIDING PRINCIPLE: only label what is CLEARLY a recognizable merchant purchase; put everything else in "other".
 - These are ONLY the proportional split of spending across categories. The app rescales them, so per-line precision does not matter — only the rough split.
