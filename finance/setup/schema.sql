@@ -116,6 +116,23 @@ create table if not exists public.income_defaults (
 );
 
 -- ─────────────────────────────────────────────────────────────
+-- MARKET VALUES: optional current market value of an illiquid account at a
+-- snapshot (from a statement or typed manually). INFORMATIONAL only — used to
+-- show "true" net worth. It NEVER feeds the derived-expense math, which stays
+-- based on illiquid-at-cost so market swings don't distort your expense.
+-- ─────────────────────────────────────────────────────────────
+create table if not exists public.market_values (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  snapshot_id   uuid not null references public.snapshots(id) on delete cascade,
+  account_id    uuid not null references public.accounts(id) on delete cascade,
+  amount        numeric not null default 0,
+  currency      text not null default 'HKD',
+  exchange_rate numeric not null default 1,
+  created_at    timestamptz not null default now()
+);
+
+-- ─────────────────────────────────────────────────────────────
 -- AUTO ROUTES: fixed monthly slices of income that are auto-recorded as
 -- contributions into an illiquid account. One row per route; a user can have
 -- several (e.g. 1000 -> MPF, 500 -> stocks). Pre-filled into each new month.
@@ -169,7 +186,7 @@ declare t text;
 begin
   foreach t in array array[
     'accounts','snapshots','balances','illiquid_moves',
-    'income','income_defaults','expense_lines','transactions','auto_routes'
+    'income','income_defaults','expense_lines','transactions','auto_routes','market_values'
   ] loop
     execute format('alter table public.%I enable row level security;', t);
     -- drop old policy if present, then create a single all-actions policy
@@ -191,3 +208,4 @@ create index if not exists idx_income_snapshot     on public.income(snapshot_id)
 create index if not exists idx_expense_snapshot    on public.expense_lines(snapshot_id);
 create index if not exists idx_txn_snapshot        on public.transactions(snapshot_id);
 create index if not exists idx_autoroutes_user      on public.auto_routes(user_id);
+create index if not exists idx_market_snapshot      on public.market_values(snapshot_id);

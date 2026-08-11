@@ -97,7 +97,7 @@ const AUTO_ROUTES=[
   {id:'ar1',user_id:'u1',account_id:'a6',amount:1500,currency:'HKD'},
   {id:'ar2',user_id:'u1',account_id:'a7',amount:800,currency:'HKD'},
 ];
-const TABLES={accounts:ACCOUNTS,snapshots:SNAPS,balances:BALANCES,illiquid_moves:MOVES,income:INCOME,expense_lines:EXPENSES,transactions:[],income_defaults:[INCOME_DEFAULTS],auto_routes:AUTO_ROUTES};
+const TABLES={accounts:ACCOUNTS,snapshots:SNAPS,balances:BALANCES,illiquid_moves:MOVES,income:INCOME,expense_lines:EXPENSES,transactions:[],income_defaults:[INCOME_DEFAULTS],auto_routes:AUTO_ROUTES,market_values:[]};
 
 function makeQuery(table){
   const api={_rows:(TABLES[table]||[]).slice(),

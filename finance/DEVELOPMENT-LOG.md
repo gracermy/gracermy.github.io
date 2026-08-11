@@ -9,6 +9,43 @@ The full approved implementation plan (all decisions + rationale) is preserved i
 
 ---
 
+## At-cost vs. market value + editable AI drafts (BUILT, 2026-08-11)
+
+Grace's insight while using the AI reader on a real HSBC statement: banks show
+illiquid holdings at **current market value** (fluctuates), but her method needs
+**at-cost** (contributions) so derived expense stays correct — and MPF/stocks are
+sometimes inside the bank (real value shown) and sometimes outside (contributions
+only). Also, the AI draft had no way to delete/edit lines.
+
+**Editable AI draft (statements.js):** every draft line (balances, liabilities,
+illiquid market values) now has a ✕ delete; spending categories are an editable,
+deletable list (rename category + edit amount) stored on `draft._categories`.
+`applyDraft` uses the edited list, and routes illiquid market values into the
+new market-value fields (not at-cost).
+
+**Dual illiquid value model — the core change:**
+- New `market_values` table (per illiquid account per snapshot; RLS + index).
+  **Informational only — never feeds expense.**
+- `snapshot.js` now computes BOTH: `netWorth` (liquid + illiquid-**at-cost** −
+  liabilities) which drives Δ-net-worth → **derived expense**, and
+  `marketNetWorth` (liquid + illiquid-**market** − liabilities) for the "true"
+  figure. Accounts without a recorded market value fall back to at-cost so the
+  market total is complete. Added `illiquidCostByAcctUpTo` for the per-account
+  fallback. **Verified:** a stock rising 20000→23000 shows marketNetWorth up but
+  leaves derived expense unchanged (uses the cost delta) — market swings no
+  longer distort expense.
+- Snapshot form: new "Current market value (optional)" section, one row per
+  illiquid account (blank = keep at-cost). "Illiquid moves" relabeled "(at cost)"
+  with clarified copy.
+- Dashboard: when any market value exists, shows "Net worth (at cost)" (labeled
+  "basis for expense") + a "Net worth (market)" tile + "Illiquid (market)".
+- Edge Function prompt: illiquid_balances clarified as CURRENT MARKET VALUE.
+
+**Requires re-running finance/setup/schema.sql** (adds `market_values`; additive,
+safe — `create table if not exists`).
+
+---
+
 ## Phase 2 + 3 — Growth charts + AI statement reading (BUILT, 2026-08-06)
 
 **Phase 2 — growth charts (`finance/charts.js`, verified light + dark):**

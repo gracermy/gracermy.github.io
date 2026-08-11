@@ -301,13 +301,14 @@
 
   // ── Load full timeline (all snapshots + their rows + all moves) ──
   async function loadTimeline() {
-    const [{ data: snaps }, { data: bals }, { data: inc }, { data: moves }, { data: exps }] =
+    const [{ data: snaps }, { data: bals }, { data: inc }, { data: moves }, { data: exps }, { data: mkts }] =
       await Promise.all([
         sb.from("snapshots").select("*"),
         sb.from("balances").select("*"),
         sb.from("income").select("*"),
         sb.from("illiquid_moves").select("*"),
         sb.from("expense_lines").select("*"),
+        sb.from("market_values").select("*"),
       ]);
     const snapshots = (snaps || []).map((s) => ({
       ...s, _date: periodKey(s.period_year, s.period_month),
@@ -315,6 +316,7 @@
         .map((b) => ({ ...b, _accountType: (acctById(b.account_id) || {}).type })),
       income: (inc || []).filter((i) => i.snapshot_id === s.id),
       expenses: (exps || []).filter((e) => e.snapshot_id === s.id),
+      marketValues: (mkts || []).filter((m) => m.snapshot_id === s.id),
     }));
     const allMoves = (moves || []).map((m) => {
       const snap = (snaps || []).find((s) => s.id === m.snapshot_id);
@@ -365,12 +367,17 @@
       el("h3", {}, periodLabel(ls.period_year, ls.period_month)),
       updated ? el("div", { class: "section-hint", style: "margin-top:-8px" }, "Last updated " + updated) : null,
       el("div", { class: "stat-grid" },
-        statTile("Net worth", fmt(latest.netWorth, c)),
+        statTile(latest.hasMarket ? "Net worth (at cost)" : "Net worth", fmt(latest.netWorth, c), null, latest.hasMarket ? "basis for expense" : null),
         statTile("Growth", fmtSigned(latest.deltaNW, c), latest.deltaNW, "vs previous month"),
         statTile("Income", latest.income ? fmt(latest.income, c) : fmt(0, c), null, "this month"),
         statTile("Expense", latest.expense === null ? "not yet" : fmt(latest.expense, c),
           latest.expense === null ? null : -1, "income minus growth"),
       ),
+      // When market values are recorded, show the "true" net worth too.
+      latest.hasMarket ? el("div", { class: "stat-grid", style: "margin-top:12px" },
+        statTile("Net worth (market)", fmt(latest.marketNetWorth, c), latest.marketNetWorth - latest.netWorth, "with current market value"),
+        statTile("Illiquid (market)", fmt(latest.illiquidMarket, c)),
+      ) : null,
       el("div", { class: "stat-grid", style: "margin-top:12px" },
         statTile("Liquid", fmt(latest.liquid, c)),
         statTile("Illiquid (at cost)", fmt(latest.illiquidCost, c)),
@@ -623,14 +630,15 @@
     // Load existing snapshot rows if editing
     let existing = null;
     if (editing) {
-      const [{ data: s }, { data: bals }, { data: moves }, { data: inc }, { data: exps }] = await Promise.all([
+      const [{ data: s }, { data: bals }, { data: moves }, { data: inc }, { data: exps }, { data: mkts }] = await Promise.all([
         sb.from("snapshots").select("*").eq("id", snapshotId).single(),
         sb.from("balances").select("*").eq("snapshot_id", snapshotId),
         sb.from("illiquid_moves").select("*").eq("snapshot_id", snapshotId),
         sb.from("income").select("*").eq("snapshot_id", snapshotId),
         sb.from("expense_lines").select("*").eq("snapshot_id", snapshotId),
+        sb.from("market_values").select("*").eq("snapshot_id", snapshotId),
       ]);
-      existing = { snap: s, bals: bals || [], moves: moves || [], inc: inc || [], exps: exps || [] };
+      existing = { snap: s, bals: bals || [], moves: moves || [], inc: inc || [], exps: exps || [], mkts: mkts || [] };
     }
 
     app.append(el("div", { class: "page-header-shell fade-up fd1" },
@@ -675,6 +683,12 @@
       movesWrap.append(makeMoveRow(illiquidAccounts, data, (row) => row.remove()));
     }
     if (existing) existing.moves.forEach((m) => addMoveRow(m));
+
+    // Current market value rows — one per illiquid account (optional, info only).
+    const marketRows = illiquidAccounts.map((a) => {
+      const prior = existing ? existing.mkts.find((m) => m.account_id === a.id) : null;
+      return makeMarketRow(a, prior);
+    });
 
     // Income rows: fixed (prefilled) + side (dynamic)
     const incomeWrap = el("div", { class: "line-list" });
@@ -734,6 +748,7 @@
             sb.from("illiquid_moves").delete().eq("snapshot_id", sid),
             sb.from("income").delete().eq("snapshot_id", sid),
             sb.from("expense_lines").delete().eq("snapshot_id", sid),
+            sb.from("market_values").delete().eq("snapshot_id", sid),
           ]);
         } else {
           const { data, error } = await sb.from("snapshots").insert({ period_year, period_month, base_currency: base(), note: noteIn.value, updated_at: nowIso }).select().single();
@@ -769,6 +784,11 @@
         const expPayload = $$(".exp-row", expWrap).map((r) => r._read()).filter((r) => r && r.amount > 0)
           .map((r) => ({ snapshot_id: sid, ...r }));
         if (expPayload.length) { const { error } = await sb.from("expense_lines").insert(expPayload); if (error) throw error; }
+
+        // market values (optional current value per illiquid account)
+        const mktPayload = marketRows.map((r) => r.read()).filter((r) => r != null)
+          .map((r) => ({ snapshot_id: sid, ...r }));
+        if (mktPayload.length) { const { error } = await sb.from("market_values").insert(mktPayload); if (error) throw error; }
 
         routeTo("dashboard");
       } catch (e) {
@@ -809,13 +829,18 @@
       };
       (draft.balances || []).forEach((b) => setLine(b.name, b.amount, b.exchange_rate_to_hkd, false));
       (draft.liabilities || []).forEach((b) => setLine(b.name, b.amount, null, true));
-      // Seed big-picture expense lines from spending categories.
-      const txns = (draft.transactions || []).filter((t) => !t.is_transfer);
-      if (txns.length) {
-        const byCat = {};
-        txns.forEach((t) => { byCat[t.category || "other"] = (byCat[t.category || "other"] || 0) + (Number(t.amount) || 0); });
-        Object.entries(byCat).forEach(([cat, amt]) => addExpRow({ category: cat, label: cat, amount: Math.round(amt) }));
-      }
+      // Illiquid MARKET values → set the market-value field of the matching
+      // illiquid account (informational; does NOT touch at-cost / expense).
+      (draft.illiquid_balances || []).forEach((b) => {
+        const key = norm(b.name);
+        if (!key) return;
+        const row = marketRows.find((r) => { const an = norm(r.account.name); return an === key || (an && (an.includes(key) || key.includes(an))); });
+        if (row) row.set(b.amount);
+      });
+      // Seed big-picture expense lines from the (edited) category list.
+      const cats = draft._categories || [];
+      cats.filter((c) => c.category && Number(c.amount) > 0)
+        .forEach((c) => addExpRow({ category: c.category, label: c.category, amount: Math.round(Number(c.amount)) }));
       err.className = "ok-msg";
       err.textContent = "Draft applied. Review the balances and expense lines below, then save.";
       err.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -831,10 +856,17 @@
       const addMoveBtn = el("button", { class: "btn btn-ghost btn-sm" }, "+ Add contribution / withdrawal");
       addMoveBtn.addEventListener("click", () => addMoveRow(null));
       app.append(el("div", { class: "shell fade-up fd2" },
-        el("h3", {}, "Illiquid moves"),
-        el("div", { class: "section-hint" }, "Only record money moving IN or OUT of illiquid holdings (at cost). Market ups/downs are not tracked."),
+        el("h3", {}, "Illiquid moves (at cost)"),
+        el("div", { class: "section-hint" }, "Only record money moving IN or OUT of illiquid holdings (at cost). This is what drives your expense math. Market ups/downs go in the next section."),
         movesWrap,
         el("div", { class: "btn-row" }, addMoveBtn)
+      ));
+
+      // Current market value (optional, informational)
+      app.append(el("div", { class: "shell fade-up fd2" },
+        el("h3", {}, "Current market value (optional)"),
+        el("div", { class: "section-hint" }, "What each illiquid holding is worth right now (from a statement or your own figure). Shown as your 'true' net worth. It does NOT affect your expense. Leave blank to keep using the at-cost value."),
+        el("div", { class: "line-list" }, marketRows.map((r) => r.node))
       ));
     }
 
@@ -900,6 +932,27 @@
         if (amount != null && isFinite(amount)) amtIn.value = amount;
         if (isForeign && rate != null && isFinite(rate)) rateIn.value = rate;
       },
+    };
+  }
+
+  // A current-market-value row for one illiquid account (optional). Leaving it
+  // blank means "no market value this month" (falls back to at-cost).
+  function makeMarketRow(account, prior) {
+    const isForeign = account.currency !== base();
+    const amtIn = el("input", { type: "number", step: "0.01", placeholder: "current value (optional)", value: prior ? prior.amount : "" });
+    const rateIn = el("input", { type: "number", step: "0.000001", placeholder: "rate → " + base(), value: prior ? prior.exchange_rate : (isForeign ? "" : 1) });
+    if (!isForeign) rateIn.value = 1;
+    const node = el("div", { class: "line-item" },
+      el("span", { class: "li-name" }, account.name),
+      el("div", { class: "li-inputs" }, amtIn, el("span", { class: "tag", style: "align-self:center" }, account.currency), isForeign ? rateIn : null));
+    return {
+      node, account,
+      read() {
+        const amount = amtIn.value === "" ? null : Number(amtIn.value);
+        const exchange_rate = isForeign ? (Number(rateIn.value) || 1) : 1;
+        return amount == null ? null : { account_id: account.id, amount, currency: account.currency, exchange_rate };
+      },
+      set(amount) { if (amount != null && isFinite(amount)) amtIn.value = amount; },
     };
   }
 

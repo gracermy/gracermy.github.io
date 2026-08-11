@@ -44,7 +44,7 @@ Return an object with these fields:
   "liabilities": [                           // amounts OWED (e.g. a credit-card statement balance). Enter as a POSITIVE number owed.
     { "name": "<card label>", "amount": <number>, "currency": "<ISO code>" }
   ],
-  "illiquid_balances": [                     // e.g. MPF / pension / investment balances printed on the statement (informational)
+  "illiquid_balances": [                     // MPF / pension / investment CURRENT MARKET VALUE printed on the statement (fluctuates; informational only)
     { "name": "<label>", "amount": <number>, "currency": "<ISO code>" }
   ],
   "transactions": [                          // spending statements only: individual line items

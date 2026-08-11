@@ -28,6 +28,18 @@ const Model = (() => {
     return total;
   }
 
+  // Per-account at-cost totals up to a date (for the market/cost fallback).
+  function illiquidCostByAcctUpTo(allMoves, snapshotDate) {
+    const byAcct = {};
+    for (const m of allMoves) {
+      if (m._date <= snapshotDate) {
+        const v = toBase(m.amount, m.exchange_rate);
+        byAcct[m.account_id] = (byAcct[m.account_id] || 0) + (m.direction === "in" ? v : -v);
+      }
+    }
+    return byAcct;
+  }
+
   // Given one snapshot's fully-loaded rows, compute its components.
   // `illiquidCost` is passed in (cumulative, computed at a higher level).
   function computeSnapshot(snap, illiquidCost) {
@@ -41,8 +53,26 @@ const Model = (() => {
     for (const inc of snap.income || []) {
       income += toBase(inc.amount, inc.exchange_rate);
     }
-    const netWorth = liquid + illiquidCost - liabilities;
-    return { liquid, illiquidCost, liabilities, income, netWorth };
+    // Market value of illiquid accounts recorded this snapshot (informational).
+    // For accounts with a recorded market value we use it; accounts without one
+    // fall back to their at-cost contribution so the market total is complete.
+    const marketByAcct = {};
+    for (const m of snap.marketValues || []) {
+      marketByAcct[m.account_id] = (marketByAcct[m.account_id] || 0) + toBase(m.amount, m.exchange_rate);
+    }
+    const hasMarket = Object.keys(marketByAcct).length > 0;
+    // illiquidMarket = sum of recorded market values + at-cost for the rest.
+    // costByAcct is the per-account at-cost (passed in via snap._illiquidCostByAcct).
+    const costByAcct = snap._illiquidCostByAcct || {};
+    let illiquidMarket = 0;
+    const allIlliquidIds = new Set([...Object.keys(costByAcct), ...Object.keys(marketByAcct)]);
+    for (const id of allIlliquidIds) {
+      illiquidMarket += (id in marketByAcct) ? marketByAcct[id] : (costByAcct[id] || 0);
+    }
+
+    const netWorth = liquid + illiquidCost - liabilities;                 // at-cost (drives expense)
+    const marketNetWorth = liquid + illiquidMarket - liabilities;         // market (informational)
+    return { liquid, illiquidCost, illiquidMarket, hasMarket, liabilities, income, netWorth, marketNetWorth };
   }
 
   // Compute a full timeline: array of snapshots (ascending by date) each with
@@ -55,6 +85,7 @@ const Model = (() => {
     let prev = null;
     for (const snap of ordered) {
       const illiquidCost = illiquidCostUpTo(allMoves, snap._date);
+      snap._illiquidCostByAcct = illiquidCostByAcctUpTo(allMoves, snap._date);
       const c = computeSnapshot(snap, illiquidCost);
       const deltaNW = prev ? c.netWorth - prev.netWorth : null;
       // Real expense = income − Δnet worth. Only meaningful when there's a prior point.
@@ -65,7 +96,7 @@ const Model = (() => {
     return out;
   }
 
-  return { toBase, computeTimeline, computeSnapshot, illiquidCostUpTo };
+  return { toBase, computeTimeline, computeSnapshot, illiquidCostUpTo, illiquidCostByAcctUpTo };
 })();
 
 // Currency formatting

@@ -90,38 +90,46 @@ const Statements = (() => {
     function renderReview() {
       reviewWrap.innerHTML = "";
       if (!draft) return;
+      // Ensure arrays exist so delete/edit is uniform.
+      draft.balances = draft.balances || [];
+      draft.liabilities = draft.liabilities || [];
+      draft.illiquid_balances = draft.illiquid_balances || [];
+      // Roll transactions into an editable category list once (kept on the draft).
+      if (!draft._categories) {
+        const spend = (draft.transactions || []).filter((t) => !t.is_transfer);
+        const excluded = (draft.transactions || []).length - spend.length;
+        const byCat = {};
+        spend.forEach((t) => { byCat[t.category || "other"] = (byCat[t.category || "other"] || 0) + (Number(t.amount) || 0); });
+        draft._categories = Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([category, amount]) => ({ category, amount: Math.round(amount) }));
+        draft._spendCount = spend.length; draft._excluded = excluded;
+      }
+
       const kind = draft.statement_kind === "spending" ? "Spending statement (credit card)" : "Asset statement (bank)";
       reviewWrap.append(el("div", { class: "section-hint" },
         `Detected: ${kind}` + (draft.period_month && draft.period_year ? ` · ${draft.period_month}/${draft.period_year}` : "")));
 
-      // Balances
-      if ((draft.balances || []).length) {
-        reviewWrap.append(el("div", { style: "font-weight:600;margin:10px 0 4px;font-size:0.85rem" }, "Balances (you own)"));
-        draft.balances.forEach((b) => reviewWrap.append(reviewRow(b, ["name", "amount", "currency"])));
+      const groupHeader = (text, color) => el("div", { style: `font-weight:600;margin:10px 0 4px;font-size:0.85rem${color ? ";color:" + color : ""}` }, text);
+
+      // Balances (you own)
+      if (draft.balances.length) {
+        reviewWrap.append(groupHeader("Balances (you own)"));
+        draft.balances.forEach((b) => reviewWrap.append(reviewRow(b, ["name", "amount", "currency"], () => { arrRemove(draft.balances, b); renderReview(); })));
       }
       // Liabilities
-      if ((draft.liabilities || []).length) {
-        reviewWrap.append(el("div", { style: "font-weight:600;margin:10px 0 4px;font-size:0.85rem;color:var(--neg)" }, "Liabilities (you owe)"));
-        draft.liabilities.forEach((b) => reviewWrap.append(reviewRow(b, ["name", "amount", "currency"])));
+      if (draft.liabilities.length) {
+        reviewWrap.append(groupHeader("Liabilities (you owe)", "var(--neg)"));
+        draft.liabilities.forEach((b) => reviewWrap.append(reviewRow(b, ["name", "amount", "currency"], () => { arrRemove(draft.liabilities, b); renderReview(); })));
       }
-      // Illiquid (informational)
-      if ((draft.illiquid_balances || []).length) {
-        reviewWrap.append(el("div", { style: "font-weight:600;margin:10px 0 4px;font-size:0.85rem" }, "Illiquid balances (info)"));
-        draft.illiquid_balances.forEach((b) => reviewWrap.append(reviewRow(b, ["name", "amount", "currency"])));
+      // Illiquid market values (informational — market value that fluctuates)
+      if (draft.illiquid_balances.length) {
+        reviewWrap.append(groupHeader("Illiquid market value (info, fluctuates)"));
+        reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" }, "This is the current market value, not your cost. It's shown separately and does not affect your derived expense. Delete any you don't want to record."));
+        draft.illiquid_balances.forEach((b) => reviewWrap.append(reviewRow(b, ["name", "amount", "currency"], () => { arrRemove(draft.illiquid_balances, b); renderReview(); })));
       }
-      // Transactions summary (spending)
-      const txns = draft.transactions || [];
-      if (txns.length) {
-        const spend = txns.filter((t) => !t.is_transfer);
-        const byCat = {};
-        spend.forEach((t) => { byCat[t.category || "other"] = (byCat[t.category || "other"] || 0) + (Number(t.amount) || 0); });
-        reviewWrap.append(el("div", { style: "font-weight:600;margin:12px 0 4px;font-size:0.85rem" },
-          `Spending by category (${spend.length} items, ${txns.length - spend.length} transfers excluded)`));
-        Object.entries(byCat).sort((a, b) => b[1] - a[1]).forEach(([cat, amt]) => {
-          reviewWrap.append(el("div", { class: "line-item" },
-            el("span", { class: "li-name" }, cat),
-            el("span", { class: "li-amt" }, Math.round(amt).toLocaleString())));
-        });
+      // Spending categories (editable + deletable)
+      if (draft._categories.length) {
+        reviewWrap.append(groupHeader(`Spending by category (${draft._spendCount} items, ${draft._excluded} transfers excluded)`));
+        draft._categories.forEach((c) => reviewWrap.append(catRow(c, () => { arrRemove(draft._categories, c); renderReview(); })));
       }
 
       const applyBtn = el("button", { class: "btn", type: "button" }, "Apply to this month");
@@ -129,9 +137,10 @@ const Statements = (() => {
       reviewWrap.append(el("div", { class: "btn-row", style: "margin-top:12px" }, applyBtn));
     }
 
-    // Editable review row (bind edits back into the draft object).
-    function reviewRow(obj, fields) {
-      const row = el("div", { class: "line-item" });
+    function arrRemove(arr, item) { const i = arr.indexOf(item); if (i >= 0) arr.splice(i, 1); }
+
+    // Editable review row with a delete (✕) button. Binds edits back into `obj`.
+    function reviewRow(obj, fields, onDelete) {
       const inputs = el("div", { class: "li-inputs" });
       fields.forEach((f) => {
         const inp = el("input", { value: obj[f] == null ? "" : obj[f], style: f === "name" ? "flex:2" : "" });
@@ -139,8 +148,19 @@ const Statements = (() => {
         inp.addEventListener("input", () => { obj[f] = f === "amount" ? Number(inp.value) : inp.value; });
         inputs.append(inp);
       });
-      row.append(inputs);
-      return row;
+      return el("div", { class: "line-item" }, inputs,
+        el("button", { class: "btn-icon", type: "button", title: "Remove", onClick: onDelete }, "✕"));
+    }
+
+    // Editable spending-category row (rename category, edit amount, delete).
+    function catRow(c, onDelete) {
+      const nameIn = el("input", { value: c.category, style: "flex:2" });
+      const amtIn = el("input", { type: "number", value: c.amount, style: "max-width:110px" });
+      nameIn.addEventListener("input", () => { c.category = nameIn.value; });
+      amtIn.addEventListener("input", () => { c.amount = Number(amtIn.value) || 0; });
+      return el("div", { class: "line-item" },
+        el("div", { class: "li-inputs" }, nameIn, amtIn),
+        el("button", { class: "btn-icon", type: "button", title: "Remove", onClick: onDelete }, "✕"));
     }
 
     return el("div", { class: "shell", style: "margin-top:12px" },
