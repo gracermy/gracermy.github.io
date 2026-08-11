@@ -25,7 +25,7 @@ window.FINANCE_CONFIG = {
 
   // Share this only with people you want to let create an account.
   // Must match the INVITE_PASSKEY secret set on the parse-statement Edge Function.
-  INVITE_PASSKEY: "flowers-diamong-rings",
+  INVITE_PASSKEY: "flowers-diamond-rings",
 
   // Turn on AI statement reading (needs the deployed Edge Function + Claude key).
   AI_STATEMENTS: true,
