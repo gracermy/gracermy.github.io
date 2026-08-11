@@ -143,11 +143,13 @@ const Statements = (() => {
         reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" }, "This is the current market value, not your cost. It's shown separately and does not affect your derived expense. Delete any you don't want to record."));
         draft.illiquid_balances.forEach((b) => reviewWrap.append(reviewRow(b, ["name", "amount", "currency"], () => { arrRemove(draft.illiquid_balances, b); renderReview(); })));
       }
-      // Spending: a STABLE total (from balances) + a category breakdown scaled to it.
+      // Spending breakdown from this statement (a rough "where it went" split).
+      // Your authoritative total is still income − net-worth change; this is only
+      // a category hint. Clear merchants get a label; anything unclear → "other".
       if (draft._total > 0 || draft._categories.length) {
-        reviewWrap.append(groupHeader(`Spending this statement: ${Math.round(draft._total).toLocaleString()}`));
+        reviewWrap.append(groupHeader(`Spending breakdown from this statement (~${Math.round(draft._total).toLocaleString()})`));
         reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" },
-          "This total is the net drop in your balance (money in minus what's left), so transfers and cash you moved and moved back cancel out. The categories below are just a rough split of that total."));
+          "A rough split of where this statement's spending went. Clear shops are labeled; transfers and unclear items go to 'other'. This is a breakdown only — your real total expense still comes from your net-worth change. Edit or delete any line."));
         draft._categories.forEach((c) => reviewWrap.append(catRow(c, () => { arrRemove(draft._categories, c); renderReview(); })));
       }
 

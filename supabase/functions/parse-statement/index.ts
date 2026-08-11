@@ -67,11 +67,17 @@ HOW TO COMPUTE spending_total (this must be STABLE and must NOT depend on how yo
     spending_total = total new PURCHASES only (exclude bill payments into the card, refunds, reversals, wallet top-ups, and cash advances repaid). Put those exclusions in self_transfer_out.
 - If you genuinely cannot determine the numbers, set spending_total to null and the app will fall back to its own derived figure.
 
-category_breakdown rules:
-- These are ONLY the proportional split of spending across categories. The app will scale them to equal spending_total, so absolute accuracy per line does NOT matter — only the rough proportions.
-- Sum each category from the genuine spending transactions (exclude transfers, self-payments, refunds, income, wallet top-ups, cash withdrawn-and-redeposited).
-- Categorize by merchant when clear (restaurants/food delivery -> food; ride-hailing/MTR/Octopus -> transport; clothing/marketplaces -> shopping; gym/classes -> fitness; streaming/bars -> entertainment; rent -> rent; utilities/telecom -> bills).
-- If a transaction is a transfer, a bank transfer to a person, ambiguous, or you are unsure of the category, put it under "other" — NEVER guess a random specific category.
+category_breakdown rules — THE GUIDING PRINCIPLE: only label what is CLEARLY a recognizable merchant purchase; put everything else in "other".
+- These are ONLY the proportional split of spending across categories. The app rescales them, so per-line precision does not matter — only the rough split.
+- LABEL a transaction ONLY when the description is a recognizable merchant/brand and the category is obvious:
+    restaurants / food delivery / supermarkets (Keeta, McDonald's, Pepper Lunch, Wellcome, PARKnSHOP, Lung Fung) -> food;
+    ride-hailing / MTR / Octopus fares -> transport;
+    clothing / online marketplaces (UNIQLO, Taobao, Revolve) -> shopping;
+    gym / fitness classes (ClassPass, Active Minds) -> fitness;
+    streaming / bars / cinemas -> entertainment;
+    rent -> rent; utilities / telecom -> bills.
+- Put in "other" (do NOT guess a specific category): any transfer or FPS payment to/from a PERSON's name, generic references, bank-to-bank transfers, ATM/cash withdrawals, ambiguous merchant names, or anything you are not confident about. A bank/savings statement that is mostly person-to-person transfers should be almost entirely "other".
+- EXCLUDE entirely (not spending at all): salary/income, paying your own credit-card bill, moving money between your own accounts, wallet top-ups, and cash withdrawn then re-deposited.
 
 Other rules:
 - If the statement prints an exchange rate for a foreign-currency line, put it in exchange_rate_to_hkd.
