@@ -59,8 +59,11 @@ const Statements = (() => {
   }
 
   // Build the upload + review widget. `onApply(draft)` is called with the
-  // (possibly edited) draft when the user confirms.
-  function widget(onApply) {
+  // (possibly edited) draft when the user confirms. `accounts` = the user's
+  // existing accounts, so each drafted balance can be assigned to one (or a new
+  // account created for it) instead of being silently mis-matched.
+  function widget(onApply, accounts) {
+    accounts = accounts || [];
     const fileIn = el("input", { type: "file", accept: "application/pdf" });
     const status = el("div", { class: "section-hint", style: "margin-top:8px" });
     const reviewWrap = el("div", {});
@@ -127,21 +130,35 @@ const Statements = (() => {
 
       const groupHeader = (text, color) => el("div", { style: `font-weight:600;margin:10px 0 4px;font-size:0.85rem${color ? ";color:" + color : ""}` }, text);
 
-      // Balances (you own)
+      // Auto-match each drafted balance to an account (by name), once.
+      const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const autoMatch = (name, wantTypes) => {
+        const key = norm(name); if (!key) return "";
+        const pool = accounts.filter((a) => wantTypes.includes(a.type));
+        let m = pool.find((a) => norm(a.name) === key);
+        if (!m) m = pool.find((a) => { const an = norm(a.name); return an && (an.includes(key) || key.includes(an)); });
+        return m ? m.id : "";
+      };
+      const initAssign = (list, wantTypes) => list.forEach((b) => { if (b._acct === undefined) b._acct = autoMatch(b.name, wantTypes); });
+      initAssign(draft.balances, ["liquid"]);
+      initAssign(draft.liabilities, ["liability"]);
+      initAssign(draft.illiquid_balances, ["illiquid"]);
+
+      // Balances (you own) → each assigns to a liquid account
       if (draft.balances.length) {
         reviewWrap.append(groupHeader("Balances (you own)"));
-        draft.balances.forEach((b) => reviewWrap.append(reviewRow(b, ["name", "amount", "currency"], () => { arrRemove(draft.balances, b); renderReview(); })));
+        draft.balances.forEach((b) => reviewWrap.append(balanceRow(b, ["liquid"], () => { arrRemove(draft.balances, b); renderReview(); })));
       }
-      // Liabilities
+      // Liabilities → liability account
       if (draft.liabilities.length) {
         reviewWrap.append(groupHeader("Liabilities (you owe)", "var(--neg)"));
-        draft.liabilities.forEach((b) => reviewWrap.append(reviewRow(b, ["name", "amount", "currency"], () => { arrRemove(draft.liabilities, b); renderReview(); })));
+        draft.liabilities.forEach((b) => reviewWrap.append(balanceRow(b, ["liability"], () => { arrRemove(draft.liabilities, b); renderReview(); })));
       }
-      // Illiquid market values (informational — market value that fluctuates)
+      // Illiquid market values → illiquid account
       if (draft.illiquid_balances.length) {
         reviewWrap.append(groupHeader("Illiquid market value (info, fluctuates)"));
-        reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" }, "This is the current market value, not your cost. It's shown separately and does not affect your derived expense. Delete any you don't want to record."));
-        draft.illiquid_balances.forEach((b) => reviewWrap.append(reviewRow(b, ["name", "amount", "currency"], () => { arrRemove(draft.illiquid_balances, b); renderReview(); })));
+        reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" }, "Current market value (info only). Delete any you don't want."));
+        draft.illiquid_balances.forEach((b) => reviewWrap.append(balanceRow(b, ["illiquid"], () => { arrRemove(draft.illiquid_balances, b); renderReview(); })));
       }
       // Spending from this statement: a real total (money that left, excl. self
       // transfers/income), split by category. Clear merchants labeled; the rest
@@ -150,7 +167,7 @@ const Statements = (() => {
       if (draft._total > 0 || draft._categories.length) {
         reviewWrap.append(groupHeader(`Spending from this statement: ${Math.round(draft._total).toLocaleString()}`));
         reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" },
-          "Money that left this account (transfers and self-moves excluded, salary not counted). Clear shops are labeled; transfers and unclear items go to 'other' — so a transfer-heavy bank statement is mostly 'other', but still a real total. Edit or delete any line."));
+          "Money that left this account. Clear shops are labeled; transfers go to 'other'. Edit or delete any line."));
         draft._categories.forEach((c) => reviewWrap.append(catRow(c, () => { arrRemove(draft._categories, c); renderReview(); })));
       }
 
@@ -161,17 +178,35 @@ const Statements = (() => {
 
     function arrRemove(arr, item) { const i = arr.indexOf(item); if (i >= 0) arr.splice(i, 1); }
 
-    // Editable review row with a delete (✕) button. Binds edits back into `obj`.
-    function reviewRow(obj, fields, onDelete) {
+    // A drafted balance row: editable name/amount/currency + an "account" dropdown
+    // (existing accounts of the right type, or "+ new account"). The chosen target
+    // is stored on the object as _acct ("" | account id | "__new__").
+    function balanceRow(obj, wantTypes, onDelete) {
       const inputs = el("div", { class: "li-inputs" });
-      fields.forEach((f) => {
-        const inp = el("input", { value: obj[f] == null ? "" : obj[f], style: f === "name" ? "flex:2" : "" });
+      // name + amount + currency
+      ["name", "amount", "currency"].forEach((f) => {
+        const inp = el("input", { value: obj[f] == null ? "" : obj[f], style: f === "name" ? "flex:2" : "max-width:90px" });
         if (f === "amount") inp.type = "number";
         inp.addEventListener("input", () => { obj[f] = f === "amount" ? Number(inp.value) : inp.value; });
         inputs.append(inp);
       });
-      return el("div", { class: "line-item" }, inputs,
+      // account assignment dropdown
+      const sel = el("select", { style: "max-width:150px" });
+      const pool = accounts.filter((a) => wantTypes.includes(a.type));
+      pool.forEach((a) => sel.append(el("option", { value: a.id, ...(obj._acct === a.id ? { selected: "" } : {}) }, a.name)));
+      sel.append(el("option", { value: "__new__", ...(obj._acct === "__new__" ? { selected: "" } : {}) }, "+ new account"));
+      if (obj._acct === "" ) { // no match: default to "+ new account" and flag it visually
+        const opt = el("option", { value: "", selected: "" }, "— choose account —");
+        sel.insertBefore(opt, sel.firstChild);
+      }
+      sel.addEventListener("change", () => { obj._acct = sel.value; });
+      const wrap = el("div", { class: "line-item" }, inputs,
+        el("span", { class: "muted", style: "font-size:0.72rem;align-self:center" }, "→"),
+        sel,
         el("button", { class: "btn-icon", type: "button", title: "Remove", onClick: onDelete }, "✕"));
+      // Highlight rows that still need a choice.
+      if (!obj._acct) wrap.style.borderColor = "var(--accent)";
+      return wrap;
     }
 
     // Editable spending-category row (rename category, edit amount, delete).

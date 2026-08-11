@@ -26,6 +26,7 @@
   let accounts = [];    // cached accounts
   let incomeDefaults = null;
   let autoRoutes = [];
+  let pendingDraft = null; // carries a parsed statement draft across a re-render after new accounts are created
 
   const CURRENCIES = [
     "HKD", "USD", "EUR", "GBP", "JPY", "CNY", "AUD", "SGD", "IDR",
@@ -809,35 +810,49 @@
 
     // AI statement upload (Phase 3) — only when enabled + configured.
     if (window.BloomStatements && db.aiEnabled && db.aiEnabled()) {
-      app.append(window.BloomStatements.widget((draft) => applyDraft(draft)));
+      app.append(window.BloomStatements.widget((draft) => applyDraft(draft), accounts));
     }
 
-    // Apply a parsed statement draft into the form (balances + expense lines).
-    function applyDraft(draft) {
+    // Apply a parsed statement draft into the form. Each drafted balance carries
+    // an _acct assignment ("" | account id | "__new__"). We first CREATE any new
+    // accounts the user asked for, then (if any were created) re-render the form
+    // with a pending-apply payload so the new rows exist to receive the values.
+    async function applyDraft(draft) {
       if (!draft) return;
-      const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-      // Match a draft line to a balance row, restricted to the right account
-      // TYPE (liabilities only match liability accounts, balances only non-
-      // liability). Prefer an exact name match, then fall back to substring.
-      const setLine = (name, amount, rate, wantLiability) => {
-        const key = norm(name);
-        if (!key) return;
-        const pool = balRows.filter((r) => (r.account.type === "liability") === wantLiability);
-        let row = pool.find((r) => norm(r.account.name) === key);
-        if (!row) row = pool.find((r) => { const an = norm(r.account.name); return an && (an.includes(key) || key.includes(an)); });
-        if (row) row.set(amount, rate);
+      // Any unassigned lines still needing a choice?
+      const allLines = [...(draft.balances || []), ...(draft.liabilities || []), ...(draft.illiquid_balances || [])];
+      if (allLines.some((b) => !b._acct)) {
+        err.className = "error-msg";
+        err.textContent = "Some balances have no account chosen. Pick an account (or '+ new account') for each highlighted line.";
+        return;
+      }
+      // Create the new accounts (one per line marked "__new__").
+      let created = false;
+      const newFor = async (b, type) => {
+        const { data, error } = await sb.from("accounts").insert({ name: (b.name || "New account").trim(), type, currency: b.currency || base(), sort_order: accounts.length }).select().single();
+        if (!error && data) { b._acct = data.id; created = true; }
       };
-      (draft.balances || []).forEach((b) => setLine(b.name, b.amount, b.exchange_rate_to_hkd, false));
-      (draft.liabilities || []).forEach((b) => setLine(b.name, b.amount, null, true));
-      // Illiquid MARKET values → set the market-value field of the matching
-      // illiquid account (informational; does NOT touch at-cost / expense).
-      (draft.illiquid_balances || []).forEach((b) => {
-        const key = norm(b.name);
-        if (!key) return;
-        const row = marketRows.find((r) => { const an = norm(r.account.name); return an === key || (an && (an.includes(key) || key.includes(an))); });
-        if (row) row.set(b.amount);
-      });
-      // Seed big-picture expense lines from the (edited) category list.
+      for (const b of (draft.balances || [])) if (b._acct === "__new__") await newFor(b, "liquid");
+      for (const b of (draft.liabilities || [])) if (b._acct === "__new__") await newFor(b, "liability");
+      for (const b of (draft.illiquid_balances || [])) if (b._acct === "__new__") await newFor(b, "illiquid");
+
+      if (created) {
+        // New accounts exist now — reload and re-render the form, carrying the
+        // draft so its values get applied against the fresh rows.
+        await loadAccounts();
+        pendingDraft = draft;
+        routeTo("snapshot", snapshotId);
+        return;
+      }
+      applyDraftToRows(draft);
+    }
+
+    // Put the (fully account-assigned) draft values into the form rows.
+    function applyDraftToRows(draft) {
+      const byId = (rows, id) => rows.find((r) => r.account.id === id);
+      (draft.balances || []).forEach((b) => { const r = byId(balRows, b._acct); if (r) r.set(b.amount, b.exchange_rate_to_hkd); });
+      (draft.liabilities || []).forEach((b) => { const r = byId(balRows, b._acct); if (r) r.set(b.amount, null); });
+      (draft.illiquid_balances || []).forEach((b) => { const r = byId(marketRows, b._acct); if (r) r.set(b.amount); });
       const cats = draft._categories || [];
       cats.filter((c) => c.category && Number(c.amount) > 0)
         .forEach((c) => addExpRow({ category: c.category, label: c.category, amount: Math.round(Number(c.amount)) }));
@@ -846,9 +861,12 @@
       err.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
+    // If we re-rendered after creating accounts, apply the carried draft now.
+    if (pendingDraft) { const d = pendingDraft; pendingDraft = null; setTimeout(() => applyDraftToRows(d), 0); }
+
     app.append(el("div", { class: "shell fade-up fd2" },
       el("h3", {}, "Balances"),
-      el("div", { class: "section-hint" }, "Liquid is what you own. Liabilities are what you owe (enter the amount owed, it gets subtracted from net worth). Rate converts to " + base() + " (1 means same currency)."),
+      el("div", { class: "section-hint" }, "Enter each closing balance. Liabilities = what you owe. Foreign accounts: set the rate to " + base() + "."),
       el("div", { class: "line-list" }, balRows.map((r) => r.node))
     ));
 
@@ -857,7 +875,7 @@
       addMoveBtn.addEventListener("click", () => addMoveRow(null));
       app.append(el("div", { class: "shell fade-up fd2" },
         el("h3", {}, "Illiquid moves (at cost)"),
-        el("div", { class: "section-hint" }, "Only record money moving IN or OUT of illiquid holdings (at cost). This is what drives your expense math. Market ups/downs go in the next section."),
+        el("div", { class: "section-hint" }, "Money you put IN or took OUT this month (at cost). Not market changes."),
         movesWrap,
         el("div", { class: "btn-row" }, addMoveBtn)
       ));
@@ -865,7 +883,7 @@
       // Current market value (optional, informational)
       app.append(el("div", { class: "shell fade-up fd2" },
         el("h3", {}, "Current market value (optional)"),
-        el("div", { class: "section-hint" }, "What each illiquid holding is worth right now (from a statement or your own figure). Shown as your 'true' net worth. It does NOT affect your expense. Leave blank to keep using the at-cost value."),
+        el("div", { class: "section-hint" }, "Today's value of each holding (optional). Shown separately; doesn't affect expense. Blank = use at-cost."),
         el("div", { class: "line-list" }, marketRows.map((r) => r.node))
       ));
     }
@@ -874,7 +892,7 @@
     addIncBtn.addEventListener("click", () => addIncomeRow(null));
     app.append(el("div", { class: "shell fade-up fd2" },
       el("h3", {}, "Income"),
-      el("div", { class: "section-hint" }, "Fixed income is pre-filled from your defaults. Add side income (bonus, gift, etc.) as needed."),
+      el("div", { class: "section-hint" }, "Salary is pre-filled. Add any extra income (bonus, gift)."),
       autoRouteNote,
       incomeWrap,
       el("div", { class: "btn-row" }, addIncBtn)
@@ -884,7 +902,7 @@
     addExpBtn.addEventListener("click", () => addExpRow(null));
     app.append(el("div", { class: "shell fade-up fd2" },
       el("h3", {}, "Big-picture expenses (optional)"),
-      el("div", { class: "section-hint" }, "For your own breakdown only. Your real total expense is worked out from the change in net worth, not from these lines."),
+      el("div", { class: "section-hint" }, "A rough breakdown only. Your real total comes from net-worth change."),
       expWrap,
       el("div", { class: "btn-row" }, addExpBtn)
     ));
