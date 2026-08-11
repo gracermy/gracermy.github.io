@@ -60,10 +60,11 @@ const Statements = (() => {
 
   // Build the upload + review widget. `onApply(draft)` is called with the
   // (possibly edited) draft when the user confirms. `accounts` = the user's
-  // existing accounts, so each drafted balance can be assigned to one (or a new
-  // account created for it) instead of being silently mis-matched.
-  function widget(onApply, accounts) {
+  // existing accounts. `curPeriod()` returns {year, month} of the month being
+  // added, so cross-month statements can highlight/apply the right portion.
+  function widget(onApply, accounts, curPeriod) {
     accounts = accounts || [];
+    curPeriod = curPeriod || (() => ({ year: 0, month: 0 }));
     const fileIn = el("input", { type: "file", accept: "application/pdf" });
     const status = el("div", { class: "section-hint", style: "margin-top:8px" });
     const reviewWrap = el("div", {});
@@ -97,31 +98,40 @@ const Statements = (() => {
       draft.balances = draft.balances || [];
       draft.liabilities = draft.liabilities || [];
       draft.illiquid_balances = draft.illiquid_balances || [];
-      // Build the category breakdown ONCE, SCALED to the stable spending_total.
-      // The total comes from the statement's balances (opening + in − closing),
-      // NOT from summing/labeling transactions — so it's stable on re-read.
-      if (!draft._categories) {
-        // The AI's raw category split (proportions only).
-        let raw = (draft.category_breakdown || []).map((c) => ({ category: c.category || "other", amount: Math.max(0, Number(c.amount) || 0) }));
-        // Fall back to old-style transactions if a legacy response comes back.
-        if (raw.length === 0 && Array.isArray(draft.transactions)) {
-          const byCat = {};
-          draft.transactions.filter((t) => !t.is_transfer).forEach((t) => { byCat[t.category || "other"] = (byCat[t.category || "other"] || 0) + (Number(t.amount) || 0); });
-          raw = Object.entries(byCat).map(([category, amount]) => ({ category, amount }));
-        }
-        const rawSum = raw.reduce((s, c) => s + c.amount, 0);
-        // The authoritative total: the stable spending_total if present, else the raw sum.
-        draft._total = (draft.spending_total != null && isFinite(draft.spending_total) && draft.spending_total >= 0)
-          ? Number(draft.spending_total) : (rawSum || 0);
-        // Scale each category so the breakdown sums exactly to _total.
-        if (rawSum > 0) {
-          draft._categories = raw.map((c) => ({ category: c.category, amount: Math.round(c.amount / rawSum * draft._total) }));
-        } else if (draft._total > 0) {
-          draft._categories = [{ category: "other", amount: Math.round(draft._total) }];
+      // Build per-CALENDAR-MONTH category breakdowns ONCE, scaled so the total
+      // across all months equals the stable spending_total. A cross-month
+      // statement (e.g. 5 Jun–4 Jul) yields two month groups.
+      if (!draft._months) {
+        // Gather raw month groups from monthly_breakdown (new) or fall back to a
+        // single group from category_breakdown / transactions (legacy).
+        let groups = [];
+        if (Array.isArray(draft.monthly_breakdown) && draft.monthly_breakdown.length) {
+          groups = draft.monthly_breakdown.map((g) => ({
+            year: Number(g.year) || draft.period_year, month: Number(g.month) || draft.period_month,
+            cats: (g.categories || []).map((c) => ({ category: c.category || "other", amount: Math.max(0, Number(c.amount) || 0) })),
+          }));
         } else {
-          draft._categories = [];
+          let raw = (draft.category_breakdown || []).map((c) => ({ category: c.category || "other", amount: Math.max(0, Number(c.amount) || 0) }));
+          if (raw.length === 0 && Array.isArray(draft.transactions)) {
+            const byCat = {};
+            draft.transactions.filter((t) => !t.is_transfer).forEach((t) => { byCat[t.category || "other"] = (byCat[t.category || "other"] || 0) + (Number(t.amount) || 0); });
+            raw = Object.entries(byCat).map(([category, amount]) => ({ category, amount }));
+          }
+          groups = [{ year: draft.period_year, month: draft.period_month, cats: raw }];
         }
-        draft._categories.sort((a, b) => b.amount - a.amount);
+        const grandRaw = groups.reduce((s, g) => s + g.cats.reduce((x, c) => x + c.amount, 0), 0);
+        draft._total = (draft.spending_total != null && isFinite(draft.spending_total) && draft.spending_total >= 0)
+          ? Number(draft.spending_total) : (grandRaw || 0);
+        // Scale every category by the same factor so all months sum to _total.
+        const factor = grandRaw > 0 ? draft._total / grandRaw : 0;
+        draft._months = groups.map((g) => {
+          const cats = g.cats.map((c) => ({ category: c.category, amount: Math.round(c.amount * factor) })).sort((a, b) => b.amount - a.amount);
+          return { year: g.year, month: g.month, categories: cats, total: cats.reduce((s, c) => s + c.amount, 0) };
+        });
+        // If nothing scaled but there's a total, put it all as "other" in the closing month.
+        if (draft._months.length === 0 && draft._total > 0) {
+          draft._months = [{ year: draft.period_year, month: draft.period_month, categories: [{ category: "other", amount: Math.round(draft._total) }], total: Math.round(draft._total) }];
+        }
       }
 
       const kind = draft.statement_kind === "spending" ? "Spending statement (credit card)" : "Asset statement (bank)";
@@ -164,11 +174,28 @@ const Statements = (() => {
       // transfers/income), split by category. Clear merchants labeled; the rest
       // → "other". Your MONTHLY total still comes from net-worth change; these
       // per-statement lines are the breakdown of where it went.
-      if (draft._total > 0 || draft._categories.length) {
+      // Spending split by calendar month. Only the CURRENT month's portion is
+      // applied; other months are shown so you know to apply them separately.
+      const MONTHS = window.MONTH_NAMES || ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const cur = curPeriod();
+      if ((draft._months || []).length) {
+        const crossMonth = draft._months.length > 1;
         reviewWrap.append(groupHeader(`Spending from this statement: ${Math.round(draft._total).toLocaleString()}`));
-        reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" },
-          "Money that left this account. Clear shops are labeled; transfers go to 'other'. Edit or delete any line."));
-        draft._categories.forEach((c) => reviewWrap.append(catRow(c, () => { arrRemove(draft._categories, c); renderReview(); })));
+        if (crossMonth) {
+          reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" },
+            "This statement crosses months. Each month's spending is shown separately — only the month you're adding now is applied. Come back to the other month to apply its part."));
+        } else {
+          reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" },
+            "Clear shops are labeled; transfers go to 'other'. Edit or delete any line."));
+        }
+        draft._months.forEach((mg) => {
+          const isCurrent = mg.year === cur.year && mg.month === cur.month;
+          const label = `${MONTHS[(mg.month || 1) - 1]} ${mg.year} — ${Math.round(mg.total).toLocaleString()}` + (isCurrent ? "  (this month → applied)" : "  (apply when you add this month)");
+          reviewWrap.append(el("div", { style: `font-weight:600;margin:10px 0 4px;font-size:0.8rem;${isCurrent ? "color:var(--accent)" : "color:var(--text-muted)"}` }, label));
+          const wrapMg = el("div", isCurrent ? {} : { style: "opacity:0.6" });
+          mg.categories.forEach((c) => wrapMg.append(catRow(c, () => { arrRemove(mg.categories, c); renderReview(); })));
+          reviewWrap.append(wrapMg);
+        });
       }
 
       const applyBtn = el("button", { class: "btn", type: "button" }, "Apply to this month");

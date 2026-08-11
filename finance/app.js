@@ -810,7 +810,8 @@
 
     // AI statement upload (Phase 3) — only when enabled + configured.
     if (window.BloomStatements && db.aiEnabled && db.aiEnabled()) {
-      app.append(window.BloomStatements.widget((draft) => applyDraft(draft), accounts));
+      const curPeriod = () => ({ year: Number(yearSel.value), month: Number(monthSel.value) });
+      app.append(window.BloomStatements.widget((draft) => applyDraft(draft), accounts, curPeriod));
     }
 
     // Apply a parsed statement draft into the form. Each drafted balance carries
@@ -853,11 +854,22 @@
       (draft.balances || []).forEach((b) => { const r = byId(balRows, b._acct); if (r) r.set(b.amount, b.exchange_rate_to_hkd); });
       (draft.liabilities || []).forEach((b) => { const r = byId(balRows, b._acct); if (r) r.set(b.amount, null); });
       (draft.illiquid_balances || []).forEach((b) => { const r = byId(marketRows, b._acct); if (r) r.set(b.amount); });
-      const cats = draft._categories || [];
+      // Apply ONLY the current month's spending portion (cross-month statements
+      // split into multiple month groups; other months are applied when you add
+      // them). Fall back to a flat _categories list for legacy drafts.
+      const curY = Number(yearSel.value), curM = Number(monthSel.value);
+      let cats = [];
+      if (Array.isArray(draft._months)) {
+        const mg = draft._months.find((g) => g.year === curY && g.month === curM);
+        cats = mg ? mg.categories : [];
+      } else {
+        cats = draft._categories || [];
+      }
       cats.filter((c) => c.category && Number(c.amount) > 0)
         .forEach((c) => addExpRow({ category: c.category, label: c.category, amount: Math.round(Number(c.amount)) }));
       err.className = "ok-msg";
-      err.textContent = "Draft applied. Review the balances and expense lines below, then save.";
+      const other = Array.isArray(draft._months) && draft._months.some((g) => (g.year !== curY || g.month !== curM) && g.total > 0);
+      err.textContent = "Draft applied." + (other ? " Note: this statement also has spending in another month — open that month to apply its part." : " Review below, then save.");
       err.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 

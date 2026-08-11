@@ -53,8 +53,8 @@ Return an object with these fields:
   "total_out": <number or null>,             // sum of ALL debits/withdrawals (money leaving the account)
   "income_in": <number or null>,             // salary / genuine income credited during the period (0 if none)
   "self_transfer_out": <number or null>,     // debits that are NOT spending: cash withdrawn that was later re-deposited, money moved to your own other account/wallet, paying your own card bill, and any debit whose matching credit also appears (round-trips). Sum of those debits.
-  "category_breakdown": [                     // ONLY the relative split of spending — NOT the total. Amounts here are rough; the app rescales them to spending_total.
-    { "category": "<one of: ${CATEGORIES.join(", ")}>", "amount": <positive number> }
+  "monthly_breakdown": [                      // spending split by the CALENDAR MONTH of each transaction's date. A statement window that crosses months (e.g. 5 Jun–4 Jul) produces two entries. Amounts are rough — the app rescales.
+    { "year": <YYYY>, "month": <1-12>, "categories": [ { "category": "<one of: ${CATEGORIES.join(", ")}>", "amount": <positive number> } ] }
   ]
 }
 
@@ -69,8 +69,9 @@ HOW TO COMPUTE spending_total — it is MONEY THAT LEFT and did NOT come back. I
 - Sanity check using the printed balances: opening_balance + (all credits including salary) - (all debits) should ≈ closing_balance. Use this to make sure you captured the debits correctly, so the same statement always yields the same spending_total.
 - Set spending_total to null ONLY if you truly cannot read the debits; then the app falls back to its own figure.
 
-category_breakdown rules — THE GUIDING PRINCIPLE: only label what is CLEARLY a recognizable merchant purchase; put everything else in "other".
-- These are ONLY the proportional split of spending across categories. The app rescales them, so per-line precision does not matter — only the rough split.
+monthly_breakdown rules — THE GUIDING PRINCIPLE: only label what is CLEARLY a recognizable merchant purchase; put everything else in "other".
+- Group spending by the CALENDAR MONTH of each transaction's own date (use the activity/transaction date, not the statement date). A statement covering 5 Jun–4 Jul produces TWO entries: one {year:2026, month:6} for the 5–30 Jun transactions, one {year:2026, month:7} for the 1–4 Jul transactions. If the whole statement is within one calendar month, return a single entry.
+- Within each month entry, these are ONLY the proportional split across categories. The app rescales them, so per-line precision does not matter — only the rough split.
 - LABEL a transaction ONLY when the description is a recognizable merchant/brand and the category is obvious:
     restaurants / food delivery / supermarkets (Keeta, McDonald's, Pepper Lunch, Wellcome, PARKnSHOP, Lung Fung) -> food;
     ride-hailing / MTR / Octopus fares -> transport;
