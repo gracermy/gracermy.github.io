@@ -30,7 +30,9 @@ const Statements = (() => {
   }
 
   // Call the Edge Function to parse a PDF. Returns the draft object or throws.
-  async function parseStatement(file) {
+  // `ownedNames` = names/keywords that identify the user's own accounts, so the
+  // AI treats transfers to/from them as self-transfers (excluded from spending).
+  async function parseStatement(file, ownedNames) {
     const sb = db.getClient();
     const { data: sess } = await sb.auth.getSession();
     const token = sess?.session?.access_token;
@@ -45,7 +47,7 @@ const Statements = (() => {
         "content-type": "application/json",
         "x-invite-passkey": db.invitePasskey(),
       },
-      body: JSON.stringify({ pdf_base64 }),
+      body: JSON.stringify({ pdf_base64, owned_names: ownedNames || [] }),
     });
     const out = await resp.json().catch(() => ({}));
     if (!resp.ok) {
@@ -59,8 +61,9 @@ const Statements = (() => {
   }
 
   // Build the upload + review widget. `onApply(draft)` is called with the
-  // (possibly edited) draft when the user confirms.
-  function widget(onApply) {
+  // (possibly edited) draft when the user confirms. `ownedNames` = the user's
+  // own account names/aliases so the AI excludes self-transfers.
+  function widget(onApply, ownedNames) {
     const fileIn = el("input", { type: "file", accept: "application/pdf" });
     const status = el("div", { class: "section-hint", style: "margin-top:8px" });
     const reviewWrap = el("div", {});
@@ -76,7 +79,7 @@ const Statements = (() => {
       uploadBtn.disabled = true;
       try {
         // Call through the exposed object so it can be mocked in preview.
-        draft = await window.BloomStatements.parseStatement(file);
+        draft = await window.BloomStatements.parseStatement(file, ownedNames || []);
         status.textContent = "Draft ready. Review below, correct anything, then Apply.";
         renderReview();
       } catch (e) {

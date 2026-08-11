@@ -445,8 +445,10 @@
       }
     }
 
-    // One account row, with inline rename (✎) and delete (✕).
+    // One account block: name row (rename ✎ / delete ✕) + an "own-transfer names"
+    // line so the AI can recognize transfers between your own accounts.
     function accountRow(a) {
+      const wrap = el("div", {});
       const row = el("div", { class: "line-item" });
       function viewMode() {
         row.innerHTML = "";
@@ -474,7 +476,24 @@
         inp.focus();
       }
       viewMode();
-      return row;
+
+      // Aliases line (own-transfer identifiers). Saved on blur.
+      const aliasIn = el("input", { value: a.statement_aliases || "", placeholder: "e.g. your name, acct number, other own bank", style: "font-size:0.82rem;padding:6px 9px" });
+      let aliasSaved = a.statement_aliases || "";
+      const saveAlias = async () => {
+        const v = aliasIn.value.trim();
+        if (v === aliasSaved) return;
+        const { error } = await sb.from("accounts").update({ statement_aliases: v }).eq("id", a.id);
+        if (!error) { a.statement_aliases = v; aliasSaved = v; }
+      };
+      aliasIn.addEventListener("blur", saveAlias);
+      aliasIn.addEventListener("keydown", (e) => { if (e.key === "Enter") aliasIn.blur(); });
+      const aliasLine = el("div", { style: "padding:2px 10px 8px;display:flex;align-items:center;gap:8px" },
+        el("span", { class: "muted", style: "font-size:0.72rem;white-space:nowrap" }, "own-transfer names"),
+        aliasIn);
+
+      wrap.append(row, aliasLine);
+      return wrap;
     }
 
     async function deleteAccount(a) {
@@ -809,7 +828,13 @@
 
     // AI statement upload (Phase 3) — only when enabled + configured.
     if (window.BloomStatements && db.aiEnabled && db.aiEnabled()) {
-      app.append(window.BloomStatements.widget((draft) => applyDraft(draft)));
+      // Own account names + aliases, so the AI excludes self-transfers.
+      const ownedNames = [];
+      accounts.forEach((a) => {
+        if (a.name) ownedNames.push(a.name);
+        (a.statement_aliases || "").split(",").map((s) => s.trim()).filter(Boolean).forEach((s) => ownedNames.push(s));
+      });
+      app.append(window.BloomStatements.widget((draft) => applyDraft(draft), ownedNames));
     }
 
     // Apply a parsed statement draft into the form (balances + expense lines).
