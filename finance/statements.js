@@ -94,14 +94,31 @@ const Statements = (() => {
       draft.balances = draft.balances || [];
       draft.liabilities = draft.liabilities || [];
       draft.illiquid_balances = draft.illiquid_balances || [];
-      // Roll transactions into an editable category list once (kept on the draft).
+      // Build the category breakdown ONCE, SCALED to the stable spending_total.
+      // The total comes from the statement's balances (opening + in − closing),
+      // NOT from summing/labeling transactions — so it's stable on re-read.
       if (!draft._categories) {
-        const spend = (draft.transactions || []).filter((t) => !t.is_transfer);
-        const excluded = (draft.transactions || []).length - spend.length;
-        const byCat = {};
-        spend.forEach((t) => { byCat[t.category || "other"] = (byCat[t.category || "other"] || 0) + (Number(t.amount) || 0); });
-        draft._categories = Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([category, amount]) => ({ category, amount: Math.round(amount) }));
-        draft._spendCount = spend.length; draft._excluded = excluded;
+        // The AI's raw category split (proportions only).
+        let raw = (draft.category_breakdown || []).map((c) => ({ category: c.category || "other", amount: Math.max(0, Number(c.amount) || 0) }));
+        // Fall back to old-style transactions if a legacy response comes back.
+        if (raw.length === 0 && Array.isArray(draft.transactions)) {
+          const byCat = {};
+          draft.transactions.filter((t) => !t.is_transfer).forEach((t) => { byCat[t.category || "other"] = (byCat[t.category || "other"] || 0) + (Number(t.amount) || 0); });
+          raw = Object.entries(byCat).map(([category, amount]) => ({ category, amount }));
+        }
+        const rawSum = raw.reduce((s, c) => s + c.amount, 0);
+        // The authoritative total: the stable spending_total if present, else the raw sum.
+        draft._total = (draft.spending_total != null && isFinite(draft.spending_total) && draft.spending_total >= 0)
+          ? Number(draft.spending_total) : (rawSum || 0);
+        // Scale each category so the breakdown sums exactly to _total.
+        if (rawSum > 0) {
+          draft._categories = raw.map((c) => ({ category: c.category, amount: Math.round(c.amount / rawSum * draft._total) }));
+        } else if (draft._total > 0) {
+          draft._categories = [{ category: "other", amount: Math.round(draft._total) }];
+        } else {
+          draft._categories = [];
+        }
+        draft._categories.sort((a, b) => b.amount - a.amount);
       }
 
       const kind = draft.statement_kind === "spending" ? "Spending statement (credit card)" : "Asset statement (bank)";
@@ -126,9 +143,11 @@ const Statements = (() => {
         reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" }, "This is the current market value, not your cost. It's shown separately and does not affect your derived expense. Delete any you don't want to record."));
         draft.illiquid_balances.forEach((b) => reviewWrap.append(reviewRow(b, ["name", "amount", "currency"], () => { arrRemove(draft.illiquid_balances, b); renderReview(); })));
       }
-      // Spending categories (editable + deletable)
-      if (draft._categories.length) {
-        reviewWrap.append(groupHeader(`Spending by category (${draft._spendCount} items, ${draft._excluded} transfers excluded)`));
+      // Spending: a STABLE total (from balances) + a category breakdown scaled to it.
+      if (draft._total > 0 || draft._categories.length) {
+        reviewWrap.append(groupHeader(`Spending this statement: ${Math.round(draft._total).toLocaleString()}`));
+        reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" },
+          "This total is the net drop in your balance (money in minus what's left), so transfers and cash you moved and moved back cancel out. The categories below are just a rough split of that total."));
         draft._categories.forEach((c) => reviewWrap.append(catRow(c, () => { arrRemove(draft._categories, c); renderReview(); })));
       }
 

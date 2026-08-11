@@ -47,17 +47,36 @@ Return an object with these fields:
   "illiquid_balances": [                     // MPF / pension / investment CURRENT MARKET VALUE printed on the statement (fluctuates; informational only)
     { "name": "<label>", "amount": <number>, "currency": "<ISO code>" }
   ],
-  "transactions": [                          // spending statements only: individual line items
-    { "date": "<YYYY-MM-DD or null>", "description": "<merchant/desc>", "amount": <positive number spent>, "currency": "<ISO code>",
-      "category": "<one of: ${CATEGORIES.join(", ")}>", "is_transfer": <true if this is a self-payment, wallet top-up, or paying your own card bill (NOT real spending), else false> }
+  "spending_total": <number or null>,        // THE STABLE TOTAL SPENDING for this statement (see the formula below). This is the authoritative number.
+  "opening_balance": <number or null>,       // opening/brought-forward balance of the main account
+  "closing_balance": <number or null>,       // closing balance of the main account
+  "total_out": <number or null>,             // sum of ALL debits/withdrawals (money leaving the account)
+  "income_in": <number or null>,             // salary / genuine income credited during the period (0 if none)
+  "self_transfer_out": <number or null>,     // debits that are NOT spending: cash withdrawn that was later re-deposited, money moved to your own other account/wallet, paying your own card bill, and any debit whose matching credit also appears (round-trips). Sum of those debits.
+  "category_breakdown": [                     // ONLY the relative split of spending — NOT the total. Amounts here are rough; the app rescales them to spending_total.
+    { "category": "<one of: ${CATEGORIES.join(", ")}>", "amount": <positive number> }
   ]
 }
 
-Rules:
+HOW TO COMPUTE spending_total (this must be STABLE and must NOT depend on how you label individual transactions):
+- For a bank/asset statement, use the balance identity and remove non-spending flows:
+    spending_total = total_out - self_transfer_out
+  Where total_out is every debit, and self_transfer_out is the debits that are round-trips or moves between your own pockets (see the field description). This way, cash you withdrew and re-deposited, or money you moved out and back, contributes 0 — because that debit is inside self_transfer_out.
+  Sanity check against balances: opening_balance + (all credits) - (all debits) should ≈ closing_balance. Use the printed opening/closing to check your arithmetic. Because it's tied to the printed balances, the same statement always yields the same spending_total.
+- For a credit-card/spending statement:
+    spending_total = total new PURCHASES only (exclude bill payments into the card, refunds, reversals, wallet top-ups, and cash advances repaid). Put those exclusions in self_transfer_out.
+- If you genuinely cannot determine the numbers, set spending_total to null and the app will fall back to its own derived figure.
+
+category_breakdown rules:
+- These are ONLY the proportional split of spending across categories. The app will scale them to equal spending_total, so absolute accuracy per line does NOT matter — only the rough proportions.
+- Sum each category from the genuine spending transactions (exclude transfers, self-payments, refunds, income, wallet top-ups, cash withdrawn-and-redeposited).
+- Categorize by merchant when clear (restaurants/food delivery -> food; ride-hailing/MTR/Octopus -> transport; clothing/marketplaces -> shopping; gym/classes -> fitness; streaming/bars -> entertainment; rent -> rent; utilities/telecom -> bills).
+- If a transaction is a transfer, a bank transfer to a person, ambiguous, or you are unsure of the category, put it under "other" — NEVER guess a random specific category.
+
+Other rules:
 - If the statement prints an exchange rate for a foreign-currency line, put it in exchange_rate_to_hkd.
 - A credit-card "statement balance" is a liability (amount owed) -> put it under "liabilities", positive.
-- On a credit-card statement, deposits/payments INTO the card (e.g. paying the bill, a refund) and wallet top-ups (e.g. Octopus) are transfers, not expenses: set is_transfer=true. Purchases are is_transfer=false with a best-guess category.
-- Categorize by merchant when possible (restaurants/food delivery -> food; ride-hailing/MTR/Octopus -> transport; clothing/marketplaces -> shopping; gym/classes -> fitness; streaming/bars -> entertainment). If unsure, use "other".
+- Do not include a "transactions" list; only the aggregate fields above.
 - Output ONLY the JSON object, no prose.`;
 
 Deno.serve(async (req) => {
