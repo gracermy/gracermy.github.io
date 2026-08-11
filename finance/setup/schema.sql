@@ -30,16 +30,10 @@ create table if not exists public.accounts (
   currency    text not null default 'HKD',
   is_active   boolean not null default true,
   sort_order  int not null default 0,
-  -- Names/keywords this account appears as on statements (your own name, an
-  -- account-number fragment, another bank you own). Comma-separated. The AI uses
-  -- these to recognize transfers between YOUR OWN accounts as self-transfers
-  -- (excluded from spending), even across separate statement uploads.
+  -- (reserved) statement_aliases: kept for backward-compat; currently unused.
   statement_aliases text default '',
   created_at  timestamptz not null default now()
 );
-
--- If upgrading an existing DB, add the column (safe no-op if it already exists):
-alter table public.accounts add column if not exists statement_aliases text default '';
 
 -- ─────────────────────────────────────────────────────────────
 -- SNAPSHOTS: one dated financial note (end-of-period)

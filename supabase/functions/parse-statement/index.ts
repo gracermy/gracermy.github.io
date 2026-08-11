@@ -108,14 +108,10 @@ Deno.serve(async (req) => {
       if (provided !== INVITE_PASSKEY) return json({ error: "invalid_passkey" }, 403);
     }
 
-    // 3. Read the uploaded PDF (base64) + owned account names from the body.
+    // 3. Read the uploaded PDF (base64) from the request body.
     const body = await req.json();
     const pdfBase64: string = body?.pdf_base64 || "";
     if (!pdfBase64) return json({ error: "no_pdf" }, 400);
-    const ownedNames: string[] = Array.isArray(body?.owned_names) ? body.owned_names.filter((s: unknown) => typeof s === "string" && s.trim()).slice(0, 50) : [];
-    const ownedNote = ownedNames.length
-      ? `\n\nThe user's OWN accounts appear on statements under these names/keywords: ${ownedNames.map((s) => `"${s}"`).join(", ")}. Any transfer TO or FROM any of these is a SELF-TRANSFER between the user's own accounts — put it in self_transfer_out (or, for incoming, ignore it as non-income) and do NOT count it as spending. Match loosely (a name or account fragment appearing in the transaction description is enough).`
-      : "";
 
     // 4. Call Claude Haiku 4.5 with the PDF as a document block.
     const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -133,7 +129,7 @@ Deno.serve(async (req) => {
           role: "user",
           content: [
             { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } },
-            { type: "text", text: "Read this statement and return the JSON described in your instructions." + ownedNote },
+            { type: "text", text: "Read this statement and return the JSON described in your instructions." },
           ],
         }],
       }),
