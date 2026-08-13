@@ -70,6 +70,13 @@
 
   function setNav(loggedIn) {
     $("#navRight").classList.toggle("hidden", !loggedIn);
+    // When signed in, the logo goes to the Bloom dashboard (not the public home);
+    // when signed out, it's a normal link back to the home page.
+    const logo = $("#navLogo");
+    if (logo) {
+      if (loggedIn) { logo.setAttribute("href", "#"); logo.onclick = (e) => { e.preventDefault(); routeTo("dashboard"); }; }
+      else { logo.setAttribute("href", "/"); logo.onclick = null; }
+    }
   }
 
   // ── Config-needed screen (interactive first-run setup) ──
@@ -397,18 +404,34 @@
       app.append(chartShell);
     }
 
-    // Recent months list
-    const recent = [...timeline].reverse().slice(0, 5);
+    // Per-month detail — shows the calculation so the numbers are never a mystery.
+    const recent = [...timeline].reverse();
     const list = el("div", {});
     for (const t of recent) {
-      list.append(el("div", { class: "history-item", onClick: () => routeTo("snapshot", t.snapshot.id) },
-        el("span", { class: "history-date" }, periodLabel(t.snapshot.period_year, t.snapshot.period_month)),
-        el("span", { class: "history-nw" }, fmt(t.netWorth, c)),
-        el("span", { class: t.expense === null ? "muted" : (t.expense > 0 ? "neg" : "pos"), style: "font-family:'JetBrains Mono',monospace;font-size:0.82rem;min-width:100px;text-align:right" },
-          t.expense === null ? "" : "spent " + fmt(t.expense, c))
-      ));
+      const monthLabel = periodLabel(t.snapshot.period_year, t.snapshot.period_month);
+      // The calculation line: Income − Growth = Expense (first month has no prior).
+      let calc;
+      if (t.expense === null) {
+        calc = el("div", { class: "calc-line muted" }, "First month — no prior month to compare, so no expense yet.");
+      } else {
+        calc = el("div", { class: "calc-line" },
+          el("span", {}, "Income "), el("b", {}, fmt(t.income, c)),
+          el("span", { class: "calc-op" }, "−"),
+          el("span", {}, "Growth "), el("b", { class: t.deltaNW >= 0 ? "pos" : "neg" }, fmtSigned(t.deltaNW, c)),
+          el("span", { class: "calc-op" }, "="),
+          el("span", {}, "Spent "), el("b", { class: "neg" }, fmt(t.expense, c)));
+      }
+      const card = el("div", { class: "month-card", onClick: () => routeTo("snapshot", t.snapshot.id) },
+        el("div", { class: "month-card-head" },
+          el("span", { class: "month-name" }, monthLabel),
+          el("span", { class: "month-nw" }, "net worth ", el("b", {}, fmt(t.netWorth, c)))),
+        calc);
+      list.append(card);
     }
-    app.append(el("div", { class: "shell fade-up fd3" }, el("h3", {}, "Recent months"), list));
+    app.append(el("div", { class: "shell fade-up fd3" },
+      el("h3", {}, "Every month"),
+      el("div", { class: "section-hint" }, "Your spending each month is worked out as Income minus how much your net worth grew. Tap a month to edit it."),
+      list));
   });
 
   function statTile(label, value, signHint, sub) {
