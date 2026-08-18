@@ -34,14 +34,14 @@ const Charts = (() => {
 
   // ── Net worth over time (single-series area+line) ──
   function netWorthChart(timeline, cur) {
-    const W = 680, H = 240, padL = 44, padR = 16, padT = 16, padB = 28;
+    const W = 680, H = 300, padL = 52, padR = 18, padT = 20, padB = 40;
     const wrap = el("div", { class: "chart-card" });
     wrap.appendChild(el("h3", {}, "Net worth over time"));
     if (timeline.length < 2) { wrap.appendChild(el("div", { class: "chart-empty" }, "Add another month to see the trend.")); return wrap; }
 
     const box = el("div", { class: "chart-box" });
     const tip = makeTip(box);
-    const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart-svg", preserveAspectRatio: "none", role: "img", "aria-label": "Net worth over time" });
+    const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart-svg", preserveAspectRatio: "xMidYMid meet", role: "img", "aria-label": "Net worth over time" });
 
     const vals = timeline.map((t) => t.netWorth);
     const min = Math.min(0, ...vals), max = Math.max(...vals);
@@ -103,10 +103,10 @@ const Charts = (() => {
     wrap.appendChild(legend([["Income", "var(--series-income)"], ["Expense", "var(--series-expense)"]]));
     if (pts.length === 0) { wrap.appendChild(el("div", { class: "chart-empty" }, "Add a second month to compare income and expense.")); return wrap; }
 
-    const W = 680, H = 220, padL = 44, padR = 12, padT = 12, padB = 28;
+    const W = 680, H = 280, padL = 52, padR = 14, padT = 16, padB = 40;
     const box = el("div", { class: "chart-box" });
     const tip = makeTip(box);
-    const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart-svg", preserveAspectRatio: "none", role: "img", "aria-label": "Income versus expense per month" });
+    const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart-svg", preserveAspectRatio: "xMidYMid meet", role: "img", "aria-label": "Income versus expense per month" });
     const max = Math.max(1, ...pts.map((t) => Math.max(t.income, t.expense)));
     const y = (v) => padT + (H - padT - padB) * (1 - v / max);
     const groupW = (W - padL - padR) / pts.length;
@@ -143,10 +143,10 @@ const Charts = (() => {
     wrap.appendChild(legend([["Liquid", "var(--series-1)"], ["Illiquid", "var(--series-2)"], ["Liabilities", "var(--series-3)"]]));
     if (timeline.length === 0) { wrap.appendChild(el("div", { class: "chart-empty" }, "No data yet.")); return wrap; }
 
-    const W = 680, H = 220, padL = 44, padR = 12, padT = 12, padB = 28;
+    const W = 680, H = 280, padL = 52, padR = 14, padT = 16, padB = 40;
     const box = el("div", { class: "chart-box" });
     const tip = makeTip(box);
-    const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart-svg", preserveAspectRatio: "none", role: "img", "aria-label": "Asset composition per month" });
+    const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart-svg", preserveAspectRatio: "xMidYMid meet", role: "img", "aria-label": "Asset composition per month" });
     // scale spans from most-negative (liabilities) to max positive stack
     const tops = timeline.map((t) => t.liquid + t.illiquidCost);
     const bots = timeline.map((t) => -t.liabilities);
@@ -208,6 +208,68 @@ const Charts = (() => {
     return n;
   }
 
+  // Categorical palette for the spending pie (validated hues, fixed order).
+  const PIE_COLORS = ["var(--cat-1)","var(--cat-2)","var(--cat-3)","var(--cat-4)","var(--cat-5)","var(--cat-6)","var(--cat-7)","var(--cat-8)"];
+
+  // Spending breakdown: a donut + a labeled legend with % and amount.
+  // `items` = [{label, amount}] (already aggregated). Small slices fold into "other".
+  function spendingPie(items, cur) {
+    const wrap = el("div", { class: "chart-card" });
+    wrap.appendChild(el("h3", {}, "Where it went"));
+    const total = items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+    if (!items.length || total <= 0) { wrap.appendChild(el("div", { class: "chart-empty" }, "No spending breakdown for this month.")); return wrap; }
+
+    // Sort desc; fold anything past 7 slices into "other".
+    let data = items.map((i) => ({ label: i.label, amount: Number(i.amount) || 0 })).filter((i) => i.amount > 0).sort((a, b) => b.amount - a.amount);
+    if (data.length > 8) {
+      const head = data.slice(0, 7);
+      const rest = data.slice(7).reduce((s, i) => s + i.amount, 0);
+      const otherIdx = head.findIndex((i) => i.label === "other");
+      if (otherIdx >= 0) head[otherIdx].amount += rest; else head.push({ label: "other", amount: rest });
+      data = head.sort((a, b) => b.amount - a.amount);
+    }
+
+    const box = el("div", { class: "pie-wrap" });
+    const R = 80, r = 48, cx = 90, cy = 90; // donut
+    const s = svg("svg", { viewBox: "0 0 180 180", class: "pie-svg", role: "img", "aria-label": "Spending by category" });
+    let a0 = -Math.PI / 2; // start at top
+    data.forEach((d, i) => {
+      const frac = d.amount / total;
+      const a1 = a0 + frac * Math.PI * 2;
+      const color = PIE_COLORS[i % PIE_COLORS.length];
+      // donut segment path
+      const big = (a1 - a0) > Math.PI ? 1 : 0;
+      const x0 = cx + R * Math.cos(a0), y0 = cy + R * Math.sin(a0);
+      const x1 = cx + R * Math.cos(a1), y1 = cy + R * Math.sin(a1);
+      const xi1 = cx + r * Math.cos(a1), yi1 = cy + r * Math.sin(a1);
+      const xi0 = cx + r * Math.cos(a0), yi0 = cy + r * Math.sin(a0);
+      const path = svg("path", {
+        d: `M ${x0} ${y0} A ${R} ${R} 0 ${big} 1 ${x1} ${y1} L ${xi1} ${yi1} A ${r} ${r} 0 ${big} 0 ${xi0} ${yi0} Z`,
+        fill: color, stroke: "var(--chart-surface)", "stroke-width": 1.5,
+      });
+      s.appendChild(path);
+      a0 = a1;
+    });
+    // center total
+    const t1 = svg("text", { x: cx, y: cy - 2, "text-anchor": "middle", class: "pie-center-val" }); t1.textContent = compact(total); s.appendChild(t1);
+    const t2 = svg("text", { x: cx, y: cy + 14, "text-anchor": "middle", class: "pie-center-lbl" }); t2.textContent = "spent"; s.appendChild(t2);
+    box.appendChild(s);
+
+    // legend rows: swatch · label · % · amount
+    const leg = el("div", { class: "pie-legend" });
+    data.forEach((d, i) => {
+      const pct = Math.round(d.amount / total * 100);
+      leg.appendChild(el("div", { class: "pie-legend-row" },
+        el("span", { class: "chart-swatch", style: `background:${PIE_COLORS[i % PIE_COLORS.length]}` }),
+        el("span", { class: "pie-legend-label" }, d.label),
+        el("span", { class: "pie-legend-pct" }, pct + "%"),
+        el("span", { class: "pie-legend-amt" }, fmt(d.amount, cur))));
+    });
+    box.appendChild(leg);
+    wrap.appendChild(box);
+    return wrap;
+  }
+
   function render(container, timeline, cur) {
     container.innerHTML = "";
     container.appendChild(netWorthChart(timeline, cur));
@@ -215,7 +277,7 @@ const Charts = (() => {
     container.appendChild(compositionChart(timeline, cur));
   }
 
-  return { render };
+  return { render, spendingPie };
 })();
 
 window.Charts = Charts;

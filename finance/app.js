@@ -374,23 +374,8 @@
     app.append(el("div", { class: "shell fade-up fd2" },
       el("h3", {}, periodLabel(ls.period_year, ls.period_month)),
       updated ? el("div", { class: "section-hint", style: "margin-top:-8px" }, "Last updated " + updated) : null,
-      el("div", { class: "stat-grid" },
-        statTile(latest.hasMarket ? "Net worth (at cost)" : "Net worth", fmt(latest.netWorth, c), null, latest.hasMarket ? "basis for expense" : null),
-        statTile("Growth", fmtSigned(latest.deltaNW, c), latest.deltaNW, "vs previous month"),
-        statTile("Income", latest.income ? fmt(latest.income, c) : fmt(0, c), null, "this month"),
-        statTile("Expense", latest.expense === null ? "not yet" : fmt(latest.expense, c),
-          latest.expense === null ? null : -1, "income minus growth"),
-      ),
-      // When market values are recorded, show the "true" net worth too.
-      latest.hasMarket ? el("div", { class: "stat-grid", style: "margin-top:12px" },
-        statTile("Net worth (market)", fmt(latest.marketNetWorth, c), latest.marketNetWorth - latest.netWorth, "with current market value"),
-        statTile("Illiquid (market)", fmt(latest.illiquidMarket, c)),
-      ) : null,
-      el("div", { class: "stat-grid", style: "margin-top:12px" },
-        statTile("Liquid", fmt(latest.liquid, c)),
-        statTile("Illiquid (at cost)", fmt(latest.illiquidCost, c)),
-        statTile("Liabilities", latest.liabilities ? fmt(-latest.liabilities, c) : fmt(0, c), latest.liabilities ? -1 : 0),
-      ),
+      ...monthStatTiles(latest),
+      el("div", { style: "margin-top:14px" }, calcLine(latest)),
       el("div", { class: "btn-row", style: "margin-top:18px" },
         el("button", { class: "btn", onClick: () => routeTo("snapshot") }, "+ Add a month"),
         el("button", { class: "btn btn-ghost", onClick: () => routeTo("history") }, "View history")
@@ -404,33 +389,22 @@
       app.append(chartShell);
     }
 
-    // Per-month detail — shows the calculation so the numbers are never a mystery.
+    // Per-month detail — tap a month to open its full summary (read-only).
     const recent = [...timeline].reverse();
     const list = el("div", {});
     for (const t of recent) {
       const monthLabel = periodLabel(t.snapshot.period_year, t.snapshot.period_month);
-      // The calculation line: Income − Growth = Expense (first month has no prior).
-      let calc;
-      if (t.expense === null) {
-        calc = el("div", { class: "calc-line muted" }, "First month — no prior month to compare, so no expense yet.");
-      } else {
-        calc = el("div", { class: "calc-line" },
-          el("span", {}, "Income "), el("b", {}, fmt(t.income, c)),
-          el("span", { class: "calc-op" }, "−"),
-          el("span", {}, "Growth "), el("b", { class: t.deltaNW >= 0 ? "pos" : "neg" }, fmtSigned(t.deltaNW, c)),
-          el("span", { class: "calc-op" }, "="),
-          el("span", {}, "Spent "), el("b", { class: "neg" }, fmt(t.expense, c)));
-      }
-      const card = el("div", { class: "month-card", onClick: () => routeTo("snapshot", t.snapshot.id) },
+      const fullNW = t.hasMarket ? t.marketNetWorth : t.netWorth;
+      const card = el("div", { class: "month-card", onClick: () => routeTo("summary", t.snapshot.id) },
         el("div", { class: "month-card-head" },
           el("span", { class: "month-name" }, monthLabel),
-          el("span", { class: "month-nw" }, "net worth ", el("b", {}, fmt(t.netWorth, c)))),
-        calc);
+          el("span", { class: "month-nw" }, "net worth ", el("b", {}, fmt(fullNW, c)))),
+        calcLine(t));
       list.append(card);
     }
     app.append(el("div", { class: "shell fade-up fd3" },
       el("h3", {}, "Every month"),
-      el("div", { class: "section-hint" }, "Your spending each month is worked out as Income minus how much your net worth grew. Tap a month to edit it."),
+      el("div", { class: "section-hint" }, "Spending each month = Income minus net-worth growth. Tap a month for its full summary."),
       list));
   });
 
@@ -442,6 +416,85 @@
       sub ? el("div", { class: "stat-sub" }, sub) : null
     );
   }
+
+  // The full stat grid for a month `t` (a computed timeline entry). Shared by the
+  // dashboard's latest month and the per-month summary view.
+  function monthStatTiles(t) {
+    const c = base();
+    // Full net worth = liquid + illiquid(market where entered, else at-cost) − liabilities.
+    // That's exactly marketNetWorth; when no market values, it equals netWorth.
+    const fullNW = t.hasMarket ? t.marketNetWorth : t.netWorth;
+    const blocks = [];
+    blocks.push(el("div", { class: "stat-grid" },
+      statTile("Total net worth", fmt(fullNW, c), null, "all assets − liabilities"),
+      statTile("Growth", t.deltaNW === null ? "—" : fmtSigned(t.deltaNW, c), t.deltaNW, "vs previous month"),
+      statTile("Income", t.income ? fmt(t.income, c) : fmt(0, c), null, "this month"),
+      statTile("Expense", t.expense === null ? "not yet" : fmt(t.expense, c), t.expense === null ? null : -1, "income minus growth"),
+    ));
+    blocks.push(el("div", { class: "stat-grid", style: "margin-top:12px" },
+      statTile("Liquid", fmt(t.liquid, c)),
+      statTile(t.hasMarket ? "Illiquid (market)" : "Illiquid (at cost)", fmt(t.hasMarket ? t.illiquidMarket : t.illiquidCost, c)),
+      statTile("Liabilities", t.liabilities ? fmt(-t.liabilities, c) : fmt(0, c), t.liabilities ? -1 : 0),
+    ));
+    return blocks;
+  }
+
+  // The "Income − Growth = Spent" line for a month.
+  function calcLine(t) {
+    const c = base();
+    if (t.expense === null) return el("div", { class: "calc-line muted" }, "First month — no prior month to compare, so no expense yet.");
+    return el("div", { class: "calc-line" },
+      el("span", {}, "Income "), el("b", {}, fmt(t.income, c)),
+      el("span", { class: "calc-op" }, "−"),
+      el("span", {}, "Growth "), el("b", { class: t.deltaNW >= 0 ? "pos" : "neg" }, fmtSigned(t.deltaNW, c)),
+      el("span", { class: "calc-op" }, "="),
+      el("span", {}, "Spent "), el("b", { class: "neg" }, fmt(t.expense, c)));
+  }
+
+  // Aggregate a snapshot's expense_lines into [{label, amount}] summed by category.
+  function aggregateExpenses(t) {
+    const by = {};
+    (t.snapshot.expenses || []).forEach((e) => {
+      const cat = (e.category || e.label || "other");
+      by[cat] = (by[cat] || 0) + (Number(e.amount) || 0);
+    });
+    return Object.entries(by).map(([label, amount]) => ({ label, amount })).sort((a, b) => b.amount - a.amount);
+  }
+
+  // ── MONTH SUMMARY (read-only) ─────────────────────────
+  route("summary", async (app, snapshotId) => {
+    const { snapshots, allMoves } = await loadTimeline();
+    const timeline = Model.computeTimeline(snapshots, allMoves);
+    const t = timeline.find((x) => x.snapshot.id === snapshotId);
+    if (!t) { routeTo("dashboard"); return; }
+    const c = base();
+    const s = t.snapshot;
+
+    app.append(el("div", { class: "page-header-shell fade-up fd1" },
+      el("h1", {}, periodLabel(s.period_year, s.period_month)),
+      el("p", {}, s.note ? s.note : "Month summary.")
+    ));
+
+    // Stats + the calculation line.
+    app.append(el("div", { class: "shell fade-up fd2" },
+      ...monthStatTiles(t),
+      el("div", { style: "margin-top:14px" }, calcLine(t))
+    ));
+
+    // Spending breakdown pie (aggregated expense lines).
+    if (window.Charts) {
+      const agg = aggregateExpenses(t);
+      const pieShell = el("div", { class: "shell fade-up fd3" });
+      pieShell.appendChild(Charts.spendingPie(agg, c));
+      app.append(pieShell);
+    }
+
+    // Actions
+    app.append(el("div", { class: "btn-row fade-up fd3", style: "margin-top:16px" },
+      el("button", { class: "btn", onClick: () => routeTo("snapshot", s.id) }, "Edit this month"),
+      el("button", { class: "btn btn-ghost", onClick: () => routeTo("dashboard") }, "Back to dashboard")
+    ));
+  });
 
   // ── ACCOUNTS ──────────────────────────────────────────
   route("accounts", async (app) => {

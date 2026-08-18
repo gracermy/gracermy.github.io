@@ -28,6 +28,9 @@
   --chart-surface: #fffafb;
   --chart-grid: rgba(180,120,120,0.14);
   --chart-axis: rgba(180,120,120,0.4);
+  /* categorical palette for the spending pie (validated fixed order, light) */
+  --cat-1: #2a78d6; --cat-2: #1baf7a; --cat-3: #eda100; --cat-4: #4a3aa7;
+  --cat-5: #e34948; --cat-6: #e87ba4; --cat-7: #eb6834; --cat-8: #008300;
 }
 
 [data-theme="dark"] {
@@ -56,6 +59,9 @@
   --chart-surface: #1c111a;
   --chart-grid: rgba(240,154,184,0.14);
   --chart-axis: rgba(240,154,184,0.35);
+  /* categorical palette (validated dark steps) */
+  --cat-1: #3987e5; --cat-2: #199e70; --cat-3: #c98500; --cat-4: #9085e9;
+  --cat-5: #e66767; --cat-6: #d55181; --cat-7: #d95926; --cat-8: #008300;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -290,7 +296,7 @@ button.btn-icon:hover { color: var(--neg); background: var(--accent-soft); }
 .chart-card h3 { margin-bottom: 4px; }
 .chart-box { position: relative; width: 100%; }
 .chart-svg { width: 100%; height: auto; display: block; overflow: visible; }
-.chart-tick { fill: var(--text-muted); font-size: 10px; font-family: 'JetBrains Mono', monospace; }
+.chart-tick { fill: var(--text-muted); font-size: 13px; font-family: 'JetBrains Mono', monospace; }
 .chart-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
 .chart-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-secondary); }
 .chart-swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
@@ -303,6 +309,25 @@ button.btn-icon:hover { color: var(--neg); background: var(--accent-soft); }
   line-height: 1.4;
 }
 .chart-tip strong { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
+
+/* ── SPENDING PIE (donut) ── */
+.pie-wrap { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.pie-svg { width: 150px; height: 150px; flex: 0 0 auto; }
+.pie-center-val { fill: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 600; }
+.pie-center-lbl { fill: var(--text-muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; }
+.pie-legend { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 6px; }
+.pie-legend-row { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+.pie-legend-label { flex: 1; color: var(--text-secondary); text-transform: capitalize; }
+.pie-legend-pct { font-family: 'JetBrains Mono', monospace; color: var(--text-muted); min-width: 38px; text-align: right; }
+.pie-legend-amt { font-family: 'JetBrains Mono', monospace; color: var(--text); min-width: 72px; text-align: right; }
+@media (max-width: 480px) {
+  .pie-wrap { justify-content: center; }
+  .pie-svg { width: 130px; height: 130px; }
+  .pie-legend { min-width: 100%; }
+  .pie-legend-amt { min-width: 62px; }
+  .calc-line { font-size: 0.78rem; }
+  .calc-op { margin: 0 5px; }
+}
 
 /* ── PER-MONTH CALCULATION CARDS ── */
 .month-card {

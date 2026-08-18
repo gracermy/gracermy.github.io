@@ -158,6 +158,7 @@ if(window.BloomStatements){
 if(window.__pvRoute){setTimeout(()=>{ if(window.__financeRoute){
   if(window.__pvRoute==='newmonth') window.__financeRoute('snapshot');
   else if(window.__pvRoute==='snapshot') window.__financeRoute('snapshot',window.__pvSnap);
+  else if(window.__pvRoute==='summary') window.__financeRoute('summary',window.__pvSnap);
   else window.__financeRoute(window.__pvRoute);
 }},700);}
 </script>
