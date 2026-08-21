@@ -377,10 +377,11 @@
       ...monthStatTiles(latest),
       el("div", { style: "margin-top:14px" }, calcLine(latest)),
       el("div", { class: "btn-row", style: "margin-top:18px" },
-        el("button", { class: "btn", onClick: () => routeTo("snapshot") }, "+ Add a month"),
-        el("button", { class: "btn btn-ghost", onClick: () => routeTo("history") }, "View history")
-      )
+        el("button", { class: "btn", onClick: () => routeTo("snapshot") }, "+ Add a month"))
     ));
+
+    // Quick-action icon cards (the app's main navigation hub).
+    app.append(actionCards());
 
     // Charts
     if (window.Charts) {
@@ -461,6 +462,31 @@
     return Object.entries(by).map(([label, amount]) => ({ label, amount })).sort((a, b) => b.amount - a.amount);
   }
 
+  // Icon action-cards — the dashboard's navigation hub (replaces top tabs).
+  function actionCards() {
+    const card = (icon, title, sub, onClick) => el("button", { class: "action-card", type: "button", onClick },
+      el("span", { class: "action-icon", html: icon }),
+      el("span", { class: "action-text" }, el("span", { class: "action-title" }, title), el("span", { class: "action-sub" }, sub)));
+    const ICON = {
+      add: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+      history: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>',
+      accounts: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
+    };
+    return el("div", { class: "action-grid fade-up fd2" },
+      card(ICON.add, "Add a month", "record this month", () => routeTo("snapshot")),
+      card(ICON.history, "History", "browse & edit months", () => routeTo("history")),
+      card(ICON.accounts, "Accounts", "banks, cards, holdings", () => routeTo("accounts")));
+  }
+
+  // A prominent top back-bar for sub-pages (→ dashboard by default).
+  function backBar(label, route, arg) {
+    const back = el("button", { class: "back-bar", type: "button",
+      onClick: () => routeTo(route || "dashboard", arg) },
+      el("span", { class: "back-arrow", html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>' }),
+      el("span", {}, label || "Dashboard"));
+    return back;
+  }
+
   // ── MONTH SUMMARY (read-only) ─────────────────────────
   route("summary", async (app, snapshotId) => {
     const { snapshots, allMoves } = await loadTimeline();
@@ -470,6 +496,7 @@
     const c = base();
     const s = t.snapshot;
 
+    app.append(backBar("Dashboard"));
     app.append(el("div", { class: "page-header-shell fade-up fd1" },
       el("h1", {}, periodLabel(s.period_year, s.period_month)),
       el("p", {}, s.note ? s.note : "Month summary.")
@@ -489,15 +516,15 @@
       app.append(pieShell);
     }
 
-    // Actions
+    // Edit action (back is at the top now).
     app.append(el("div", { class: "btn-row fade-up fd3", style: "margin-top:16px" },
-      el("button", { class: "btn", onClick: () => routeTo("snapshot", s.id) }, "Edit this month"),
-      el("button", { class: "btn btn-ghost", onClick: () => routeTo("dashboard") }, "Back to dashboard")
+      el("button", { class: "btn", onClick: () => routeTo("snapshot", s.id) }, "Edit this month")
     ));
   });
 
   // ── ACCOUNTS ──────────────────────────────────────────
   route("accounts", async (app) => {
+    app.append(backBar("Dashboard"));
     app.append(el("div", { class: "page-header-shell fade-up fd1" },
       el("h1", {}, "Accounts"),
       el("p", {}, "The banks, wallets, cash, cards and illiquid holdings you track.")
@@ -718,6 +745,7 @@
       existing = { snap: s, bals: bals || [], moves: moves || [], inc: inc || [], exps: exps || [], mkts: mkts || [] };
     }
 
+    app.append(editing ? backBar("History", "history") : backBar("Dashboard"));
     app.append(el("div", { class: "page-header-shell fade-up fd1" },
       el("h1", {}, editing ? "Edit month" : "Add a month"),
       el("p", {}, "Record end-of-month balances. Your expense is worked out automatically.")
@@ -1116,6 +1144,7 @@
 
   // ── HISTORY ───────────────────────────────────────────
   route("history", async (app) => {
+    app.append(backBar("Dashboard"));
     app.append(el("div", { class: "page-header-shell fade-up fd1" },
       el("h1", {}, "History"),
       el("p", {}, "Every month, newest first. Tap to open or edit.")

@@ -45,7 +45,7 @@ const Statements = (() => {
         "content-type": "application/json",
         "x-invite-passkey": db.invitePasskey(),
       },
-      body: JSON.stringify({ pdf_base64 }),
+      body: JSON.stringify({ pdf_base64, base_currency: db.baseCurrency() }),
     });
     const out = await resp.json().catch(() => ({}));
     if (!resp.ok) {

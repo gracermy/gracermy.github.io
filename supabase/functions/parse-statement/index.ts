@@ -31,7 +31,7 @@ const CORS = {
 // Categories the app understands (must match EXPENSE_CATS in app.js).
 const CATEGORIES = ["rent", "food", "transport", "shopping", "travel", "entertainment", "fitness", "gift", "bills", "other"];
 
-const SYSTEM_PROMPT = `You read a single bank or credit-card statement (PDF) and return STRICT JSON describing what it contains. You never invent data. If a value is not clearly present, omit it or use null.
+const buildPrompt = (BASE_CURRENCY: string) => `You read a single bank or credit-card statement (PDF) and return STRICT JSON describing what it contains. You never invent data. If a value is not clearly present, omit it or use null.
 
 Return an object with these fields:
 {
@@ -54,9 +54,15 @@ Return an object with these fields:
   "income_in": <number or null>,             // salary / genuine income credited during the period (0 if none)
   "self_transfer_out": <number or null>,     // debits that are NOT spending: cash withdrawn that was later re-deposited, money moved to your own other account/wallet, paying your own card bill, and any debit whose matching credit also appears (round-trips). Sum of those debits.
   "monthly_breakdown": [                      // spending split by the CALENDAR MONTH of each transaction's date. A statement window that crosses months (e.g. 5 Jun–4 Jul) produces two entries. Amounts are rough — the app rescales.
-    { "year": <YYYY>, "month": <1-12>, "categories": [ { "category": "<one of: ${CATEGORIES.join(", ")}>", "amount": <positive number> } ] }
+    { "year": <YYYY>, "month": <1-12>, "categories": [ { "category": "<one of: ${CATEGORIES.join(", ")}>", "amount": <positive number in BASE_CURRENCY> } ] }
   ]
 }
+
+CURRENCY — ALL money amounts you output must be in the base currency (${BASE_CURRENCY}):
+- spending_total, total_out, self_transfer_out, income_in, and every monthly_breakdown category amount must be converted to ${BASE_CURRENCY}.
+- If the statement is entirely in ${BASE_CURRENCY}, no conversion is needed.
+- If any transaction is in a foreign currency, convert it to ${BASE_CURRENCY} using the exchange rate printed on the statement (or the HKD-equivalent column if the statement shows one — many statements print both). If no rate is printed, use a reasonable approximate rate and still output ${BASE_CURRENCY}.
+- The "balances", "liabilities", and "illiquid_balances" arrays keep their OWN currency + the exchange_rate_to_hkd field (the app converts those). Only the SPENDING numbers above are pre-converted to ${BASE_CURRENCY}.
 
 HOW TO COMPUTE spending_total — it is MONEY THAT LEFT and did NOT come back. It must be STABLE (not depend on how you label lines). It is NOT reduced by salary/income.
 - EVERY statement (bank OR card) has a spending_total — it is essentially never zero if money went out. A transfer-heavy bank account still has real spending (fees, payments, transfers out); those all count, most as category "other".
@@ -109,10 +115,11 @@ Deno.serve(async (req) => {
       if (provided !== INVITE_PASSKEY) return json({ error: "invalid_passkey" }, 403);
     }
 
-    // 3. Read the uploaded PDF (base64) from the request body.
+    // 3. Read the uploaded PDF (base64) + base currency from the request body.
     const body = await req.json();
     const pdfBase64: string = body?.pdf_base64 || "";
     if (!pdfBase64) return json({ error: "no_pdf" }, 400);
+    const baseCurrency: string = (typeof body?.base_currency === "string" && body.base_currency.trim()) ? body.base_currency.trim().toUpperCase().slice(0, 6) : "HKD";
 
     // 4. Call Claude Haiku 4.5 with the PDF as a document block.
     const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -125,7 +132,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: "claude-haiku-4-5",
         max_tokens: 4096,
-        system: SYSTEM_PROMPT,
+        system: buildPrompt(baseCurrency),
         messages: [{
           role: "user",
           content: [

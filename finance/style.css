@@ -329,6 +329,44 @@ button.btn-icon:hover { color: var(--neg); background: var(--accent-soft); }
   .calc-op { margin: 0 5px; }
 }
 
+/* ── ACTION CARDS (dashboard nav hub) ── */
+.action-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px;
+}
+.action-card {
+  display: flex; align-items: center; gap: 12px; text-align: left;
+  background: var(--shell); border: 1px solid var(--shell-border);
+  border-radius: var(--radius); padding: 16px 16px; cursor: pointer;
+  font-family: inherit; color: var(--text);
+  box-shadow: 0 2px 16px var(--glass-shadow); transition: all 0.2s;
+}
+.action-card:hover { border-color: var(--border-hover); transform: translateY(-3px); box-shadow: 0 6px 24px var(--glass-shadow); }
+.action-icon {
+  width: 40px; height: 40px; flex: 0 0 auto; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-soft); color: var(--accent);
+}
+.action-icon svg { width: 20px; height: 20px; }
+.action-text { display: flex; flex-direction: column; gap: 1px; }
+.action-title { font-weight: 600; font-size: 0.95rem; }
+.action-sub { font-size: 0.76rem; color: var(--text-muted); }
+@media (max-width: 600px) {
+  .action-grid { grid-template-columns: 1fr; gap: 10px; }
+  .action-card { padding: 14px; }
+}
+
+/* ── BACK BAR (top of sub-pages) ── */
+.back-bar {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 32px;
+  background: var(--accent-soft); color: var(--accent);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 9px 16px 9px 12px; font-family: inherit; font-size: 0.9rem; font-weight: 500;
+  cursor: pointer; transition: all 0.2s;
+}
+.back-bar:hover { border-color: var(--accent); background: var(--accent); color: #fff; }
+.back-arrow { display: inline-flex; }
+.back-arrow svg { width: 17px; height: 17px; display: block; }
+
 /* ── PER-MONTH CALCULATION CARDS ── */
 .month-card {
   border: 1px solid var(--border); border-radius: 11px;
