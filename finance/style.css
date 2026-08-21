@@ -66,22 +66,17 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-#blossom-canvas {
-  position: fixed; inset: 0;
-  width: 100vw; height: 100vh;
-  z-index: 0; display: block;
-  cursor: crosshair;
-}
-
 body {
-  background: #f5e8ea;
+  /* Clean, calm app background (no falling-petal canvas) — a soft rose wash. */
+  background: linear-gradient(180deg, #fbeef0 0%, #f6e6e9 100%);
+  background-attachment: fixed;
   color: var(--text);
   font-family: 'Source Sans 3', sans-serif;
   font-weight: 400; line-height: 1.6;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
 }
-[data-theme="dark"] body { background: #120810; }
+[data-theme="dark"] body { background: linear-gradient(180deg, #160d13 0%, #100810 100%); background-attachment: fixed; }
 
 nav, main, footer { position: relative; z-index: 1; }
 .container { max-width: 860px; margin: 0 auto; padding: 0 24px; }
@@ -190,9 +185,9 @@ button.btn:hover { opacity: 0.9; }
 button.btn:active { transform: translateY(1px); }
 button.btn:disabled { opacity: 0.5; cursor: default; }
 button.btn-ghost {
-  background: transparent; color: var(--accent); border-color: var(--border);
+  background: var(--accent-soft); color: var(--accent); border-color: var(--border);
 }
-button.btn-ghost:hover { border-color: var(--border-hover); }
+button.btn-ghost:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 button.btn-sm { padding: 6px 12px; font-size: 0.82rem; }
 button.btn-icon {
   background: transparent; border: none; color: var(--text-muted);
@@ -214,8 +209,13 @@ button.btn-icon:hover { color: var(--neg); background: var(--accent-soft); }
 
 /* ── STAT TILES ── */
 .stat-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 12px; margin-top: 4px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px; margin-top: 4px;
+}
+@media (max-width: 600px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .stat { padding: 11px 12px; }
+  .stat .stat-value { font-size: 1.15rem; }
 }
 .stat {
   background: var(--field-bg); border: 1px solid var(--border);
@@ -408,9 +408,10 @@ footer {
 }
 footer p { font-size: 0.78rem; color: var(--text-muted); text-align: center; font-weight: 300; }
 
-.fade-up { opacity: 0; transform: translateY(14px); animation: fadeUp 0.6s ease forwards; }
-@keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
-.fd1 { animation-delay: 0s; } .fd2 { animation-delay: 0.08s; } .fd3 { animation-delay: 0.16s; }
+/* Fast, subtle fade — no per-element stagger (feels instant, not slow). */
+.fade-up { opacity: 0; animation: fadeUp 0.15s ease-out forwards; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.fd1, .fd2, .fd3 { animation-delay: 0s; }
 
 @media (max-width: 600px) {
   .page-header-shell { margin-top: 26px; padding: 24px 18px 20px; }

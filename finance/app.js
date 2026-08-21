@@ -371,42 +371,44 @@
     const c = base();
     const ls = latest.snapshot;
     const updated = fmtUpdated(ls.updated_at || ls.created_at);
-    app.append(el("div", { class: "shell fade-up fd2" },
-      el("h3", {}, periodLabel(ls.period_year, ls.period_month)),
-      updated ? el("div", { class: "section-hint", style: "margin-top:-8px" }, "Last updated " + updated) : null,
-      ...monthStatTiles(latest),
-      el("div", { style: "margin-top:14px" }, calcLine(latest)),
-      el("div", { class: "btn-row", style: "margin-top:18px" },
-        el("button", { class: "btn", onClick: () => routeTo("snapshot") }, "+ Add a month"))
-    ));
 
-    // Quick-action icon cards (the app's main navigation hub).
+    // 1) Action cards at the top (the navigation hub).
     app.append(actionCards());
 
-    // Charts
-    if (window.Charts) {
-      const chartShell = el("div", { class: "shell fade-up fd3" });
-      Charts.render(chartShell, timeline, c);
-      app.append(chartShell);
+    // 2) Latest month summary (compact stat grid + calc).
+    app.append(el("div", { class: "shell fade-up" },
+      el("div", { class: "month-card-head", style: "margin-bottom:10px" },
+        el("h3", { style: "margin:0" }, periodLabel(ls.period_year, ls.period_month)),
+        updated ? el("span", { class: "section-hint", style: "margin:0" }, "updated " + updated) : null),
+      ...monthStatTiles(latest),
+      el("div", { style: "margin-top:14px" }, calcLine(latest))
+    ));
+
+    // 3) Previous months (each taps into its full summary; mirrors the main view).
+    const recent = [...timeline].reverse();
+    if (recent.length > 1) {
+      const list = el("div", {});
+      recent.slice(1).forEach((t) => {
+        const monthLabel = periodLabel(t.snapshot.period_year, t.snapshot.period_month);
+        const fullNW = t.hasMarket ? t.marketNetWorth : t.netWorth;
+        list.append(el("div", { class: "month-card", onClick: () => routeTo("summary", t.snapshot.id) },
+          el("div", { class: "month-card-head" },
+            el("span", { class: "month-name" }, monthLabel),
+            el("span", { class: "month-nw" }, "net worth ", el("b", {}, fmt(fullNW, c)))),
+          calcLine(t)));
+      });
+      app.append(el("div", { class: "shell fade-up" },
+        el("h3", {}, "Previous months"),
+        el("div", { class: "section-hint" }, "Tap a month for its full summary."),
+        list));
     }
 
-    // Per-month detail — tap a month to open its full summary (read-only).
-    const recent = [...timeline].reverse();
-    const list = el("div", {});
-    for (const t of recent) {
-      const monthLabel = periodLabel(t.snapshot.period_year, t.snapshot.period_month);
-      const fullNW = t.hasMarket ? t.marketNetWorth : t.netWorth;
-      const card = el("div", { class: "month-card", onClick: () => routeTo("summary", t.snapshot.id) },
-        el("div", { class: "month-card-head" },
-          el("span", { class: "month-name" }, monthLabel),
-          el("span", { class: "month-nw" }, "net worth ", el("b", {}, fmt(fullNW, c)))),
-        calcLine(t));
-      list.append(card);
+    // 4) Statistics (charts).
+    if (window.Charts) {
+      const chartInner = el("div", {});
+      Charts.render(chartInner, timeline, c);
+      app.append(el("div", { class: "shell fade-up" }, el("h3", {}, "Statistics"), chartInner));
     }
-    app.append(el("div", { class: "shell fade-up fd3" },
-      el("h3", {}, "Every month"),
-      el("div", { class: "section-hint" }, "Spending each month = Income minus net-worth growth. Tap a month for its full summary."),
-      list));
   });
 
   function statTile(label, value, signHint, sub) {
@@ -418,26 +420,21 @@
     );
   }
 
-  // The full stat grid for a month `t` (a computed timeline entry). Shared by the
-  // dashboard's latest month and the per-month summary view.
+  // The full stat grid for a month `t` — ONE compact responsive grid of all
+  // tiles (flows 3-across on PC, 2 on phone). Shared by dashboard + summary.
   function monthStatTiles(t) {
     const c = base();
     // Full net worth = liquid + illiquid(market where entered, else at-cost) − liabilities.
-    // That's exactly marketNetWorth; when no market values, it equals netWorth.
     const fullNW = t.hasMarket ? t.marketNetWorth : t.netWorth;
-    const blocks = [];
-    blocks.push(el("div", { class: "stat-grid" },
+    return [el("div", { class: "stat-grid" },
       statTile("Total net worth", fmt(fullNW, c), null, "all assets − liabilities"),
       statTile("Growth", t.deltaNW === null ? "—" : fmtSigned(t.deltaNW, c), t.deltaNW, "vs previous month"),
       statTile("Income", t.income ? fmt(t.income, c) : fmt(0, c), null, "this month"),
       statTile("Expense", t.expense === null ? "not yet" : fmt(t.expense, c), t.expense === null ? null : -1, "income minus growth"),
-    ));
-    blocks.push(el("div", { class: "stat-grid", style: "margin-top:12px" },
       statTile("Liquid", fmt(t.liquid, c)),
       statTile(t.hasMarket ? "Illiquid (market)" : "Illiquid (at cost)", fmt(t.hasMarket ? t.illiquidMarket : t.illiquidCost, c)),
       statTile("Liabilities", t.liabilities ? fmt(-t.liabilities, c) : fmt(0, c), t.liabilities ? -1 : 0),
-    ));
-    return blocks;
+    )];
   }
 
   // The "Income − Growth = Spent" line for a month.
