@@ -392,6 +392,164 @@ button.btn-icon:hover { color: var(--neg); background: var(--accent-soft); }
 
 .divider { height: 1px; background: var(--border); margin: 18px 0; border: none; }
 
+/* ── HOME: the two-tracker fork ──
+   Bloom is two independent trackers. These are the only cards that show both,
+   and they never show each other's numbers. */
+.tracker-grid { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
+.tracker-card {
+  display: flex; align-items: center; gap: 16px; text-align: left; width: 100%;
+  background: var(--shell); border: 1px solid var(--shell-border);
+  border-radius: var(--radius); padding: 20px 20px; cursor: pointer;
+  font-family: inherit; color: var(--text);
+  box-shadow: 0 2px 16px var(--glass-shadow); transition: all 0.2s;
+}
+.tracker-card:hover {
+  border-color: var(--border-hover); transform: translateY(-3px);
+  box-shadow: 0 6px 24px var(--glass-shadow);
+}
+.tracker-icon {
+  width: 48px; height: 48px; flex: 0 0 auto; border-radius: 13px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-soft); color: var(--accent);
+}
+.tracker-icon svg { width: 24px; height: 24px; }
+.tracker-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.tracker-title { font-weight: 600; font-size: 1.05rem; }
+.tracker-desc { font-size: 0.82rem; color: var(--text-muted); }
+.tracker-figure { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.tracker-value { font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 500; }
+.tracker-hint { font-size: 0.76rem; color: var(--text-muted); }
+.tracker-chev { color: var(--text-muted); font-size: 1.3rem; flex: 0 0 auto; }
+@media (max-width: 600px) {
+  .tracker-card { padding: 16px; gap: 13px; }
+  .tracker-icon { width: 42px; height: 42px; }
+}
+
+/* ── WALLETS ── */
+.wallet-row {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--shell); border: 1px solid var(--shell-border);
+  border-radius: var(--radius); padding: 15px 18px; margin-bottom: 10px;
+  cursor: pointer; transition: all 0.2s;
+}
+.wallet-row:hover { border-color: var(--border-hover); transform: translateY(-2px); }
+.wallet-emoji { font-size: 1.5rem; flex: 0 0 auto; line-height: 1; }
+.wallet-main { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
+.wallet-name { font-weight: 500; font-size: 0.95rem; }
+.wallet-pos { display: flex; flex-direction: column; align-items: flex-end; flex: 0 0 auto; }
+.wallet-pos b { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; }
+.wallet-pos-lbl { font-size: 0.72rem; color: var(--text-muted); }
+
+/* member avatars: colour derived from the name, so it's stable without storing one */
+.member-avs { display: flex; gap: 4px; flex-wrap: wrap; }
+.member-av {
+  width: 24px; height: 24px; flex: 0 0 auto; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.72rem; font-weight: 600; color: #fff; letter-spacing: 0;
+}
+.member-av.more { background: var(--border) !important; color: var(--text-secondary); }
+.member-actions { display: flex; gap: 6px; flex: 0 0 auto; flex-wrap: wrap; }
+.member-status { display: block; font-size: 0.75rem; color: var(--text-muted); font-weight: 400; }
+.member-status.invited { color: var(--accent); }
+
+.emoji-picker { display: flex; gap: 6px; flex-wrap: wrap; }
+.emoji-opt {
+  width: 40px; height: 40px; border-radius: 11px; font-size: 1.15rem; line-height: 1;
+  background: var(--field-bg); border: 1px solid var(--border);
+  cursor: pointer; transition: all 0.2s;
+}
+.emoji-opt:hover { border-color: var(--border-hover); }
+.emoji-opt.active { background: var(--accent-soft); border-color: var(--accent); }
+
+@media (max-width: 600px) {
+  .wallet-row { padding: 13px 14px; gap: 11px; }
+  .member-actions { width: 100%; margin-top: 6px; }
+}
+
+/* ── WALLET HOME ── */
+.wallet-head { display: flex; align-items: flex-start; gap: 12px; }
+.wallet-head .btn-ghost { flex: 0 0 auto; margin-top: 34px; }
+
+.balance-head { text-align: center; padding: 6px 0 4px; }
+.balance-lbl { font-size: 0.85rem; color: var(--text-muted); }
+.balance-val {
+  font-family: 'JetBrains Mono', monospace; font-size: 2rem;
+  font-weight: 500; letter-spacing: -0.02em; margin-top: 2px;
+}
+
+/* who owes whom, after simplification */
+.debt-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.debt-row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  background: var(--field-bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 13px;
+  font-family: inherit; font-size: 0.88rem; color: var(--text); text-align: left;
+}
+.debt-row.tappable { cursor: pointer; transition: all 0.2s; }
+.debt-row.tappable:hover { border-color: var(--accent); background: var(--accent-soft); }
+.debt-text { flex: 1; }
+.debt-amt { font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+
+/* ── PILL ROWS (category chips, split mode, filters) ── */
+.pill-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.pill {
+  font-family: inherit; font-size: 0.82rem; padding: 6px 13px;
+  border-radius: 999px; cursor: pointer; transition: all 0.15s;
+  background: var(--field-bg); border: 1px solid var(--border); color: var(--text-secondary);
+}
+.pill:hover { border-color: var(--border-hover); }
+.pill.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 500; }
+
+/* ── ACTIVITY FEED ── */
+.act-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 13px; border-radius: 10px;
+  background: var(--field-bg); border: 1px solid var(--border);
+  cursor: pointer; transition: all 0.2s;
+}
+.act-row:hover { border-color: var(--border-hover); transform: translateY(-1px); }
+.act-row.settlement { background: transparent; border-style: dashed; }
+.act-date {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
+  color: var(--text-muted); flex: 0 0 auto; min-width: 48px;
+}
+.act-main { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.act-desc {
+  font-size: 0.9rem; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.act-sub { font-size: 0.75rem; color: var(--text-muted); }
+.act-amt {
+  display: flex; flex-direction: column; align-items: flex-end; flex: 0 0 auto;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.9rem;
+}
+.act-cat { font-family: 'Source Sans 3', sans-serif; font-size: 0.7rem; color: var(--text-muted); }
+
+/* ── SPLIT EDITOR ── */
+.split-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
+}
+.split-head .pill-row { margin-bottom: 0; }
+.split-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 10px;
+  background: var(--field-bg); border: 1px solid var(--border);
+  cursor: pointer; transition: opacity 0.2s;
+}
+.split-row.off { opacity: 0.45; }
+.split-amt { font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; flex: 0 0 auto; }
+.split-input { flex: 0 0 auto; width: 110px; }
+.split-input input { width: 100%; }
+
+@media (max-width: 600px) {
+  .balance-val { font-size: 1.7rem; }
+  .wallet-head { flex-direction: column; gap: 0; }
+  .wallet-head .btn-ghost { margin-top: 0; margin-bottom: 8px; }
+  .act-row { gap: 9px; padding: 10px; }
+  .act-date { min-width: 42px; font-size: 0.72rem; }
+}
+
 /* view switching */
 .view { display: none; }
 .view.active { display: block; }

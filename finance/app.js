@@ -70,11 +70,11 @@
 
   function setNav(loggedIn) {
     $("#navRight").classList.toggle("hidden", !loggedIn);
-    // When signed in, the logo goes to the Bloom dashboard (not the public home);
+    // When signed in, the logo goes to Bloom's home fork (not the public site);
     // when signed out, it's a normal link back to the home page.
     const logo = $("#navLogo");
     if (logo) {
-      if (loggedIn) { logo.setAttribute("href", "#"); logo.onclick = (e) => { e.preventDefault(); routeTo("dashboard"); }; }
+      if (loggedIn) { logo.setAttribute("href", "#"); logo.onclick = (e) => { e.preventDefault(); routeTo("home"); }; }
       else { logo.setAttribute("href", "/"); logo.onclick = null; }
     }
   }
@@ -273,13 +273,16 @@
     ));
   }
 
-  // ── Enter app (loads accounts + defaults, shows dashboard) ──
+  // ── Enter app (loads accounts + defaults, shows home) ──
   async function enterApp() {
     setNav(true);
+    // Claim any wallet seats invited to this email BEFORE the first render, so
+    // a wallet someone added you to is already there on first load.
+    if (window.Split) await Split.claimInvites();
     await loadAccounts();
     await loadIncomeDefaults();
     await loadAutoRoutes();
-    routeTo("dashboard");
+    routeTo("home");
   }
 
   async function loadAccounts() {
@@ -333,10 +336,109 @@
     return { snapshots, allMoves };
   }
 
-  // ── DASHBOARD ─────────────────────────────────────────
-  route("dashboard", async (app) => {
+  // ── HOME (the fork: two independent trackers) ─────────
+  // Bloom is two separate trackers behind one login. They never share a screen
+  // and never share math: the asset tracker derives spending from net worth,
+  // the expense tracker splits shared costs between people.
+  route("home", async (app) => {
     app.append(el("div", { class: "page-header-shell fade-up fd1" },
       el("h1", {}, "Bloom"),
+      el("p", {}, "Give your money room to bloom. Pick a tracker to get started.")
+    ));
+
+    const grid = el("div", { class: "tracker-grid fade-up fd2" });
+
+    // Asset card: latest net worth, or a prompt if nothing is set up yet.
+    let assetValue = "Get started", assetHint = "add your accounts";
+    if (accounts.length) {
+      const { snapshots, allMoves } = await loadTimeline();
+      const timeline = Model.computeTimeline(snapshots, allMoves);
+      if (timeline.length) {
+        const latest = timeline[timeline.length - 1];
+        assetValue = fmt(latest.hasMarket ? latest.marketNetWorth : latest.netWorth, base());
+        assetHint = "net worth · " + periodLabel(latest.snapshot.period_year, latest.snapshot.period_month);
+      } else { assetValue = "Get started"; assetHint = "add your first month"; }
+    }
+    grid.append(trackerCard({
+      icon: TRACKER_ICON.asset,
+      title: "Asset Tracker",
+      desc: "Net worth, growth, and monthly spending",
+      value: assetValue, hint: assetHint,
+      onClick: () => routeTo("dashboard"),
+    }));
+
+    // Expense card: your overall position across wallets.
+    let expValue = "Get started", expHint = "set up a wallet", expSign = null;
+    if (window.Split) {
+      const wallets = (await Split.loadWallets()).filter((w) => !w.archived);
+      if (wallets.length) {
+        const positions = await Promise.all(wallets.map(async (w) => {
+          const { balances } = await loadWalletLedger(w);
+          return { cur: w.base_currency, net: Split.myPosition(w, balances) };
+        }));
+        const owing = positions.filter((p) => Math.abs(p.net) >= 0.005);
+        const count = walletCountLabel(wallets.length);
+
+        if (!owing.length) { expValue = "Settled up"; expHint = count; expSign = 0; }
+        else {
+          // Wallets are independent and may be in different currencies, so a
+          // single total is only meaningful when they all share one. Otherwise
+          // report how many wallets are outstanding rather than adding up
+          // amounts that aren't in the same units.
+          const currencies = [...new Set(owing.map((p) => p.cur))];
+          if (currencies.length === 1) {
+            const net = owing.reduce((s, p) => s + p.net, 0);
+            if (Math.abs(net) < 0.005) { expValue = "Settled up"; expHint = count; expSign = 0; }
+            else {
+              expValue = fmt(Math.abs(net), currencies[0]);
+              expHint = (net > 0 ? "you're owed · " : "you owe · ") + count;
+              expSign = net > 0 ? 1 : -1;
+            }
+          } else {
+            expValue = owing.length + (owing.length === 1 ? " wallet" : " wallets");
+            expHint = "with a balance · " + count;
+            expSign = null;
+          }
+        }
+      }
+    }
+    grid.append(trackerCard({
+      icon: TRACKER_ICON.expense,
+      title: "Expense Tracker",
+      desc: "Split bills with friends, flatmates, and partners",
+      value: expValue, hint: expHint, sign: expSign,
+      onClick: () => routeTo("wallets"),
+    }));
+
+    app.append(grid);
+  });
+
+  function walletCountLabel(n) { return n + (n === 1 ? " wallet" : " wallets"); }
+
+  const TRACKER_ICON = {
+    asset: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 3 3 5-6 3 3"/><path d="M3 21h18"/></svg>',
+    expense: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 2 21 6 17 10"/><path d="M21 6H8a4 4 0 0 0-4 4"/><polyline points="7 22 3 18 7 14"/><path d="M3 18h13a4 4 0 0 0 4-4"/></svg>',
+  };
+
+  // The two big cards on home. One live number each, so home is useful.
+  function trackerCard({ icon, title, desc, value, hint, sign, onClick }) {
+    const cls = sign == null ? "" : sign > 0 ? "pos" : sign < 0 ? "neg" : "";
+    return el("button", { class: "tracker-card", type: "button", onClick },
+      el("span", { class: "tracker-icon", html: icon }),
+      el("span", { class: "tracker-body" },
+        el("span", { class: "tracker-title" }, title),
+        el("span", { class: "tracker-desc" }, desc),
+        el("span", { class: "tracker-figure" },
+          el("b", { class: "tracker-value " + cls }, value),
+          el("span", { class: "tracker-hint" }, hint))),
+      el("span", { class: "tracker-chev" }, "›"));
+  }
+
+  // ── DASHBOARD (Asset Tracker home) ────────────────────
+  route("dashboard", async (app) => {
+    app.append(backBar("Home", "home"));
+    app.append(el("div", { class: "page-header-shell fade-up fd1" },
+      el("h1", {}, "Asset Tracker"),
       el("p", {}, "Your assets, growth, and spending, all in one calm place.")
     ));
 
@@ -1169,6 +1271,904 @@
     app.append(shell);
     app.append(el("div", { class: "btn-row fade-up fd3", style: "margin-top:16px" },
       el("button", { class: "btn", onClick: () => routeTo("snapshot") }, "+ Add a month")));
+  });
+
+  // ══════════════════════════════════════════════════════
+  //  EXPENSE TRACKER (split wallets)
+  //
+  //  A separate ledger. Nothing below reads or writes snapshots, balances, or
+  //  income — the two trackers never share math. Vocabulary is kept distinct
+  //  on purpose: the asset tracker says "spending", this one says "spent" and
+  //  "your share", so the same word never means two things.
+  // ══════════════════════════════════════════════════════
+
+  // Loads one wallet's expenses/shares/settlements and computes its balances.
+  // Phase 1 has no expense UI yet, so in practice this returns zeroes — but the
+  // math runs for real, so the home and wallet screens are already correct once
+  // Phase 2 starts writing rows.
+  async function loadWalletLedger(wallet) {
+    const [{ data: expenses }, { data: settlements }] = await Promise.all([
+      sb.from("shared_expenses").select("*").eq("wallet_id", wallet.id),
+      sb.from("settlements").select("*").eq("wallet_id", wallet.id),
+    ]);
+    let shares = [];
+    const ids = (expenses || []).map((e) => e.id);
+    if (ids.length) {
+      const { data } = await sb.from("expense_shares").select("*").in("expense_id", ids);
+      shares = data || [];
+    }
+    const balances = Split.computeBalances(
+      wallet.activeMembers, expenses || [], shares, settlements || []);
+    return { expenses: expenses || [], shares, settlements: settlements || [], balances };
+  }
+
+  // Initial-letter avatar. Colour is derived from the name so a person keeps
+  // the same colour everywhere without storing one.
+  function memberAvatar(name) {
+    const n = (name || "?").trim();
+    const idx = Math.abs([...n].reduce((h, ch) => h * 31 + ch.charCodeAt(0), 7)) % 8 + 1;
+    return el("span", { class: "member-av", style: `background:var(--cat-${idx})` },
+      n.charAt(0).toUpperCase());
+  }
+
+  // ── WALLETS (Expense Tracker home) ────────────────────
+  route("wallets", async (app) => {
+    app.append(backBar("Home", "home"));
+    app.append(el("div", { class: "page-header-shell fade-up fd1" },
+      el("h1", {}, "Expense Tracker"),
+      el("p", {}, "Shared wallets for splitting bills. Each one is tracked separately.")
+    ));
+
+    let wallets = [];
+    try { wallets = await Split.loadWallets(); }
+    catch {
+      app.append(el("div", { class: "shell fade-up fd2" },
+        el("div", { class: "empty-state" },
+          el("p", {}, "Couldn't load your wallets. If this is the first run, the split tables may not be set up yet — run setup/split-schema.sql in Supabase."))));
+      return;
+    }
+
+    const active = wallets.filter((w) => !w.archived);
+    const archived = wallets.filter((w) => w.archived);
+
+    if (!active.length && !archived.length) {
+      app.append(el("div", { class: "shell fade-up fd2" },
+        el("div", { class: "empty-state" },
+          el("p", {}, "No wallets yet. Create one for each group you split with — your flatmate, your friends, a trip."),
+          el("div", { class: "btn-row", style: "justify-content:center;margin-top:14px" },
+            el("button", { class: "btn", onClick: () => routeTo("newWallet") }, "New wallet")))));
+      return;
+    }
+
+    const list = el("div", { class: "fade-up fd2" });
+    for (const w of active) list.append(await walletRow(w));
+    app.append(list);
+
+    app.append(el("div", { class: "btn-row fade-up fd3", style: "margin-top:16px" },
+      el("button", { class: "btn", onClick: () => routeTo("newWallet") }, "+ New wallet")));
+
+    if (archived.length) {
+      const arcList = el("div", {});
+      for (const w of archived) arcList.append(await walletRow(w));
+      app.append(el("div", { class: "shell fade-up", style: "margin-top:22px" },
+        el("h3", {}, "Archived"),
+        el("div", { class: "section-hint" }, "Kept for reference. Balances still shown."),
+        arcList));
+    }
+  });
+
+  // One row in the wallets list: emoji, name, members, your position.
+  async function walletRow(w) {
+    const { balances } = await loadWalletLedger(w);
+    const net = Split.myPosition(w, balances);
+    const settled = Math.abs(net) < 0.005;
+    const posEl = settled
+      ? el("span", { class: "wallet-pos muted" }, "settled up")
+      : el("span", { class: "wallet-pos " + (net > 0 ? "pos" : "neg") },
+          el("span", { class: "wallet-pos-lbl" }, net > 0 ? "you're owed" : "you owe"),
+          el("b", {}, fmt(Math.abs(net), w.base_currency)));
+
+    const avatars = el("span", { class: "member-avs" });
+    w.activeMembers.slice(0, 4).forEach((m) => avatars.append(memberAvatar(m.display_name)));
+    if (w.activeMembers.length > 4) avatars.append(el("span", { class: "member-av more" }, "+" + (w.activeMembers.length - 4)));
+
+    return el("div", { class: "wallet-row", onClick: () => routeTo("wallet", w.id) },
+      el("span", { class: "wallet-emoji" }, w.emoji || "👛"),
+      el("span", { class: "wallet-main" },
+        el("span", { class: "wallet-name" }, w.name),
+        avatars),
+      posEl,
+      el("span", { class: "muted" }, "›"));
+  }
+
+  // ── WALLET HOME ───────────────────────────────────────
+  // The main screen of a wallet: what you're owed, who owes whom, where the
+  // money went, and the recent expenses.
+  route("wallet", async (app, walletId) => {
+    const w = await Split.loadWallet(walletId);
+    if (!w) { routeTo("wallets"); return; }
+    const cur = w.base_currency;
+
+    app.append(backBar("Wallets", "wallets"));
+    app.append(el("div", { class: "wallet-head fade-up fd1" },
+      el("div", { class: "page-header-shell", style: "margin-top:0;flex:1" },
+        el("h1", {}, (w.emoji || "👛") + " " + w.name),
+        el("p", {}, w.activeMembers.map((m) => m.display_name).join(", "))),
+      el("button", { class: "btn btn-ghost btn-sm", type: "button",
+        onClick: () => routeTo("walletSettings", w.id) }, "Settings")));
+
+    const { expenses, shares, settlements, balances } = await loadWalletLedger(w);
+
+    // ── Headline: your position + who owes whom ──
+    const net = Split.myPosition(w, balances);
+    const settled = Math.abs(net) < 0.005;
+    const head = el("div", { class: "shell fade-up fd2" });
+    head.append(el("div", { class: "balance-head" },
+      el("div", { class: "balance-lbl" }, settled ? "All settled up" : (net > 0 ? "You're owed" : "You owe")),
+      el("div", { class: "balance-val " + (settled ? "muted" : net > 0 ? "pos" : "neg") },
+        settled ? "—" : fmt(Math.abs(net), cur))));
+
+    const debts = Split.simplifyDebts(balances);
+    if (debts.length) {
+      // Simplified: the fewest transfers that clear everything, rather than
+      // every pairwise debt (three people would otherwise owe in a circle).
+      const rows = el("div", { class: "debt-list" });
+      debts.forEach((d) => {
+        rows.append(el("div", { class: "debt-row" },
+          memberAvatar(d.from.display_name),
+          el("span", { class: "debt-text" },
+            el("b", {}, d.from.display_name), " owes ", el("b", {}, d.to.display_name)),
+          el("span", { class: "debt-amt" }, fmt(d.amount, cur))));
+      });
+      head.append(rows);
+      if (debts.length > 1) {
+        head.append(el("div", { class: "section-hint", style: "margin:10px 0 0" },
+          "Simplified to the fewest payments that clear everything."));
+      }
+    }
+
+    head.append(el("div", { class: "btn-row", style: "margin-top:16px" },
+      el("button", { class: "btn", onClick: () => routeTo("expense", { walletId: w.id }) }, "+ Add expense"),
+      debts.length
+        ? el("button", { class: "btn btn-ghost", onClick: () => routeTo("settle", w.id) }, "Settle up")
+        : null));
+    app.append(head);
+
+    if (!expenses.length) {
+      app.append(el("div", { class: "shell fade-up fd3" },
+        el("div", { class: "empty-state" },
+          el("p", {}, "No expenses yet. Add the first one and Bloom works out who owes what."))));
+      return;
+    }
+
+    // ── Spending by category ──
+    // "Your share" by default: what this month actually cost YOU, which is the
+    // number people care about. Toggle to see the whole group's spend.
+    if (window.Charts) {
+      let mineOnly = true;
+      const chartBox = el("div", {});
+      const toggle = el("div", { class: "pill-row" });
+      const mineBtn = el("button", { class: "pill active", type: "button" }, "Your share");
+      const allBtn = el("button", { class: "pill", type: "button" }, "Whole wallet");
+
+      const drawPie = () => {
+        chartBox.innerHTML = "";
+        const items = Split.categoryTotals(expenses, shares,
+          mineOnly && w.myMember ? w.myMember.id : null);
+        chartBox.append(Charts.spendingPie(items, cur));
+      };
+      mineBtn.addEventListener("click", () => {
+        mineOnly = true; mineBtn.classList.add("active"); allBtn.classList.remove("active"); drawPie();
+      });
+      allBtn.addEventListener("click", () => {
+        mineOnly = false; allBtn.classList.add("active"); mineBtn.classList.remove("active"); drawPie();
+      });
+      if (w.myMember) toggle.append(mineBtn, allBtn);
+      drawPie();
+
+      app.append(el("div", { class: "shell fade-up fd3" },
+        el("h3", {}, "Where it went"),
+        w.myMember ? toggle : null,
+        chartBox));
+    }
+
+    // ── Recent activity ──
+    const activity = buildActivity(expenses, settlements, w);
+    const recent = activity.slice(0, 8);
+    const list = el("div", { class: "line-list" });
+    recent.forEach((item) => list.append(activityRow(item, w, shares)));
+
+    const shell = el("div", { class: "shell fade-up" },
+      el("h3", {}, "Recent"), list);
+    if (activity.length > recent.length) {
+      shell.append(el("div", { class: "btn-row", style: "margin-top:12px" },
+        el("button", { class: "btn btn-ghost", onClick: () => routeTo("walletHistory", w.id) },
+          "See all " + activity.length)));
+    }
+    app.append(shell);
+  });
+
+  // Expenses and settlements merged into one date-sorted feed, newest first.
+  function buildActivity(expenses, settlements, w) {
+    const byId = {};
+    (w.members || []).forEach((m) => { byId[m.id] = m; });
+    const items = [
+      ...expenses.map((e) => ({ kind: "expense", date: e.spent_on, row: e })),
+      ...settlements.map((s) => ({ kind: "settlement", date: s.settled_on, row: s })),
+    ];
+    items.forEach((i) => { i.members = byId; });
+    return items.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  }
+
+  function fmtDay(iso) {
+    if (!iso) return "";
+    try {
+      return new Date(iso + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    } catch { return iso; }
+  }
+
+  // One row in the activity feed. Expenses show your share; settlements read
+  // as a payment between two people.
+  function activityRow(item, w, allShares) {
+    const cur = w.base_currency;
+    const m = item.members;
+
+    if (item.kind === "settlement") {
+      const s = item.row;
+      const from = m[s.from_member_id], to = m[s.to_member_id];
+      return el("div", { class: "act-row settlement", onClick: () => routeTo("settle", w.id) },
+        el("span", { class: "act-date" }, fmtDay(s.settled_on)),
+        el("span", { class: "act-main" },
+          el("span", { class: "act-desc" },
+            (from ? from.display_name : "?"), " paid ", (to ? to.display_name : "?")),
+          el("span", { class: "act-sub" }, s.note || "settlement")),
+        el("span", { class: "act-amt pos" }, fmt(Split.toBase(s.amount, s.exchange_rate), cur)));
+    }
+
+    const e = item.row;
+    const payer = m[e.paid_by_member_id];
+    const myShare = w.myMember
+      ? (allShares || []).find((s) => s.expense_id === e.id && s.member_id === w.myMember.id)
+      : null;
+    const shareTxt = myShare
+      ? "your share " + fmt(Split.toBase(myShare.share_amount, e.exchange_rate), cur)
+      : "not your split";
+
+    return el("div", { class: "act-row", onClick: () => routeTo("expense", { walletId: w.id, expenseId: e.id }) },
+      el("span", { class: "act-date" }, fmtDay(e.spent_on)),
+      el("span", { class: "act-main" },
+        el("span", { class: "act-desc" }, e.description || e.category),
+        el("span", { class: "act-sub" },
+          (payer ? payer.display_name : "?") + " paid · " + shareTxt)),
+      el("span", { class: "act-amt" },
+        fmt(Split.toBase(e.amount, e.exchange_rate), cur),
+        el("span", { class: "act-cat" }, e.category)));
+  }
+
+  // ── WALLET HISTORY (all activity) ─────────────────────
+  route("walletHistory", async (app, walletId) => {
+    const w = await Split.loadWallet(walletId);
+    if (!w) { routeTo("wallets"); return; }
+
+    app.append(backBar(w.name, "wallet", w.id));
+    app.append(el("div", { class: "page-header-shell fade-up fd1" },
+      el("h1", {}, "All activity"),
+      el("p", {}, "Every expense and settlement in this wallet.")));
+
+    const { expenses, shares, settlements } = await loadWalletLedger(w);
+    const all = buildActivity(expenses, settlements, w);
+
+    // Category filter — the one filter that earns its place here.
+    const cats = [...new Set(expenses.map((e) => e.category || "other"))].sort();
+    let activeCat = null;
+    const pills = el("div", { class: "pill-row" });
+    const listBox = el("div", { class: "line-list" });
+
+    const draw = () => {
+      listBox.innerHTML = "";
+      const rows = activeCat
+        ? all.filter((i) => i.kind === "expense" && (i.row.category || "other") === activeCat)
+        : all;
+      if (!rows.length) { listBox.append(el("div", { class: "empty-state" }, "Nothing here.")); return; }
+      rows.forEach((i) => listBox.append(activityRow(i, w, shares)));
+    };
+
+    if (cats.length > 1) {
+      const allPill = el("button", { class: "pill active", type: "button" }, "All");
+      const setActive = (btn, cat) => {
+        activeCat = cat;
+        [...pills.children].forEach((c) => c.classList.toggle("active", c === btn));
+        draw();
+      };
+      allPill.addEventListener("click", () => setActive(allPill, null));
+      pills.append(allPill);
+      cats.forEach((c) => {
+        const p = el("button", { class: "pill", type: "button" }, c);
+        p.addEventListener("click", () => setActive(p, c));
+        pills.append(p);
+      });
+    }
+    draw();
+
+    app.append(el("div", { class: "shell fade-up fd2" },
+      cats.length > 1 ? pills : null, listBox));
+  });
+
+  // ── NEW WALLET ────────────────────────────────────────
+  route("newWallet", async (app) => {
+    app.append(backBar("Wallets", "wallets"));
+    app.append(el("div", { class: "page-header-shell fade-up fd1" },
+      el("h1", {}, "New wallet"),
+      el("p", {}, "A shared book for one group of people.")));
+
+    const EMOJIS = ["👛", "🏠", "🎉", "❤️", "✈️", "🍜", "🚗", "🐱", "🎓", "☕"];
+    let emoji = "👛";
+    const nameIn = el("input", { placeholder: "Flatmate, Friends, Japan trip…" });
+    const myNameIn = el("input", { placeholder: "your name in this wallet", value: defaultMyName() });
+    const curIn = currencySelect(base());
+
+    const picker = el("div", { class: "emoji-picker" });
+    EMOJIS.forEach((e) => {
+      const b = el("button", { class: "emoji-opt" + (e === emoji ? " active" : ""), type: "button" }, e);
+      b.addEventListener("click", () => {
+        emoji = e;
+        [...picker.children].forEach((c) => c.classList.toggle("active", c === b));
+      });
+      picker.append(b);
+    });
+
+    // People added before the wallet exists; written once it's created.
+    const people = [];
+    const peopleList = el("div", { class: "line-list" });
+    const pNameIn = el("input", { placeholder: "name" });
+    const pEmailIn = el("input", { type: "email", placeholder: "email (optional)" });
+
+    function renderPeople() {
+      peopleList.innerHTML = "";
+      people.forEach((p, i) => {
+        peopleList.append(el("div", { class: "line-item" },
+          memberAvatar(p.name),
+          el("span", { class: "li-name" }, p.name,
+            p.email ? el("span", { class: "member-status invited" }, p.email) : null),
+          el("button", { class: "btn btn-ghost btn-sm", type: "button",
+            onClick: () => { people.splice(i, 1); renderPeople(); } }, "Remove")));
+      });
+    }
+
+    function addPerson() {
+      const n = pNameIn.value.trim();
+      if (!n) { err.textContent = "Enter a name for the person you're adding."; return; }
+      people.push({ name: n, email: pEmailIn.value.trim() });
+      pNameIn.value = ""; pEmailIn.value = ""; err.textContent = "";
+      renderPeople(); pNameIn.focus();
+    }
+    pEmailIn.addEventListener("keydown", (e) => { if (e.key === "Enter") addPerson(); });
+
+    const err = el("div", { class: "error-msg" });
+    const saveBtn = el("button", { class: "btn" }, "Create wallet");
+
+    saveBtn.addEventListener("click", async () => {
+      err.textContent = "";
+      const name = nameIn.value.trim();
+      if (!name) { err.textContent = "Give the wallet a name."; return; }
+      saveBtn.disabled = true;
+      try {
+        const wallet = await Split.createWallet({
+          name, emoji, baseCurrency: curIn.value, myName: myNameIn.value.trim() || "Me",
+        });
+        for (const p of people) await Split.addMember(wallet.id, p);
+        routeTo("wallet", wallet.id);
+      } catch (e) {
+        err.textContent = e.message || "Couldn't create the wallet.";
+        saveBtn.disabled = false;
+      }
+    });
+
+    app.append(el("div", { class: "shell fade-up fd2" },
+      el("div", { class: "field" }, el("label", {}, "Wallet name"), nameIn),
+      el("div", { class: "field" }, el("label", {}, "Icon"), picker),
+      el("div", { class: "field-row" },
+        el("div", { class: "field" }, el("label", {}, "Your name here"), myNameIn),
+        el("div", { class: "field" }, el("label", {}, "Currency"), curIn)),
+      el("hr", { class: "divider" }),
+      el("h3", {}, "People"),
+      el("div", { class: "section-hint" },
+        "Add a name on its own to track what someone owes without them signing up. Add an email and the wallet appears in their Bloom automatically when they join."),
+      peopleList,
+      el("div", { class: "li-inputs", style: "margin-top:8px" }, pNameIn, pEmailIn,
+        el("button", { class: "btn btn-ghost", type: "button", onClick: addPerson }, "Add")),
+      el("div", { class: "btn-row", style: "margin-top:16px" }, saveBtn,
+        el("button", { class: "btn btn-ghost", onClick: () => routeTo("wallets") }, "Cancel")),
+      err));
+  });
+
+  // A sensible default for "your name in this wallet": the part of your email
+  // before the @, capitalised.
+  function defaultMyName() {
+    const email = (user && user.email) || "";
+    const stem = email.split("@")[0].replace(/[._-]+/g, " ").trim();
+    return stem ? stem.charAt(0).toUpperCase() + stem.slice(1) : "Me";
+  }
+
+  // ── ADD / EDIT EXPENSE ────────────────────────────────
+  // The screen that has to be fastest, so the defaults do the work: today,
+  // you as payer, split equally with everyone, last-used category. Realistically
+  // it's type the amount, tap a category, save.
+  route("expense", async (app, arg) => {
+    const walletId = arg && arg.walletId;
+    const expenseId = arg && arg.expenseId;
+    const w = await Split.loadWallet(walletId);
+    if (!w) { routeTo("wallets"); return; }
+    const editing = !!expenseId;
+    const existing = editing ? await Split.loadExpense(expenseId) : null;
+    if (editing && !existing) { routeTo("wallet", w.id); return; }
+
+    app.append(backBar(w.name, "wallet", w.id));
+    app.append(el("div", { class: "page-header-shell fade-up fd1" },
+      el("h1", {}, editing ? "Edit expense" : "Add expense"),
+      el("p", {}, editing ? "Change anything and save." : "Split a shared cost with " + w.name + ".")));
+
+    const membs = w.activeMembers;
+    if (!membs.length) {
+      app.append(el("div", { class: "shell fade-up fd2" },
+        el("div", { class: "empty-state" }, el("p", {}, "Add people to this wallet first."))));
+      return;
+    }
+
+    // ── Fields ──
+    const amountIn = el("input", { type: "number", step: "0.01", inputmode: "decimal",
+      placeholder: "0.00", value: existing ? existing.amount : "" });
+    const descIn = el("input", { placeholder: "Groceries, dinner, taxi…",
+      value: existing ? (existing.description || "") : "" });
+    const dateIn = el("input", { type: "date",
+      value: existing ? existing.spent_on : new Date().toISOString().slice(0, 10) });
+
+    // Currency: defaults to the wallet's own. A different one needs a rate, so
+    // the rate field only appears when it actually applies.
+    const curIn = currencySelect(existing ? existing.currency : w.base_currency);
+    const rateIn = el("input", { type: "number", step: "0.0001", placeholder: "1.0",
+      value: existing ? existing.exchange_rate : 1 });
+    const rateField = el("div", { class: "field hidden" },
+      el("label", {}, "Rate to " + w.base_currency), rateIn,
+      el("div", { class: "section-hint", style: "margin:4px 0 0" },
+        "How much 1 unit is worth in " + w.base_currency + "."));
+    const syncRate = () => {
+      const same = curIn.value === w.base_currency;
+      rateField.classList.toggle("hidden", same);
+      if (same) rateIn.value = 1;
+    };
+    curIn.addEventListener("change", syncRate);
+
+    // Category chips — faster than a dropdown on a phone.
+    let category = existing ? existing.category : lastCategory(w.id);
+    const catRow = el("div", { class: "pill-row" });
+    EXPENSE_CATS.forEach((c) => {
+      const p = el("button", { class: "pill" + (c === category ? " active" : ""), type: "button" }, c);
+      p.addEventListener("click", () => {
+        category = c;
+        [...catRow.children].forEach((x) => x.classList.toggle("active", x === p));
+      });
+      catRow.append(p);
+    });
+
+    // Payer defaults to you.
+    const payerSel = el("select", {});
+    const defaultPayer = existing ? existing.paid_by_member_id : (w.myMember ? w.myMember.id : membs[0].id);
+    membs.forEach((m) => payerSel.append(
+      el("option", { value: m.id, ...(m.id === defaultPayer ? { selected: "" } : {}) }, m.display_name)));
+
+    // ── Split ──
+    // Equal is the default and stays collapsed. Custom expands per-person rows
+    // with an include toggle and an amount box.
+    let mode = existing ? existing.split_mode : "equal";
+    const included = {};   // member_id -> bool
+    const exactVals = {};  // member_id -> string
+    membs.forEach((m) => {
+      const sh = existing ? existing.shares.find((s) => s.member_id === m.id) : null;
+      included[m.id] = existing ? !!sh : true;
+      exactVals[m.id] = sh ? String(sh.share_amount) : "";
+    });
+
+    const equalBtn = el("button", { class: "pill" + (mode === "equal" ? " active" : ""), type: "button" }, "Equally");
+    const customBtn = el("button", { class: "pill" + (mode === "exact" ? " active" : ""), type: "button" }, "Custom");
+    const splitBox = el("div", {});
+    const remainEl = el("div", { class: "section-hint", style: "margin:8px 0 0" });
+
+    function includedIds() { return membs.filter((m) => included[m.id]).map((m) => m.id); }
+
+    function drawSplit() {
+      splitBox.innerHTML = "";
+      const total = Number(amountIn.value) || 0;
+
+      if (mode === "equal") {
+        const ids = includedIds();
+        const preview = Split.allocateEqual(total, ids);
+        const rows = el("div", { class: "line-list" });
+        membs.forEach((m) => {
+          const on = included[m.id];
+          const share = preview.find((p) => p.member_id === m.id);
+          const chk = el("input", { type: "checkbox", style: "width:auto;margin:0" });
+          chk.checked = on;
+          chk.addEventListener("change", () => { included[m.id] = chk.checked; drawSplit(); });
+          rows.append(el("label", { class: "split-row" + (on ? "" : " off") },
+            chk, memberAvatar(m.display_name),
+            el("span", { class: "li-name" }, m.display_name),
+            el("span", { class: "split-amt" },
+              on && share ? fmt(share.share_amount, curIn.value) : "—")));
+        });
+        splitBox.append(rows);
+        remainEl.textContent = ids.length
+          ? "Split evenly between " + ids.length + (ids.length === 1 ? " person." : " people.")
+          : "Pick at least one person.";
+        remainEl.classList.remove("neg");
+        return;
+      }
+
+      // Custom: per-person amounts, with a live remainder that blocks saving
+      // until the shares actually add up.
+      const rows = el("div", { class: "line-list" });
+      membs.forEach((m) => {
+        const inp = el("input", { type: "number", step: "0.01", inputmode: "decimal",
+          placeholder: "0.00", value: exactVals[m.id] });
+        inp.addEventListener("input", () => { exactVals[m.id] = inp.value; updateRemainder(); });
+        rows.append(el("div", { class: "split-row" },
+          memberAvatar(m.display_name),
+          el("span", { class: "li-name" }, m.display_name),
+          el("span", { class: "split-input" }, inp)));
+      });
+      splitBox.append(rows);
+      updateRemainder();
+    }
+
+    function exactSum() {
+      return membs.reduce((s, m) => s + (Number(exactVals[m.id]) || 0), 0);
+    }
+    function updateRemainder() {
+      const total = Number(amountIn.value) || 0;
+      const diff = total - exactSum();
+      const off = Math.abs(diff) >= 0.005;
+      remainEl.textContent = off
+        ? (diff > 0 ? fmt(diff, curIn.value) + " left to assign." : fmt(-diff, curIn.value) + " over the total.")
+        : "Adds up exactly.";
+      remainEl.classList.toggle("neg", off);
+    }
+
+    equalBtn.addEventListener("click", () => {
+      mode = "equal"; equalBtn.classList.add("active"); customBtn.classList.remove("active"); drawSplit();
+    });
+    customBtn.addEventListener("click", () => {
+      mode = "exact"; customBtn.classList.add("active"); equalBtn.classList.remove("active");
+      // Seed the custom boxes from the current equal split, so "custom" starts
+      // from something sensible rather than empty.
+      const preview = Split.allocateEqual(Number(amountIn.value) || 0, includedIds());
+      membs.forEach((m) => {
+        const p = preview.find((x) => x.member_id === m.id);
+        if (!exactVals[m.id]) exactVals[m.id] = p ? String(p.share_amount) : "";
+      });
+      drawSplit();
+    });
+    amountIn.addEventListener("input", drawSplit);
+    curIn.addEventListener("change", drawSplit);
+    syncRate();
+    drawSplit();
+
+    // ── Save ──
+    const err = el("div", { class: "error-msg" });
+    const saveBtn = el("button", { class: "btn" }, editing ? "Save changes" : "Add expense");
+
+    saveBtn.addEventListener("click", async () => {
+      err.textContent = "";
+      const amount = Number(amountIn.value);
+      if (!isFinite(amount) || amount <= 0) { err.textContent = "Enter an amount greater than zero."; return; }
+
+      let shares;
+      if (mode === "equal") {
+        const ids = includedIds();
+        if (!ids.length) { err.textContent = "Pick at least one person to split with."; return; }
+        shares = Split.allocateEqual(amount, ids);
+      } else {
+        if (Math.abs(amount - exactSum()) >= 0.005) {
+          err.textContent = "The custom shares must add up to the total.";
+          return;
+        }
+        shares = Split.allocateShares(amount, null, "exact", exactVals)
+          .filter((s) => s.share_amount !== 0);
+        if (!shares.length) { err.textContent = "Give at least one person a share."; return; }
+      }
+
+      saveBtn.disabled = true;
+      try {
+        await Split.saveExpense(w.id, {
+          id: expenseId,
+          paid_by_member_id: payerSel.value,
+          spent_on: dateIn.value,
+          description: descIn.value,
+          category,
+          amount,
+          currency: curIn.value,
+          exchange_rate: curIn.value === w.base_currency ? 1 : (Number(rateIn.value) || 1),
+          split_mode: mode,
+        }, shares);
+        rememberCategory(w.id, category);
+        routeTo("wallet", w.id);
+      } catch (e) {
+        err.textContent = e.message || "Couldn't save that expense.";
+        saveBtn.disabled = false;
+      }
+    });
+
+    const actions = el("div", { class: "btn-row", style: "margin-top:16px" },
+      saveBtn,
+      el("button", { class: "btn btn-ghost", onClick: () => routeTo("wallet", w.id) }, "Cancel"));
+    if (editing) {
+      actions.append(el("button", { class: "btn btn-ghost", style: "margin-left:auto",
+        onClick: async () => {
+          if (!confirm("Delete this expense? Balances will be recalculated.")) return;
+          try { await Split.deleteExpense(expenseId); routeTo("wallet", w.id); }
+          catch (e) { err.textContent = e.message || "Couldn't delete it."; }
+        } }, "Delete"));
+    }
+
+    app.append(el("div", { class: "shell fade-up fd2" },
+      el("div", { class: "field-row" },
+        el("div", { class: "field" }, el("label", {}, "Amount"), amountIn),
+        el("div", { class: "field" }, el("label", {}, "Currency"), curIn)),
+      rateField,
+      el("div", { class: "field" }, el("label", {}, "What for"), descIn),
+      el("div", { class: "field" }, el("label", {}, "Category"), catRow),
+      el("div", { class: "field-row" },
+        el("div", { class: "field" }, el("label", {}, "Date"), dateIn),
+        el("div", { class: "field" }, el("label", {}, "Paid by"), payerSel)),
+      el("hr", { class: "divider" }),
+      el("div", { class: "split-head" },
+        el("h3", { style: "margin:0" }, "Split"),
+        el("div", { class: "pill-row", style: "margin:0" }, equalBtn, customBtn)),
+      splitBox, remainEl,
+      actions, err));
+  });
+
+  // Last-used category per wallet — a small convenience that makes the common
+  // case (the same category twice in a row) a tap shorter. Purely local.
+  function lastCategory(walletId) {
+    try { return localStorage.getItem("bloom_lastcat_" + walletId) || "food"; }
+    catch { return "food"; }
+  }
+  function rememberCategory(walletId, cat) {
+    try { localStorage.setItem("bloom_lastcat_" + walletId, cat); } catch {}
+  }
+
+  // ── SETTLE UP ─────────────────────────────────────────
+  // Pre-filled from the simplified debts: pick a suggested payment, confirm the
+  // amount (editable for a partial payment), save. Nothing is deleted — a
+  // settlement is a row that offsets the balance, so history stays auditable.
+  route("settle", async (app, walletId) => {
+    const w = await Split.loadWallet(walletId);
+    if (!w) { routeTo("wallets"); return; }
+    const cur = w.base_currency;
+
+    app.append(backBar(w.name, "wallet", w.id));
+    app.append(el("div", { class: "page-header-shell fade-up fd1" },
+      el("h1", {}, "Settle up"),
+      el("p", {}, "Record a reimbursement between two people.")));
+
+    const { balances, settlements } = await loadWalletLedger(w);
+    const debts = Split.simplifyDebts(balances);
+    const membs = w.activeMembers;
+
+    const fromSel = el("select", {});
+    const toSel = el("select", {});
+    membs.forEach((m) => {
+      fromSel.append(el("option", { value: m.id }, m.display_name));
+      toSel.append(el("option", { value: m.id }, m.display_name));
+    });
+    const amountIn = el("input", { type: "number", step: "0.01", inputmode: "decimal", placeholder: "0.00" });
+    const dateIn = el("input", { type: "date", value: new Date().toISOString().slice(0, 10) });
+    const noteIn = el("input", { placeholder: "note (optional)" });
+    const err = el("div", { class: "error-msg" });
+
+    const applySuggestion = (d) => {
+      fromSel.value = d.from.id;
+      toSel.value = d.to.id;
+      amountIn.value = d.amount.toFixed(2);
+      err.textContent = "";
+    };
+
+    const shell = el("div", { class: "shell fade-up fd2" });
+    if (debts.length) {
+      shell.append(el("h3", {}, "Suggested"));
+      shell.append(el("div", { class: "section-hint" }, "Tap one to fill the form below."));
+      const rows = el("div", { class: "debt-list" });
+      debts.forEach((d) => {
+        rows.append(el("button", { class: "debt-row tappable", type: "button",
+          onClick: () => applySuggestion(d) },
+          memberAvatar(d.from.display_name),
+          el("span", { class: "debt-text" },
+            el("b", {}, d.from.display_name), " owes ", el("b", {}, d.to.display_name)),
+          el("span", { class: "debt-amt" }, fmt(d.amount, cur))));
+      });
+      shell.append(rows);
+      applySuggestion(debts[0]);
+      shell.append(el("hr", { class: "divider" }));
+    } else {
+      shell.append(el("div", { class: "empty-state" },
+        el("p", {}, "Everyone's square. You can still record a payment below.")));
+    }
+
+    const saveBtn = el("button", { class: "btn" }, "Record payment");
+    saveBtn.addEventListener("click", async () => {
+      err.textContent = "";
+      const amount = Number(amountIn.value);
+      if (!isFinite(amount) || amount <= 0) { err.textContent = "Enter an amount greater than zero."; return; }
+      if (fromSel.value === toSel.value) { err.textContent = "Pick two different people."; return; }
+      saveBtn.disabled = true;
+      try {
+        await Split.saveSettlement(w.id, {
+          from_member_id: fromSel.value,
+          to_member_id: toSel.value,
+          amount,
+          currency: cur,
+          exchange_rate: 1,
+          settled_on: dateIn.value,
+          note: noteIn.value,
+        });
+        routeTo("wallet", w.id);
+      } catch (e) {
+        err.textContent = e.message || "Couldn't record that payment.";
+        saveBtn.disabled = false;
+      }
+    });
+
+    shell.append(
+      el("div", { class: "field-row" },
+        el("div", { class: "field" }, el("label", {}, "From"), fromSel),
+        el("div", { class: "field" }, el("label", {}, "To"), toSel)),
+      el("div", { class: "field-row" },
+        el("div", { class: "field" }, el("label", {}, "Amount (" + cur + ")"), amountIn),
+        el("div", { class: "field" }, el("label", {}, "Date"), dateIn)),
+      el("div", { class: "field" }, el("label", {}, "Note"), noteIn),
+      el("div", { class: "btn-row", style: "margin-top:14px" }, saveBtn,
+        el("button", { class: "btn btn-ghost", onClick: () => routeTo("wallet", w.id) }, "Cancel")),
+      err);
+    app.append(shell);
+
+    // Past settlements, newest first, each removable if recorded by mistake.
+    if (settlements.length) {
+      const byId = {};
+      w.members.forEach((m) => { byId[m.id] = m; });
+      const rows = el("div", { class: "line-list" });
+      [...settlements].sort((a, b) => (a.settled_on < b.settled_on ? 1 : -1)).forEach((s) => {
+        const from = byId[s.from_member_id], to = byId[s.to_member_id];
+        rows.append(el("div", { class: "line-item" },
+          el("span", { class: "act-date" }, fmtDay(s.settled_on)),
+          el("span", { class: "li-name" },
+            (from ? from.display_name : "?") + " → " + (to ? to.display_name : "?"),
+            s.note ? el("span", { class: "member-status" }, s.note) : null),
+          el("span", { class: "li-amt" }, fmt(Split.toBase(s.amount, s.exchange_rate), cur)),
+          el("button", { class: "btn-icon", type: "button", title: "Delete",
+            onClick: async () => {
+              if (!confirm("Delete this payment? Balances will be recalculated.")) return;
+              try { await Split.deleteSettlement(s.id); routeTo("settle", w.id); }
+              catch (e) { alert(e.message || "Couldn't delete it."); }
+            } }, "×")));
+      });
+      app.append(el("div", { class: "shell fade-up fd3" },
+        el("h3", {}, "Past payments"), rows));
+    }
+  });
+
+  // ── WALLET SETTINGS (roster + admin) ──
+  route("walletSettings", async (app, walletId) => {
+    const w = await Split.loadWallet(walletId);
+    if (!w) { routeTo("wallets"); return; }
+    const isOwner = !!(w.myMember && w.myMember.is_owner);
+
+    app.append(backBar(w.name, "wallet", w.id));
+    app.append(el("div", { class: "page-header-shell fade-up fd1" },
+      el("h1", {}, "Settings"),
+      el("p", {}, w.archived ? "Archived wallet." : (w.emoji || "👛") + " " + w.name)));
+
+    const { balances } = await loadWalletLedger(w);
+    const net = Split.myPosition(w, balances);
+    app.append(el("div", { class: "shell fade-up fd2" },
+      el("div", { class: "stat-grid" },
+        statTile("Your balance",
+          Math.abs(net) < 0.005 ? "Settled up" : fmt(Math.abs(net), w.base_currency),
+          Math.abs(net) < 0.005 ? 0 : (net > 0 ? 1 : -1),
+          Math.abs(net) < 0.005 ? "nothing owed either way" : (net > 0 ? "you're owed" : "you owe")),
+        statTile("People", String(w.activeMembers.length), null, "in this wallet"),
+        statTile("Currency", w.base_currency, null, "for this wallet"))));
+
+    // ── Members ──
+    const shell = el("div", { class: "shell fade-up fd3" });
+    shell.append(el("h3", {}, "People"));
+    shell.append(el("div", { class: "section-hint" },
+      isOwner ? "Only you, as the wallet owner, can add or remove people."
+              : "Only the wallet owner can add or remove people."));
+
+    const rows = el("div", { class: "line-list" });
+    w.activeMembers.forEach((m) => {
+      const status = Split.memberStatus(m);
+      const isMe = w.myMember && m.id === w.myMember.id;
+      const label = { joined: "joined", invited: "invited — not yet joined", "name-only": "name only" }[status];
+
+      const actions = el("span", { class: "member-actions" });
+      if (isOwner && !isMe) {
+        // Name-only or mis-typed invites can be given an email here; this is
+        // how someone gets linked to an account after the fact. Once they've
+        // actually joined, the email has done its job and editing it does
+        // nothing, so the button isn't offered.
+        if (status !== "joined") {
+          actions.append(el("button", { class: "btn btn-ghost btn-sm", type: "button",
+            onClick: () => promptEmail(m) }, m.invite_email ? "Change email" : "Invite by email"));
+        }
+        actions.append(el("button", { class: "btn btn-ghost btn-sm", type: "button",
+          onClick: async () => {
+            if (!confirm(`Remove ${m.display_name} from ${w.name}? Their past expenses stay, but they won't be in new splits.`)) return;
+            try { await Split.removeMember(m.id); routeTo("walletSettings", w.id); }
+            catch (e) { alert(e.message || "Couldn't remove them."); }
+          } }, "Remove"));
+      }
+
+      rows.append(el("div", { class: "line-item" },
+        memberAvatar(m.display_name),
+        el("span", { class: "li-name" },
+          m.display_name, isMe ? el("span", { class: "tag" }, "you") : null,
+          m.is_owner ? el("span", { class: "tag" }, "owner") : null,
+          el("span", { class: "member-status " + status }, label,
+            m.invite_email && status === "invited" ? " · " + m.invite_email : "")),
+        actions));
+    });
+    shell.append(rows);
+
+    function promptEmail(m) {
+      const v = prompt(`Email to invite ${m.display_name} with:`, m.invite_email || "");
+      if (v === null) return;
+      Split.updateMember(m.id, { invite_email: v })
+        .then(() => routeTo("walletSettings", w.id))
+        .catch((e) => alert(e.message || "Couldn't save that email."));
+    }
+
+    if (isOwner) {
+      const nIn = el("input", { placeholder: "name" });
+      const eIn = el("input", { type: "email", placeholder: "email (optional)" });
+      const addErr = el("div", { class: "error-msg" });
+      const doAdd = async () => {
+        addErr.textContent = "";
+        const name = nIn.value.trim();
+        if (!name) { addErr.textContent = "Enter a name."; return; }
+        try { await Split.addMember(w.id, { name, email: eIn.value.trim() }); routeTo("walletSettings", w.id); }
+        catch (e) { addErr.textContent = e.message || "Couldn't add them."; }
+      };
+      eIn.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
+      shell.append(el("div", { class: "li-inputs", style: "margin-top:10px" }, nIn, eIn,
+        el("button", { class: "btn btn-ghost", type: "button", onClick: doAdd }, "Add")));
+      shell.append(addErr);
+    }
+    app.append(shell);
+
+    // ── Wallet admin ──
+    if (isOwner) {
+      const nameIn = el("input", { value: w.name });
+      const curIn = currencySelect(w.base_currency);
+      const admErr = el("div", { class: "error-msg" });
+      app.append(el("div", { class: "shell fade-up" },
+        el("h3", {}, "Wallet settings"),
+        el("div", { class: "field" }, el("label", {}, "Name"), nameIn),
+        el("div", { class: "field" }, el("label", {}, "Currency"), curIn),
+        el("div", { class: "btn-row" },
+          el("button", { class: "btn", onClick: async () => {
+            admErr.textContent = "";
+            try {
+              await Split.updateWallet(w.id, { name: nameIn.value.trim() || w.name, base_currency: curIn.value });
+              routeTo("walletSettings", w.id);
+            } catch (e) { admErr.textContent = e.message || "Couldn't save."; }
+          } }, "Save"),
+          el("button", { class: "btn btn-ghost", onClick: async () => {
+            try { await Split.archiveWallet(w.id, !w.archived); routeTo("wallets"); }
+            catch (e) { admErr.textContent = e.message || "Couldn't archive."; }
+          } }, w.archived ? "Unarchive" : "Archive")),
+        admErr));
+    }
   });
 
   // ── Nav wiring ────────────────────────────────────────
