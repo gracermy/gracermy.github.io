@@ -346,6 +346,9 @@
       el("p", {}, "Give your money room to bloom. Pick a tracker to get started.")
     ));
 
+    const installCard = installPrompt();
+    if (installCard) app.append(installCard);
+
     const grid = el("div", { class: "tracker-grid fade-up fd2" });
 
     // Asset card: latest net worth, or a prompt if nothing is set up yet.
@@ -414,6 +417,67 @@
   });
 
   function walletCountLabel(n) { return n + (n === 1 ? " wallet" : " wallets"); }
+
+  // ── Install to Home Screen ────────────────────────────
+  // Two very different platforms:
+  //   Android/desktop fire `beforeinstallprompt`, which we capture and replay
+  //   from a button, so install is one tap.
+  //   iOS has no such API — Safari only offers Share -> Add to Home Screen, so
+  //   the best we can do is tell people where it is. That matters more than it
+  //   sounds: on iOS, notifications only work once the app is installed this
+  //   way, so this hint is the gateway to Phase 2.
+  let deferredInstall = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();          // stop Chrome's own mini-infobar
+    deferredInstall = e;
+  });
+
+  function isStandalone() {
+    return window.matchMedia("(display-mode: standalone)").matches
+      || window.navigator.standalone === true;   // iOS
+  }
+  function isIOS() {
+    return /iphone|ipad|ipod/i.test(navigator.userAgent)
+      // iPadOS 13+ reports as a Mac; the touch check separates it from a real one.
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  }
+  const DISMISS_KEY = "bloom_install_dismissed";
+  function installDismissed() {
+    try { return localStorage.getItem(DISMISS_KEY) === "1"; } catch { return false; }
+  }
+
+  function installPrompt() {
+    // Already installed, or they've said no — never nag.
+    if (isStandalone() || installDismissed()) return null;
+    // Nothing useful to say on a desktop browser that can't install.
+    if (!deferredInstall && !isIOS()) return null;
+
+    const dismiss = () => {
+      try { localStorage.setItem(DISMISS_KEY, "1"); } catch {}
+      routeTo("home");
+    };
+
+    const action = deferredInstall
+      ? el("button", { class: "btn btn-sm", onClick: async () => {
+          const evt = deferredInstall;
+          deferredInstall = null;
+          evt.prompt();
+          try { await evt.userChoice; } catch {}
+          routeTo("home");
+        } }, "Install")
+      : null;
+
+    return el("div", { class: "install-card fade-up fd2" },
+      el("span", { class: "install-icon" }, "📲"),
+      el("span", { class: "install-body" },
+        el("span", { class: "install-title" }, "Add Bloom to your home screen"),
+        el("span", { class: "install-text" }, isIOS()
+          ? "Tap the Share button below, then “Add to Home Screen”. Bloom opens full-screen — and it's how notifications will work later."
+          : "Install Bloom for a full-screen app and instant opening.")),
+      el("span", { class: "install-actions" },
+        action,
+        el("button", { class: "btn btn-ghost btn-sm", onClick: dismiss }, "Not now")));
+  }
 
   const TRACKER_ICON = {
     asset: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 3 3 5-6 3 3"/><path d="M3 21h18"/></svg>',

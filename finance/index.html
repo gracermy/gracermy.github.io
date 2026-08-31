@@ -5,6 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bloom · gracermy</title>
 <meta name="robots" content="noindex, nofollow">
+
+<!-- Installable web app (PWA). Adding Bloom to the Home Screen gives it an
+     icon, a full-screen launch, and — on iOS — the ability to receive push
+     notifications, which Apple allows ONLY for home-screen installs. -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#fbeef0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#160d13" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<!-- iOS ignores the manifest's icon and display fields; it needs these. -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Bloom">
+
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Source+Sans+3:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -64,5 +78,17 @@
 <script src="statements.js"></script>
 <script src="split.js"></script>
 <script src="app.js"></script>
+
+<!-- Register the service worker. Wrapped in every guard that matters: it only
+     runs on HTTPS (or localhost), and a failure here must never stop the app
+     from working — a PWA that won't install is a missing convenience, but a
+     crash on load is a broken app. -->
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+</script>
 </body>
 </html>

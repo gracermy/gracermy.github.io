@@ -436,6 +436,22 @@ button.btn-icon:hover { color: var(--neg); background: var(--accent-soft); }
   .tracker-chev { display: none; }
 }
 
+/* ── INSTALL PROMPT (add to home screen) ── */
+.install-card {
+  display: flex; align-items: flex-start; gap: 13px;
+  background: var(--accent-soft); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 15px 17px; margin-top: 18px;
+}
+.install-icon { font-size: 1.3rem; line-height: 1.2; flex: 0 0 auto; }
+.install-body { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.install-title { font-weight: 600; font-size: 0.92rem; }
+.install-text { font-size: 0.82rem; color: var(--text-secondary); }
+.install-actions { display: flex; gap: 7px; flex: 0 0 auto; flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .install-card { flex-wrap: wrap; }
+  .install-actions { width: 100%; justify-content: flex-end; }
+}
+
 /* ── WALLETS ── */
 .wallet-row {
   display: flex; align-items: center; gap: 14px;
