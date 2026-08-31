@@ -21,9 +21,22 @@ This creates `push_subscriptions` (one row per device) plus the functions that
 find who to notify: everyone in a wallet *except* the person who caused the
 change, and the weekly summary data.
 
-## 2. Install the Supabase CLI
+## 2. Get the Supabase CLI
 
-If you already did this for the statement-reading feature, skip ahead.
+If you already linked your project for the statement-reading feature, skip
+ahead to step 3.
+
+**If you have Node installed** (check with `node --version`), you do not need
+to install anything. `npx` fetches the CLI on demand:
+
+```bash
+npx supabase@latest login
+npx supabase@latest link --project-ref YOUR-PROJECT-REF
+```
+
+Use `npx supabase@latest` in place of `supabase` for every command below.
+
+**Otherwise**, install it with Homebrew:
 
 ```bash
 brew install supabase/tap/supabase
