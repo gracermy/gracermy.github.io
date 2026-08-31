@@ -75,3 +75,88 @@ $$;
 -- harvest other people's push endpoints.
 revoke all on function public.wallet_push_targets(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.wallet_push_targets(uuid, uuid) to service_role;
+
+
+-- ─────────────────────────────────────────────────────────────
+-- WEEKLY SUMMARY DATA
+--
+-- For each user with at least one active wallet, returns a compact summary of
+-- the last 7 days: how much was spent across their wallets, their share of it,
+-- and their current net position. The Edge Function turns this into one
+-- notification per person.
+--
+-- Only users who actually have a push subscription are considered, so the
+-- function does no work for people who never turned notifications on.
+-- ─────────────────────────────────────────────────────────────
+create or replace function public.weekly_summaries()
+returns table (
+  user_id        uuid,
+  wallet_count   int,
+  expense_count  int,
+  total_spent    numeric,
+  your_share     numeric,
+  currency       text
+)
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  with my_wallets as (
+    select distinct m.user_id, m.wallet_id, m.id as member_id, w.base_currency
+      from public.wallet_members m
+      join public.wallets w on w.id = m.wallet_id
+     where m.left_at is null
+       and m.user_id is not null
+       and not w.archived
+       and exists (select 1 from public.push_subscriptions p where p.user_id = m.user_id)
+  ),
+  recent as (
+    select mw.user_id,
+           mw.wallet_id,
+           mw.member_id,
+           mw.base_currency,
+           e.id as expense_id,
+           e.amount * coalesce(e.exchange_rate, 1) as spent
+      from my_wallets mw
+      join public.shared_expenses e on e.wallet_id = mw.wallet_id
+     where e.spent_on >= current_date - interval '7 days'
+  )
+  select r.user_id,
+         count(distinct r.wallet_id)::int      as wallet_count,
+         count(distinct r.expense_id)::int     as expense_count,
+         sum(r.spent)                          as total_spent,
+         coalesce(sum(
+           (select s.share_amount * coalesce(e2.exchange_rate, 1)
+              from public.expense_shares s
+              join public.shared_expenses e2 on e2.id = s.expense_id
+             where s.expense_id = r.expense_id
+               and s.member_id = r.member_id)
+         ), 0)                                 as your_share,
+         min(r.base_currency)                  as currency
+    from recent r
+   group by r.user_id
+  having count(distinct r.expense_id) > 0;
+$$;
+
+revoke all on function public.weekly_summaries() from public, anon, authenticated;
+grant execute on function public.weekly_summaries() to service_role;
+
+
+-- ─────────────────────────────────────────────────────────────
+-- PUSH TARGETS FOR ONE USER (used by the weekly summary)
+-- ─────────────────────────────────────────────────────────────
+create or replace function public.user_push_targets(uid uuid)
+returns table (endpoint text, p256dh text, auth text)
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select s.endpoint, s.p256dh, s.auth
+    from public.push_subscriptions s
+   where s.user_id = uid;
+$$;
+
+revoke all on function public.user_push_targets(uuid) from public, anon, authenticated;
+grant execute on function public.user_push_targets(uuid) to service_role;

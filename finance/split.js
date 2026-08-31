@@ -333,7 +333,7 @@ const Split = (() => {
     }
     if (isIOS() && !isStandalone()) {
       return { state: "needs-install",
-        reason: "On iPhone, add Bloom to your Home Screen first — Apple only allows notifications for installed apps." };
+        reason: "On iPhone, add Bloom to your Home Screen first. Apple only allows notifications for installed apps." };
     }
     if (!vapidKey()) {
       return { state: "not-configured", reason: "Notifications aren't set up for this site yet." };

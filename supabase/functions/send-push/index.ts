@@ -94,7 +94,84 @@ async function buildMessage(table: string, row: Record<string, unknown>) {
     };
   }
 
+  if (table === "wallet_members") {
+    return {
+      title: `${wallet.emoji || "👛"} ${wallet.name}`,
+      body: `${row.display_name || "Someone"} joined the wallet`,
+      url: `/finance/#wallet/${walletId}`,
+    };
+  }
+
   return null;
+}
+
+type Target = { endpoint: string; p256dh: string; auth: string };
+
+// Send one message to a set of devices, pruning any the push service reports
+// as gone. Shared by the event notifications and the weekly digest.
+async function pushToTargets(targets: Target[], message: unknown) {
+  if (!targets.length) return { sent: 0, pruned: 0 };
+  const server = await appServer();
+  const body = JSON.stringify(message);
+  let sent = 0;
+  const expired: string[] = [];
+
+  await Promise.all(targets.map(async (t) => {
+    try {
+      const subscriber = server.subscribe({
+        endpoint: t.endpoint,
+        keys: { p256dh: t.p256dh, auth: t.auth },
+      });
+      await subscriber.pushTextMessage(body, {});
+      sent++;
+    } catch (e) {
+      // 404/410 mean the browser threw this subscription away (app deleted,
+      // permission revoked, iOS expiry). Those rows would fail forever.
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      if (status === 404 || status === 410) expired.push(t.endpoint);
+    }
+  }));
+
+  if (expired.length) {
+    await db.from("push_subscriptions").delete().in("endpoint", expired);
+  }
+  return { sent, pruned: expired.length };
+}
+
+// The weekly digest: one notification per person summarising the last 7 days.
+// Sent to everyone who has notifications on and had activity; people with a
+// quiet week get nothing rather than a "you spent nothing" ping.
+async function sendWeeklySummaries() {
+  const { data: rows, error } = await db.rpc("weekly_summaries");
+  if (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500, headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  let people = 0, sent = 0;
+  for (const r of (rows || [])) {
+    const { data: targets } = await db.rpc("user_push_targets", { uid: r.user_id });
+    if (!targets || !targets.length) continue;
+
+    const share = money(Number(r.your_share) || 0, r.currency);
+    const total = money(Number(r.total_spent) || 0, r.currency);
+    const n = Number(r.expense_count) || 0;
+    const wallets = Number(r.wallet_count) || 1;
+    const where = wallets === 1 ? "1 wallet" : `${wallets} wallets`;
+
+    const result = await pushToTargets(targets as Target[], {
+      title: "Your week in Bloom",
+      body: `${n} ${n === 1 ? "expense" : "expenses"} across ${where}. ${total} spent, your share ${share}.`,
+      url: "/finance/#wallets",
+    });
+    people++;
+    sent += result.sent;
+  }
+
+  return new Response(JSON.stringify({ people, sent }), {
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 Deno.serve(async (req) => {
@@ -107,17 +184,50 @@ Deno.serve(async (req) => {
     return new Response("Forbidden", { status: 403 });
   }
 
-  let payload: { type?: string; table?: string; record?: Record<string, unknown> };
+  let payload: {
+    type?: string;
+    table?: string;
+    record?: Record<string, unknown>;
+    old_record?: Record<string, unknown>;
+    job?: string;
+  };
   try {
     payload = await req.json();
   } catch {
     return new Response("Bad JSON", { status: 400 });
   }
 
-  // Only new rows notify. An edit shouldn't ping everyone again — a
-  // notification per typo correction is how people learn to ignore them.
-  if (payload.type !== "INSERT" || !payload.record || !payload.table) {
-    return new Response(JSON.stringify({ skipped: "not an insert" }), {
+  // The weekly digest is triggered by pg_cron rather than a table event.
+  if (payload.job === "weekly-summary") {
+    return await sendWeeklySummaries();
+  }
+
+  if (!payload.record || !payload.table) {
+    return new Response(JSON.stringify({ skipped: "no record" }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // Someone joining is an UPDATE, not an insert: the member row already exists
+  // (added by name or invited by email) and joining fills in its user_id. So
+  // this is the one update worth notifying about, and only on the exact
+  // transition from unlinked to linked.
+  const isJoin = payload.table === "wallet_members"
+    && payload.type === "UPDATE"
+    && !payload.old_record?.user_id
+    && !!payload.record.user_id;
+
+  // Otherwise only new rows notify. Editing an expense shouldn't ping everyone
+  // again: a notification per typo correction is how people learn to ignore them.
+  if (!isJoin && payload.type !== "INSERT") {
+    return new Response(JSON.stringify({ skipped: "not a notifiable change" }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  // A plain insert into wallet_members is someone being ADDED to a wallet, not
+  // joining it. The person doesn't have an account yet, so nobody needs telling.
+  if (!isJoin && payload.table === "wallet_members") {
+    return new Response(JSON.stringify({ skipped: "member added, not joined" }), {
       headers: { "Content-Type": "application/json" },
     });
   }
@@ -129,8 +239,12 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Everyone in the wallet except whoever caused this.
-  const actor = (payload.record.created_by as string) || "00000000-0000-0000-0000-000000000000";
+  // Everyone in the wallet except whoever caused this. For a join, the actor is
+  // the person who just joined (they don't need telling about themselves);
+  // for expenses and settlements it's whoever saved the row.
+  const actor = (isJoin
+    ? (payload.record.user_id as string)
+    : (payload.record.created_by as string)) || "00000000-0000-0000-0000-000000000000";
   const { data: targets, error } = await db.rpc("wallet_push_targets", {
     wid: payload.record.wallet_id as string,
     actor,
@@ -146,33 +260,8 @@ Deno.serve(async (req) => {
     });
   }
 
-  const server = await appServer();
-  const body = JSON.stringify(message);
-  let sent = 0;
-  const expired: string[] = [];
-
-  await Promise.all(targets.map(async (t: { endpoint: string; p256dh: string; auth: string }) => {
-    try {
-      const subscriber = server.subscribe({
-        endpoint: t.endpoint,
-        keys: { p256dh: t.p256dh, auth: t.auth },
-      });
-      await subscriber.pushTextMessage(body, {});
-      sent++;
-    } catch (e) {
-      // 404/410 mean the browser threw this subscription away (app deleted,
-      // permission revoked, iOS expiry). Those rows are dead weight that would
-      // fail forever, so collect them for deletion.
-      const status = (e as { response?: { status?: number } })?.response?.status;
-      if (status === 404 || status === 410) expired.push(t.endpoint);
-    }
-  }));
-
-  if (expired.length) {
-    await db.from("push_subscriptions").delete().in("endpoint", expired);
-  }
-
-  return new Response(JSON.stringify({ sent, pruned: expired.length }), {
+  const result = await pushToTargets(targets as Target[], message);
+  return new Response(JSON.stringify(result), {
     headers: { "Content-Type": "application/json" },
   });
 });

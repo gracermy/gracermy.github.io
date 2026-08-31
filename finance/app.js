@@ -359,7 +359,7 @@
       if (timeline.length) {
         const latest = timeline[timeline.length - 1];
         assetValue = fmt(latest.hasMarket ? latest.marketNetWorth : latest.netWorth, base());
-        assetHint = "net worth · " + periodLabel(latest.snapshot.period_year, latest.snapshot.period_month);
+        assetHint = "net worth, " + periodLabel(latest.snapshot.period_year, latest.snapshot.period_month);
       } else { assetValue = "Get started"; assetHint = "add your first month"; }
     }
     grid.append(trackerCard({
@@ -394,12 +394,12 @@
             if (Math.abs(net) < 0.005) { expValue = "Settled up"; expHint = count; expSign = 0; }
             else {
               expValue = fmt(Math.abs(net), currencies[0]);
-              expHint = (net > 0 ? "you're owed · " : "you owe · ") + count;
+              expHint = (net > 0 ? "you're owed in " : "you owe across ") + count;
               expSign = net > 0 ? 1 : -1;
             }
           } else {
             expValue = owing.length + (owing.length === 1 ? " wallet" : " wallets");
-            expHint = "with a balance · " + count;
+            expHint = "with a balance, of " + count;
             expSign = null;
           }
         }
@@ -472,7 +472,7 @@
       el("span", { class: "install-body" },
         el("span", { class: "install-title" }, "Add Bloom to your home screen"),
         el("span", { class: "install-text" }, isIOS()
-          ? "Tap the Share button below, then “Add to Home Screen”. Bloom opens full-screen — and it's how notifications will work later."
+          ? "Tap the Share button below, then \u201cAdd to Home Screen\u201d. Bloom opens full-screen, and it's how notifications work later."
           : "Install Bloom for a full-screen app and instant opening.")),
       el("span", { class: "install-actions" },
         action,
@@ -606,7 +606,7 @@
   // The "Income − Growth = Spent" line for a month.
   function calcLine(t) {
     const c = base();
-    if (t.expense === null) return el("div", { class: "calc-line muted" }, "First month — no prior month to compare, so no expense yet.");
+    if (t.expense === null) return el("div", { class: "calc-line muted" }, "First month, so there's no prior month to compare against yet.");
     return el("div", { class: "calc-line" },
       el("span", {}, "Income "), el("b", {}, fmt(t.income, c)),
       el("span", { class: "calc-op" }, "−"),
@@ -1136,7 +1136,7 @@
         .forEach((c) => addExpRow({ category: c.category, label: c.category, amount: Math.round(Number(c.amount)) }));
       err.className = "ok-msg";
       const other = Array.isArray(draft._months) && draft._months.some((g) => (g.year !== curY || g.month !== curM) && g.total > 0);
-      err.textContent = "Draft applied." + (other ? " Note: this statement also has spending in another month — open that month to apply its part." : " Review below, then save.");
+      err.textContent = "Draft applied." + (other ? " Note: this statement also has spending in another month. Open that month to apply its part." : " Review below, then save.");
       err.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
@@ -1388,7 +1388,7 @@
     catch {
       app.append(el("div", { class: "shell fade-up fd2" },
         el("div", { class: "empty-state" },
-          el("p", {}, "Couldn't load your wallets. If this is the first run, the split tables may not be set up yet — run setup/split-schema.sql in Supabase."))));
+          el("p", {}, "Couldn't load your wallets. If this is the first run, the split tables may not be set up yet. Run setup/split-schema.sql in Supabase."))));
       return;
     }
 
@@ -1398,7 +1398,7 @@
     if (!active.length && !archived.length) {
       app.append(el("div", { class: "shell fade-up fd2" },
         el("div", { class: "empty-state" },
-          el("p", {}, "No wallets yet. Create one for each group you split with — your flatmate, your friends, a trip."),
+          el("p", {}, "No wallets yet. Create one for each group you split with: your flatmate, your friends, a trip."),
           el("div", { class: "btn-row", style: "justify-content:center;margin-top:14px" },
             el("button", { class: "btn", onClick: () => routeTo("newWallet") }, "New wallet")))));
       return;
@@ -1478,7 +1478,7 @@
 
     shell.append(el("div", { class: "btn-row" }, btn), err);
     shell.append(el("div", { class: "section-hint", style: "margin:12px 0 0;font-size:0.78rem" },
-      "Notifications are per device — turn them on separately on your phone and computer."));
+      "Notifications are per device, so turn them on separately on your phone and computer."));
     return shell;
   }
 
@@ -1664,7 +1664,7 @@
       el("span", { class: "act-main" },
         el("span", { class: "act-desc" }, e.description || e.category),
         el("span", { class: "act-sub" },
-          (payer ? payer.display_name : "?") + " paid · " + shareTxt)),
+          (payer ? payer.display_name : "?") + " paid, " + shareTxt)),
       el("span", { class: "act-amt" },
         fmt(Split.toBase(e.amount, e.exchange_rate), cur),
         el("span", { class: "act-cat" }, e.category)));
@@ -2214,7 +2214,7 @@
     w.activeMembers.forEach((m) => {
       const status = Split.memberStatus(m);
       const isMe = w.myMember && m.id === w.myMember.id;
-      const label = { joined: "joined", invited: "invited — not yet joined", "name-only": "name only" }[status];
+      const label = { joined: "joined", invited: "invited, not yet joined", "name-only": "name only" }[status];
 
       const actions = el("span", { class: "member-actions" });
       if (isOwner && !isMe) {
@@ -2240,7 +2240,7 @@
           m.display_name, isMe ? el("span", { class: "tag" }, "you") : null,
           m.is_owner ? el("span", { class: "tag" }, "owner") : null,
           el("span", { class: "member-status " + status }, label,
-            m.invite_email && status === "invited" ? " · " + m.invite_email : "")),
+            m.invite_email && status === "invited" ? " (" + m.invite_email + ")" : "")),
         actions));
     });
     shell.append(rows);
