@@ -2109,7 +2109,7 @@
           } }, "Remove"));
       }
 
-      rows.append(el("div", { class: "line-item" },
+      rows.append(el("div", { class: "line-item member-item" },
         memberAvatar(m.display_name),
         el("span", { class: "li-name" },
           m.display_name, isMe ? el("span", { class: "tag" }, "you") : null,

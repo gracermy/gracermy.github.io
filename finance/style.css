@@ -148,7 +148,9 @@ nav .container { display: flex; justify-content: space-between; align-items: cen
   border-radius: var(--radius);
   padding: 22px 24px;
   box-shadow: 0 2px 16px var(--glass-shadow);
-  margin-top: 16px;
+  /* Symmetric margins: a top-only margin let a shell sit flush against a
+     following button row or list, which read as stuck together. */
+  margin: 18px 0;
 }
 .shell h2 {
   font-family: 'Instrument Serif', serif;
@@ -234,15 +236,21 @@ button.btn-icon:hover { color: var(--neg); background: var(--accent-soft); }
 .neg { color: var(--neg); }
 
 /* ── LINE ITEMS / TABLES ── */
-.line-list { display: flex; flex-direction: column; gap: 8px; }
+.line-list { display: flex; flex-direction: column; gap: 10px; }
 .line-item {
   display: flex; align-items: center; gap: 10px;
   background: var(--field-bg); border: 1px solid var(--border);
-  border-radius: 9px; padding: 8px 10px;
+  border-radius: 9px; padding: 9px 11px;
 }
-.line-item .li-name { flex: 1; font-size: 0.9rem; }
-.line-item .li-amt { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; }
-.li-inputs { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }
+/* min-width:0 is load-bearing: a flex item defaults to min-width:auto, so a
+   long name or email refuses to shrink and pushes the row past the card edge.
+   Every flexible text column below needs it for the same reason. */
+.line-item .li-name { flex: 1; min-width: 0; font-size: 0.9rem; overflow-wrap: break-word; }
+/* In a member row the NAME stays on one line and truncates; only the email
+   below it is allowed to wrap. Wrapping the name mid-word looked broken. */
+.member-item .li-name > .member-status { margin-top: 2px; }
+.line-item .li-amt { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; flex: 0 0 auto; }
+.li-inputs { display: flex; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
 .li-inputs input, .li-inputs select { width: auto; flex: 1; min-width: 90px; }
 
 .history-item {
@@ -415,30 +423,37 @@ button.btn-icon:hover { color: var(--neg); background: var(--accent-soft); }
 .tracker-icon svg { width: 24px; height: 24px; }
 .tracker-body { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .tracker-title { font-weight: 600; font-size: 1.05rem; }
-.tracker-desc { font-size: 0.82rem; color: var(--text-muted); }
+.tracker-desc { font-size: 0.82rem; color: var(--text-muted); overflow-wrap: anywhere; }
 .tracker-figure { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 .tracker-value { font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 500; }
 .tracker-hint { font-size: 0.76rem; color: var(--text-muted); }
 .tracker-chev { color: var(--text-muted); font-size: 1.3rem; flex: 0 0 auto; }
 @media (max-width: 600px) {
+  .tracker-grid { gap: 12px; }
   .tracker-card { padding: 16px; gap: 13px; }
   .tracker-icon { width: 42px; height: 42px; }
+  /* The chevron costs width the text needs more on a narrow screen. */
+  .tracker-chev { display: none; }
 }
 
 /* ── WALLETS ── */
 .wallet-row {
   display: flex; align-items: center; gap: 14px;
   background: var(--shell); border: 1px solid var(--shell-border);
-  border-radius: var(--radius); padding: 15px 18px; margin-bottom: 10px;
+  border-radius: var(--radius); padding: 15px 18px; margin-bottom: 12px;
   cursor: pointer; transition: all 0.2s;
 }
+.wallet-row:last-child { margin-bottom: 0; }
 .wallet-row:hover { border-color: var(--border-hover); transform: translateY(-2px); }
 .wallet-emoji { font-size: 1.5rem; flex: 0 0 auto; line-height: 1; }
 .wallet-main { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
-.wallet-name { font-weight: 500; font-size: 0.95rem; }
+.wallet-name {
+  font-weight: 500; font-size: 0.95rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .wallet-pos { display: flex; flex-direction: column; align-items: flex-end; flex: 0 0 auto; }
-.wallet-pos b { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; }
-.wallet-pos-lbl { font-size: 0.72rem; color: var(--text-muted); }
+.wallet-pos b { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; white-space: nowrap; }
+.wallet-pos-lbl { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
 
 /* member avatars: colour derived from the name, so it's stable without storing one */
 .member-avs { display: flex; gap: 4px; flex-wrap: wrap; }
@@ -449,8 +464,17 @@ button.btn-icon:hover { color: var(--neg); background: var(--accent-soft); }
 }
 .member-av.more { background: var(--border) !important; color: var(--text-secondary); }
 .member-actions { display: flex; gap: 6px; flex: 0 0 auto; flex-wrap: wrap; }
-.member-status { display: block; font-size: 0.75rem; color: var(--text-muted); font-weight: 400; }
+/* An invited email is long and arbitrary — it must wrap inside the row rather
+   than force the card wider. overflow-wrap:anywhere breaks a bare address,
+   which has no spaces to break at. */
+.member-status {
+  display: block; font-size: 0.75rem; color: var(--text-muted);
+  font-weight: 400; overflow-wrap: anywhere;
+}
 .member-status.invited { color: var(--accent); }
+/* Member rows carry a name, badges, an email and two buttons: let them wrap
+   onto a second line instead of overflowing. */
+.line-item.member-item { flex-wrap: wrap; }
 
 .emoji-picker { display: flex; gap: 6px; flex-wrap: wrap; }
 .emoji-opt {
@@ -479,16 +503,25 @@ button.btn-icon:hover { color: var(--neg); background: var(--accent-soft); }
 
 /* who owes whom, after simplification */
 .debt-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+/* Wraps to a second line when the names are long, so the amount keeps its own
+   space and the text never has to break mid-word to fit beside it. */
 .debt-row {
-  display: flex; align-items: center; gap: 10px; width: 100%;
+  display: flex; align-items: center; gap: 10px; width: 100%; flex-wrap: wrap;
   background: var(--field-bg); border: 1px solid var(--border);
   border-radius: 10px; padding: 10px 13px;
   font-family: inherit; font-size: 0.88rem; color: var(--text); text-align: left;
 }
+.debt-row > .member-av { flex: 0 0 auto; }
 .debt-row.tappable { cursor: pointer; transition: all 0.2s; }
 .debt-row.tappable:hover { border-color: var(--accent); background: var(--accent-soft); }
-.debt-text { flex: 1; }
-.debt-amt { font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+/* break-word, not anywhere: long names wrap between words and only split a
+   single over-long word as a last resort, instead of mid-name every time.
+   The rule must also reach the nested <b> names, which wrap independently. */
+.debt-text, .debt-text b { min-width: 0; overflow-wrap: break-word; }
+/* Basis of 60% lets the row wrap the amount onto its own line once the names
+   need the width, rather than squeezing the text into a narrow column. */
+.debt-text { flex: 1 1 60%; }
+.debt-amt { font-family: 'JetBrains Mono', monospace; font-weight: 500; flex: 0 0 auto; white-space: nowrap; }
 
 /* ── PILL ROWS (category chips, split mode, filters) ── */
 .pill-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -518,10 +551,15 @@ button.btn-icon:hover { color: var(--neg); background: var(--accent-soft); }
   font-size: 0.9rem; font-weight: 500;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.act-sub { font-size: 0.75rem; color: var(--text-muted); }
+/* The sub-line names the payer and your share; long names truncate rather
+   than widen the row. */
+.act-sub {
+  font-size: 0.75rem; color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .act-amt {
   display: flex; flex-direction: column; align-items: flex-end; flex: 0 0 auto;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.9rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; white-space: nowrap;
 }
 .act-cat { font-family: 'Source Sans 3', sans-serif; font-size: 0.7rem; color: var(--text-muted); }
 
@@ -538,7 +576,11 @@ button.btn-icon:hover { color: var(--neg); background: var(--accent-soft); }
   cursor: pointer; transition: opacity 0.2s;
 }
 .split-row.off { opacity: 0.45; }
-.split-amt { font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; flex: 0 0 auto; }
+.split-row .li-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.split-amt {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.88rem;
+  flex: 0 0 auto; white-space: nowrap;
+}
 .split-input { flex: 0 0 auto; width: 110px; }
 .split-input input { width: 100%; }
 
@@ -548,6 +590,19 @@ button.btn-icon:hover { color: var(--neg); background: var(--accent-soft); }
   .wallet-head .btn-ghost { margin-top: 0; margin-bottom: 8px; }
   .act-row { gap: 9px; padding: 10px; }
   .act-date { min-width: 42px; font-size: 0.72rem; }
+  .shell { padding: 18px 16px; margin: 14px 0; }
+  .debt-row { padding: 10px 11px; gap: 8px; }
+  /* Stack the per-person amount box under the name rather than squeezing both. */
+  .split-input { width: 92px; }
+  .field-row { flex-wrap: wrap; }
+  .field-row > * { min-width: 140px; }
+}
+
+/* Nothing in the app should scroll the page sideways — a long name or email
+   wraps or truncates inside its card instead. */
+body { overflow-x: hidden; }
+.shell, .wallet-row, .act-row, .line-item, .debt-row, .split-row, .tracker-card {
+  max-width: 100%;
 }
 
 /* view switching */
