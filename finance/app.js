@@ -1411,6 +1411,10 @@
     app.append(el("div", { class: "btn-row fade-up fd3", style: "margin-top:16px" },
       el("button", { class: "btn", onClick: () => routeTo("newWallet") }, "+ New wallet")));
 
+    // Notifications are a property of THIS DEVICE, not of a wallet, so the
+    // control lives here rather than inside any one wallet's settings.
+    app.append(await notificationCard());
+
     if (archived.length) {
       const arcList = el("div", {});
       for (const w of archived) arcList.append(await walletRow(w));
@@ -1420,6 +1424,63 @@
         arcList));
     }
   });
+
+  // ── Notification settings (per device) ────────────────
+  // Every branch here corresponds to a real state a user can land in. The two
+  // that matter most are iOS-not-installed (a button would silently fail) and
+  // blocked (only the browser's own settings can undo it), because in both
+  // cases there is nothing the app can do and saying so is the whole job.
+  async function notificationCard() {
+    if (!window.Split || !Split.pushSupported()) return el("div", { class: "hidden" });
+
+    const shell = el("div", { class: "shell fade-up", style: "margin-top:22px" });
+    const status = await Split.pushStatus();
+    const err = el("div", { class: "error-msg" });
+
+    shell.append(el("h3", {}, "Notifications"));
+
+    if (status.state === "unsupported" || status.state === "not-configured") {
+      return el("div", { class: "hidden" }); // nothing useful to offer
+    }
+
+    if (status.state === "needs-install") {
+      shell.append(el("div", { class: "section-hint", style: "margin-bottom:0" }, status.reason));
+      return shell;
+    }
+
+    if (status.state === "blocked") {
+      shell.append(el("div", { class: "section-hint", style: "margin-bottom:0" }, status.reason));
+      return shell;
+    }
+
+    const on = status.state === "on";
+    shell.append(el("div", { class: "section-hint" },
+      on ? "This device gets a notification when someone adds an expense or records a payment."
+         : "Get a notification on this device when someone adds an expense or records a payment."));
+
+    const btn = el("button", { class: on ? "btn btn-ghost" : "btn" },
+      on ? "Turn off on this device" : "Turn on notifications");
+
+    btn.addEventListener("click", async () => {
+      err.textContent = "";
+      btn.disabled = true;
+      const prev = btn.textContent;
+      btn.textContent = on ? "Turning off…" : "Turning on…";
+      try {
+        if (on) await Split.disablePush(); else await Split.enablePush();
+        routeTo("wallets");
+      } catch (e) {
+        err.textContent = e.message || "Couldn't change that.";
+        btn.disabled = false;
+        btn.textContent = prev;
+      }
+    });
+
+    shell.append(el("div", { class: "btn-row" }, btn), err);
+    shell.append(el("div", { class: "section-hint", style: "margin:12px 0 0;font-size:0.78rem" },
+      "Notifications are per device — turn them on separately on your phone and computer."));
+    return shell;
+  }
 
   // One row in the wallets list: emoji, name, members, your position.
   async function walletRow(w) {
@@ -2235,6 +2296,19 @@
     }
   });
 
+  // Tapping a push notification focuses an already-open Bloom and asks it to
+  // route to the wallet in question, rather than reloading the whole app.
+  function wirePushNavigation() {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      const msg = event.data;
+      if (!msg || msg.type !== "notification-click") return;
+      const m = /#wallet\/([0-9a-f-]+)/i.exec(msg.url || "");
+      if (m && user) routeTo("wallet", m[1]);
+      else if (user) routeTo("wallets");
+    });
+  }
+
   // ── Nav wiring ────────────────────────────────────────
   function wireNav() {
     $$("[data-route]").forEach((a) => {
@@ -2243,5 +2317,5 @@
     $("#signOutBtn").addEventListener("click", async () => { await sb.auth.signOut(); });
   }
 
-  document.addEventListener("DOMContentLoaded", () => { wireNav(); boot(); });
+  document.addEventListener("DOMContentLoaded", () => { wireNav(); wirePushNavigation(); boot(); });
 })();

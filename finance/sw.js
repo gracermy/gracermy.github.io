@@ -7,10 +7,9 @@
 //   * HTML uses network-first, so a deploy is picked up on the next load;
 //   * bumping CACHE_VERSION wipes every old cache.
 //
-// Phase 2 will add push handlers here. Nothing about caching needs to change
-// for that.
+// Push notification handlers live at the bottom of this file.
 
-const CACHE_VERSION = "bloom-v1";
+const CACHE_VERSION = "bloom-v2";
 
 // The app shell: enough to open Bloom offline and show the UI. Data still
 // needs the network — this is about the app opening instantly, not working
@@ -99,5 +98,53 @@ self.addEventListener("fetch", (event) => {
     }).catch(() => null);
     return cached || (await network) ||
       new Response("", { status: 504 });
+  })());
+});
+
+// ── PUSH NOTIFICATIONS ────────────────────────────────────────
+// The Edge Function sends {title, body, url}. Everything here is defensive:
+// a push that throws in this handler shows the browser's generic "This site
+// has been updated in the background" notification, which looks broken.
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    // Not JSON — fall back to the raw text rather than dropping the message.
+    try { data = { body: event.data.text() }; } catch { data = {}; }
+  }
+
+  const title = data.title || "Bloom";
+  const options = {
+    body: data.body || "New activity in one of your wallets.",
+    icon: "icons/icon-192.png",
+    badge: "icons/icon-192.png",
+    // Collapses repeat notifications from the same wallet into one line rather
+    // than stacking five of them on the lock screen.
+    tag: data.url || "bloom",
+    renotify: true,
+    data: { url: data.url || "/finance/" },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Tapping a notification should land you on the wallet it's about — reusing an
+// open Bloom window if there is one, rather than piling up new tabs.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || "/finance/";
+
+  event.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of all) {
+      if (client.url.includes("/finance/") && "focus" in client) {
+        // Ask the page to route itself; a full navigation would throw away
+        // the app's state and reload everything.
+        client.postMessage({ type: "notification-click", url: target });
+        return client.focus();
+      }
+    }
+    if (self.clients.openWindow) return self.clients.openWindow(target);
   })());
 });

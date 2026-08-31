@@ -18,10 +18,22 @@ function savedConfig() {
 }
 
 // Merged config: localStorage wins over config.js field-by-field.
+//
+// One exception: a key the saved config doesn't define must fall through to
+// config.js rather than being overridden with undefined. The setup screen only
+// ever writes the fields it asks about, so without this an older saved config
+// would blank out anything added later (e.g. VAPID_PUBLIC_KEY) and the feature
+// would silently never appear on that device.
 function config() {
   const file = window.FINANCE_CONFIG || {};
   const ls = savedConfig() || {};
-  return { ...file, ...ls };
+  const merged = { ...file };
+  for (const [k, v] of Object.entries(ls)) {
+    // Only skip keys the saved config genuinely doesn't carry. `false` and ""
+    // are real choices a user made on the setup screen and must still win.
+    if (v !== undefined) merged[k] = v;
+  }
+  return merged;
 }
 
 function isPlaceholder(cfg) {

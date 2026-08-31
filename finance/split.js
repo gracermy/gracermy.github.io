@@ -288,6 +288,121 @@ const Split = (() => {
     if (error) throw error;
   }
 
+  // ── Push notifications ────────────────────────────────
+  // A subscription is one BROWSER on one DEVICE, not a person: the same user on
+  // a phone and a laptop has two, and they expire independently (iOS drops them
+  // after long disuse). So "are notifications on?" is always a question about
+  // this device, and the answer can change without warning.
+
+  // The VAPID public key identifies our server to the push service. It's public
+  // by design — it ships in the browser. The private half lives only in the
+  // Edge Function's secrets.
+  function vapidKey() {
+    const cfg = window.FinanceDB.config();
+    return (cfg.VAPID_PUBLIC_KEY || "").trim();
+  }
+
+  function pushSupported() {
+    return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  }
+
+  // iOS only allows push in an installed (home-screen) app. Detecting this lets
+  // the UI explain that instead of showing a button that silently fails.
+  function isStandalone() {
+    return window.matchMedia("(display-mode: standalone)").matches
+      || window.navigator.standalone === true;
+  }
+  function isIOS() {
+    return /iphone|ipad|ipod/i.test(navigator.userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  }
+
+  // Why this exists: applicationServerKey wants raw bytes, but a VAPID key is
+  // distributed as a base64url string.
+  function urlBase64ToUint8Array(base64) {
+    const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+    const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const raw = atob(b64);
+    return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+  }
+
+  // What the settings toggle needs to know, in one call.
+  async function pushStatus() {
+    if (!pushSupported()) {
+      return { state: "unsupported", reason: "This browser doesn't support notifications." };
+    }
+    if (isIOS() && !isStandalone()) {
+      return { state: "needs-install",
+        reason: "On iPhone, add Bloom to your Home Screen first — Apple only allows notifications for installed apps." };
+    }
+    if (!vapidKey()) {
+      return { state: "not-configured", reason: "Notifications aren't set up for this site yet." };
+    }
+    if (Notification.permission === "denied") {
+      return { state: "blocked",
+        reason: "Notifications are blocked in your browser settings for this site." };
+    }
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      return { state: sub ? "on" : "off" };
+    } catch {
+      return { state: "off" };
+    }
+  }
+
+  // Ask permission and register this device. MUST be called from a click —
+  // browsers reject permission requests that aren't tied to a user gesture.
+  async function enablePush() {
+    if (!pushSupported()) throw new Error("This browser doesn't support notifications.");
+    const key = vapidKey();
+    if (!key) throw new Error("Notifications aren't set up for this site yet.");
+
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      throw new Error(permission === "denied"
+        ? "Notifications are blocked. You can re-enable them in your browser settings."
+        : "Notifications weren't turned on.");
+    }
+
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(key),
+      });
+    }
+
+    const json = sub.toJSON();
+    // Upsert on endpoint: re-subscribing the same browser must update its row,
+    // not create a duplicate that sends a second copy of every notification.
+    const { error } = await sb().from("push_subscriptions").upsert({
+      user_id: (await currentUserId()),
+      endpoint: sub.endpoint,
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth,
+      user_agent: navigator.userAgent.slice(0, 300),
+      last_used_at: new Date().toISOString(),
+    }, { onConflict: "endpoint" });
+    if (error) throw error;
+    return true;
+  }
+
+  // Turn off for THIS device only; other devices keep working.
+  async function disablePush() {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return true;
+    const endpoint = sub.endpoint;
+    try { await sub.unsubscribe(); } catch {}
+    // Delete after unsubscribing: a row left behind would make the Edge
+    // Function send to a dead endpoint forever.
+    const { error } = await sb().from("push_subscriptions").delete().eq("endpoint", endpoint);
+    if (error) throw error;
+    return true;
+  }
+
   // ── Balances ──────────────────────────────────────────
   //   paid    = Σ expenses this member paid for
   //   owed    = Σ their shares across all expenses
@@ -365,6 +480,7 @@ const Split = (() => {
     allocateEqual, allocateShares,
     saveExpense, deleteExpense, loadExpense, categoryTotals,
     saveSettlement, deleteSettlement,
+    pushStatus, enablePush, disablePush, pushSupported,
     computeBalances, simplifyDebts, myPosition,
     toBase,
   };

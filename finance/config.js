@@ -29,4 +29,10 @@ window.FINANCE_CONFIG = {
 
   // Turn on AI statement reading (needs the deployed Edge Function + Claude key).
   AI_STATEMENTS: true,
+
+  // Push notifications: the PUBLIC half of the VAPID key pair. It is meant to
+  // ship in client code — it only identifies our server to the push service.
+  // The private half lives solely in the send-push Edge Function's secrets.
+  // Leave empty to hide the notifications option entirely.
+  VAPID_PUBLIC_KEY: "BAErrFZyvs7I3p5EgFKM6M4W0AI-4fwbVIeaumUNF70LDb3cdxDkmJ8-Z3a2UqicNMXpYBwnkUsqgKZxGLtQNVU",
 };

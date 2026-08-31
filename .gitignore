@@ -22,3 +22,9 @@ scripts/apply-bank-review.js
 scripts/merge-pictures.js
 scripts/kept-pictures.json
 scripts/discarded-pictures.json
+
+# VAPID private key for push notifications. The PUBLIC half is committed in
+# finance/config.js on purpose (it ships to browsers by design); the private
+# half must only ever live as a Supabase secret.
+vapid.json
+finance/vapid.json
