@@ -283,6 +283,24 @@ const Split = (() => {
     if (error) throw error;
   }
 
+  async function updateSettlement(id, fields) {
+    const { error } = await sb().from("settlements").update({
+      from_member_id: fields.from_member_id,
+      to_member_id: fields.to_member_id,
+      amount: Number(fields.amount) || 0,
+      settled_on: fields.settled_on,
+      note: (fields.note || "").trim() || null,
+    }).eq("id", id);
+    if (error) throw error;
+  }
+
+  async function loadSettlement(id) {
+    const { data, error } = await sb()
+      .from("settlements").select("*").eq("id", id).maybeSingle();
+    if (error) return null;
+    return data;
+  }
+
   async function deleteSettlement(id) {
     const { error } = await sb().from("settlements").delete().eq("id", id);
     if (error) throw error;
@@ -479,7 +497,7 @@ const Split = (() => {
     addMember, updateMember, removeMember, memberStatus,
     allocateEqual, allocateShares,
     saveExpense, deleteExpense, loadExpense, categoryTotals,
-    saveSettlement, deleteSettlement,
+    saveSettlement, updateSettlement, loadSettlement, deleteSettlement,
     pushStatus, enablePush, disablePush, pushSupported,
     computeBalances, simplifyDebts, myPosition,
     toBase,

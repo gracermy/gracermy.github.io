@@ -1383,6 +1383,10 @@
       el("p", {}, "Shared wallets for splitting bills. Each one is tracked separately.")
     ));
 
+    // Notifications are a property of THIS DEVICE, not of a wallet, so the
+    // control lives here rather than inside any one wallet's settings.
+    app.append(await notificationCard());
+
     let wallets = [];
     try { wallets = await Split.loadWallets(); }
     catch {
@@ -1404,16 +1408,12 @@
       return;
     }
 
-    const list = el("div", { class: "fade-up fd2" });
+    const list = el("div", { class: "wallet-list fade-up fd2" });
     for (const w of active) list.append(await walletRow(w));
     app.append(list);
 
     app.append(el("div", { class: "btn-row fade-up fd3", style: "margin-top:16px" },
       el("button", { class: "btn", onClick: () => routeTo("newWallet") }, "+ New wallet")));
-
-    // Notifications are a property of THIS DEVICE, not of a wallet, so the
-    // control lives here rather than inside any one wallet's settings.
-    app.append(await notificationCard());
 
     if (archived.length) {
       const arcList = el("div", {});
@@ -1433,53 +1433,42 @@
   async function notificationCard() {
     if (!window.Split || !Split.pushSupported()) return el("div", { class: "hidden" });
 
-    const shell = el("div", { class: "shell fade-up", style: "margin-top:22px" });
     const status = await Split.pushStatus();
-    const err = el("div", { class: "error-msg" });
-
-    shell.append(el("h3", {}, "Notifications"));
-
     if (status.state === "unsupported" || status.state === "not-configured") {
-      return el("div", { class: "hidden" }); // nothing useful to offer
+      return el("div", { class: "hidden" });
     }
 
-    if (status.state === "needs-install") {
-      shell.append(el("div", { class: "section-hint", style: "margin-bottom:0" }, status.reason));
-      return shell;
-    }
+    const row = el("div", { class: "notif-bar fade-up" });
+    const label = el("span", { class: "notif-label" }, "Notifications");
 
-    if (status.state === "blocked") {
-      shell.append(el("div", { class: "section-hint", style: "margin-bottom:0" }, status.reason));
-      return shell;
+    // States the app cannot act on: say so in a few words rather than offering
+    // a switch that would silently do nothing.
+    if (status.state === "needs-install" || status.state === "blocked") {
+      row.append(label, el("span", { class: "notif-note" },
+        status.state === "blocked" ? "Blocked in browser settings" : "Add to Home Screen first"));
+      return row;
     }
 
     const on = status.state === "on";
-    shell.append(el("div", { class: "section-hint" },
-      on ? "This device gets a notification when someone adds an expense or records a payment."
-         : "Get a notification on this device when someone adds an expense or records a payment."));
+    const sw = el("button", {
+      class: "switch" + (on ? " on" : ""), type: "button",
+      role: "switch", "aria-checked": on ? "true" : "false",
+      "aria-label": on ? "Turn notifications off" : "Turn notifications on",
+    }, el("span", { class: "switch-knob" }));
 
-    const btn = el("button", { class: on ? "btn btn-ghost" : "btn" },
-      on ? "Turn off on this device" : "Turn on notifications");
-
-    btn.addEventListener("click", async () => {
-      err.textContent = "";
-      btn.disabled = true;
-      const prev = btn.textContent;
-      btn.textContent = on ? "Turning off…" : "Turning on…";
+    sw.addEventListener("click", async () => {
+      sw.disabled = true;
       try {
         if (on) await Split.disablePush(); else await Split.enablePush();
         routeTo("wallets");
       } catch (e) {
-        err.textContent = e.message || "Couldn't change that.";
-        btn.disabled = false;
-        btn.textContent = prev;
+        sw.disabled = false;
+        row.append(el("span", { class: "notif-note neg" }, e.message || "Couldn't change that."));
       }
     });
 
-    shell.append(el("div", { class: "btn-row" }, btn), err);
-    shell.append(el("div", { class: "section-hint", style: "margin:12px 0 0;font-size:0.78rem" },
-      "Notifications are per device, so turn them on separately on your phone and computer."));
-    return shell;
+    row.append(label, sw);
+    return row;
   }
 
   // One row in the wallets list: emoji, name, members, your position.
@@ -1516,11 +1505,13 @@
 
     app.append(backBar("Wallets", "wallets"));
     app.append(el("div", { class: "wallet-head fade-up fd1" },
-      el("div", { class: "page-header-shell", style: "margin-top:0;flex:1" },
+      el("div", { class: "page-header-shell", style: "margin-top:0;flex:1;min-width:0" },
         el("h1", {}, (w.emoji || "👛") + " " + w.name),
         el("p", {}, w.activeMembers.map((m) => m.display_name).join(", "))),
-      el("button", { class: "btn btn-ghost btn-sm", type: "button",
-        onClick: () => routeTo("walletSettings", w.id) }, "Settings")));
+      el("button", { class: "icon-btn", type: "button", title: "Wallet settings",
+        "aria-label": "Wallet settings",
+        onClick: () => routeTo("walletSettings", w.id),
+        html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>' })));
 
     const { expenses, shares, settlements, balances } = await loadWalletLedger(w);
 
@@ -1567,20 +1558,25 @@
     }
 
     // ── Spending by category ──
-    // "Your share" by default: what this month actually cost YOU, which is the
-    // number people care about. Toggle to see the whole group's spend.
+    // Defaults to "Your share" (what this actually cost YOU) when we can work
+    // out which member you are; otherwise the whole wallet, which is always
+    // computable. Falling back matters: if your share came out empty we'd
+    // otherwise render an empty chart and look broken.
     if (window.Charts) {
-      let mineOnly = true;
+      const myShareItems = w.myMember
+        ? Split.categoryTotals(expenses, shares, w.myMember.id) : [];
+      const allItems = Split.categoryTotals(expenses, shares, null);
+      const canShowMine = myShareItems.length > 0;
+
+      let mineOnly = canShowMine;
       const chartBox = el("div", {});
       const toggle = el("div", { class: "pill-row" });
-      const mineBtn = el("button", { class: "pill active", type: "button" }, "Your share");
-      const allBtn = el("button", { class: "pill", type: "button" }, "Whole wallet");
+      const mineBtn = el("button", { class: "pill" + (mineOnly ? " active" : ""), type: "button" }, "Your share");
+      const allBtn = el("button", { class: "pill" + (mineOnly ? "" : " active"), type: "button" }, "Whole wallet");
 
       const drawPie = () => {
         chartBox.innerHTML = "";
-        const items = Split.categoryTotals(expenses, shares,
-          mineOnly && w.myMember ? w.myMember.id : null);
-        chartBox.append(Charts.spendingPie(items, cur));
+        chartBox.append(Charts.spendingPie(mineOnly ? myShareItems : allItems, cur));
       };
       mineBtn.addEventListener("click", () => {
         mineOnly = true; mineBtn.classList.add("active"); allBtn.classList.remove("active"); drawPie();
@@ -1588,12 +1584,13 @@
       allBtn.addEventListener("click", () => {
         mineOnly = false; allBtn.classList.add("active"); mineBtn.classList.remove("active"); drawPie();
       });
-      if (w.myMember) toggle.append(mineBtn, allBtn);
+      // Only offer the toggle when both views have something to show.
+      if (canShowMine && allItems.length) toggle.append(mineBtn, allBtn);
       drawPie();
 
       app.append(el("div", { class: "shell fade-up fd3" },
         el("h3", {}, "Where it went"),
-        w.myMember ? toggle : null,
+        toggle.childNodes.length ? toggle : null,
         chartBox));
     }
 
@@ -1641,7 +1638,8 @@
     if (item.kind === "settlement") {
       const s = item.row;
       const from = m[s.from_member_id], to = m[s.to_member_id];
-      return el("div", { class: "act-row settlement", onClick: () => routeTo("settle", w.id) },
+      return el("div", { class: "act-row settlement",
+        onClick: () => routeTo("payment", { walletId: w.id, settlementId: s.id }) },
         el("span", { class: "act-date" }, fmtDay(s.settled_on)),
         el("span", { class: "act-main" },
           el("span", { class: "act-desc" },
@@ -2062,6 +2060,85 @@
     try { localStorage.setItem("bloom_lastcat_" + walletId, cat); } catch {}
   }
 
+  // ── EDIT A PAYMENT ────────────────────────────────────
+  // Tapping a recorded payment opens it here. Editing or deleting recalculates
+  // balances automatically, since they are always derived from the rows rather
+  // than stored.
+  route("payment", async (app, arg) => {
+    const walletId = arg && arg.walletId;
+    const settlementId = arg && arg.settlementId;
+    const w = await Split.loadWallet(walletId);
+    if (!w) { routeTo("wallets"); return; }
+    const s = await Split.loadSettlement(settlementId);
+    if (!s) { routeTo("wallet", w.id); return; }
+    const cur = w.base_currency;
+    const membs = w.activeMembers;
+
+    app.append(backBar(w.name, "wallet", w.id));
+    app.append(el("div", { class: "page-header-shell fade-up fd1" },
+      el("h1", {}, "Edit payment"),
+      el("p", {}, "Change or remove this reimbursement.")));
+
+    const fromSel = el("select", {});
+    const toSel = el("select", {});
+    // A member who has since left still needs to render, or their payment
+    // could not be edited at all.
+    const forSelect = w.members.filter((m) => !m.left_at
+      || m.id === s.from_member_id || m.id === s.to_member_id);
+    forSelect.forEach((m) => {
+      fromSel.append(el("option", { value: m.id, ...(m.id === s.from_member_id ? { selected: "" } : {}) }, m.display_name));
+      toSel.append(el("option", { value: m.id, ...(m.id === s.to_member_id ? { selected: "" } : {}) }, m.display_name));
+    });
+
+    const amountIn = el("input", { type: "number", step: "0.01", inputmode: "decimal", value: s.amount });
+    const dateIn = el("input", { type: "date", value: s.settled_on });
+    const noteIn = el("input", { placeholder: "note (optional)", value: s.note || "" });
+    const err = el("div", { class: "error-msg" });
+
+    const saveBtn = el("button", { class: "btn" }, "Save changes");
+    saveBtn.addEventListener("click", async () => {
+      err.textContent = "";
+      const amount = Number(amountIn.value);
+      if (!isFinite(amount) || amount <= 0) { err.textContent = "Enter an amount greater than zero."; return; }
+      if (fromSel.value === toSel.value) { err.textContent = "Pick two different people."; return; }
+      saveBtn.disabled = true;
+      try {
+        await Split.updateSettlement(s.id, {
+          from_member_id: fromSel.value,
+          to_member_id: toSel.value,
+          amount,
+          settled_on: dateIn.value,
+          note: noteIn.value,
+        });
+        routeTo("wallet", w.id);
+      } catch (e) {
+        err.textContent = e.message || "Couldn't save that payment.";
+        saveBtn.disabled = false;
+      }
+    });
+
+    const delBtn = el("button", { class: "btn btn-ghost", style: "margin-left:auto" }, "Delete");
+    delBtn.addEventListener("click", async () => {
+      if (!confirm("Delete this payment? Balances will be recalculated.")) return;
+      delBtn.disabled = true;
+      try { await Split.deleteSettlement(s.id); routeTo("wallet", w.id); }
+      catch (e) { err.textContent = e.message || "Couldn't delete it."; delBtn.disabled = false; }
+    });
+
+    app.append(el("div", { class: "shell fade-up fd2" },
+      el("div", { class: "field-row" },
+        el("div", { class: "field" }, el("label", {}, "From"), fromSel),
+        el("div", { class: "field" }, el("label", {}, "To"), toSel)),
+      el("div", { class: "field-row" },
+        el("div", { class: "field" }, el("label", {}, "Amount (" + cur + ")"), amountIn),
+        el("div", { class: "field" }, el("label", {}, "Date"), dateIn)),
+      el("div", { class: "field" }, el("label", {}, "Note"), noteIn),
+      el("div", { class: "btn-row", style: "margin-top:14px" }, saveBtn,
+        el("button", { class: "btn btn-ghost", onClick: () => routeTo("wallet", w.id) }, "Cancel"),
+        delBtn),
+      err));
+  });
+
   // ── SETTLE UP ─────────────────────────────────────────
   // Pre-filled from the simplified debts: pick a suggested payment, confirm the
   // amount (editable for a partial payment), save. Nothing is deleted — a
@@ -2163,18 +2240,16 @@
       const rows = el("div", { class: "line-list" });
       [...settlements].sort((a, b) => (a.settled_on < b.settled_on ? 1 : -1)).forEach((s) => {
         const from = byId[s.from_member_id], to = byId[s.to_member_id];
-        rows.append(el("div", { class: "line-item" },
+        // Tapping opens the same editor as the wallet's activity feed, so a
+        // payment behaves the same way wherever you find it.
+        rows.append(el("div", { class: "line-item tappable",
+          onClick: () => routeTo("payment", { walletId: w.id, settlementId: s.id }) },
           el("span", { class: "act-date" }, fmtDay(s.settled_on)),
           el("span", { class: "li-name" },
-            (from ? from.display_name : "?") + " → " + (to ? to.display_name : "?"),
+            (from ? from.display_name : "?") + " to " + (to ? to.display_name : "?"),
             s.note ? el("span", { class: "member-status" }, s.note) : null),
           el("span", { class: "li-amt" }, fmt(Split.toBase(s.amount, s.exchange_rate), cur)),
-          el("button", { class: "btn-icon", type: "button", title: "Delete",
-            onClick: async () => {
-              if (!confirm("Delete this payment? Balances will be recalculated.")) return;
-              try { await Split.deleteSettlement(s.id); routeTo("settle", w.id); }
-              catch (e) { alert(e.message || "Couldn't delete it."); }
-            } }, "×")));
+          el("span", { class: "muted" }, "›")));
       });
       app.append(el("div", { class: "shell fade-up fd3" },
         el("h3", {}, "Past payments"), rows));
