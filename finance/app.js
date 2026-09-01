@@ -1588,8 +1588,8 @@
       if (canShowMine && allItems.length) toggle.append(mineBtn, allBtn);
       drawPie();
 
+      // No <h3> here: spendingPie renders its own "Where it went" heading.
       app.append(el("div", { class: "shell fade-up fd3" },
-        el("h3", {}, "Where it went"),
         toggle.childNodes.length ? toggle : null,
         chartBox));
     }

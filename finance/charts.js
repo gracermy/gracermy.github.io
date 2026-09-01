@@ -232,24 +232,36 @@ const Charts = (() => {
     const box = el("div", { class: "pie-wrap" });
     const R = 80, r = 48, cx = 90, cy = 90; // donut
     const s = svg("svg", { viewBox: "0 0 180 180", class: "pie-svg", role: "img", "aria-label": "Spending by category" });
-    let a0 = -Math.PI / 2; // start at top
-    data.forEach((d, i) => {
-      const frac = d.amount / total;
-      const a1 = a0 + frac * Math.PI * 2;
-      const color = PIE_COLORS[i % PIE_COLORS.length];
-      // donut segment path
-      const big = (a1 - a0) > Math.PI ? 1 : 0;
-      const x0 = cx + R * Math.cos(a0), y0 = cy + R * Math.sin(a0);
-      const x1 = cx + R * Math.cos(a1), y1 = cy + R * Math.sin(a1);
-      const xi1 = cx + r * Math.cos(a1), yi1 = cy + r * Math.sin(a1);
-      const xi0 = cx + r * Math.cos(a0), yi0 = cy + r * Math.sin(a0);
-      const path = svg("path", {
-        d: `M ${x0} ${y0} A ${R} ${R} 0 ${big} 1 ${x1} ${y1} L ${xi1} ${yi1} A ${r} ${r} 0 ${big} 0 ${xi0} ${yi0} Z`,
-        fill: color, stroke: "var(--chart-surface)", "stroke-width": 1.5,
+    // A single category fills the whole circle. An arc whose start and end
+    // points are identical is a no-op in SVG and draws NOTHING, so a one-slice
+    // donut would silently vanish. Draw it as two concentric circles with an
+    // even-odd fill rule instead.
+    if (data.length === 1) {
+      s.appendChild(svg("path", {
+        d: `M ${cx} ${cy - R} A ${R} ${R} 0 1 1 ${cx} ${cy + R} A ${R} ${R} 0 1 1 ${cx} ${cy - R} Z`
+         + ` M ${cx} ${cy - r} A ${r} ${r} 0 1 0 ${cx} ${cy + r} A ${r} ${r} 0 1 0 ${cx} ${cy - r} Z`,
+        fill: PIE_COLORS[0], "fill-rule": "evenodd",
+      }));
+    } else {
+      let a0 = -Math.PI / 2; // start at top
+      data.forEach((d, i) => {
+        const frac = d.amount / total;
+        const a1 = a0 + frac * Math.PI * 2;
+        const color = PIE_COLORS[i % PIE_COLORS.length];
+        // donut segment path
+        const big = (a1 - a0) > Math.PI ? 1 : 0;
+        const x0 = cx + R * Math.cos(a0), y0 = cy + R * Math.sin(a0);
+        const x1 = cx + R * Math.cos(a1), y1 = cy + R * Math.sin(a1);
+        const xi1 = cx + r * Math.cos(a1), yi1 = cy + r * Math.sin(a1);
+        const xi0 = cx + r * Math.cos(a0), yi0 = cy + r * Math.sin(a0);
+        const path = svg("path", {
+          d: `M ${x0} ${y0} A ${R} ${R} 0 ${big} 1 ${x1} ${y1} L ${xi1} ${yi1} A ${r} ${r} 0 ${big} 0 ${xi0} ${yi0} Z`,
+          fill: color, stroke: "var(--chart-surface)", "stroke-width": 1.5,
+        });
+        s.appendChild(path);
+        a0 = a1;
       });
-      s.appendChild(path);
-      a0 = a1;
-    });
+    }
     // center total
     const t1 = svg("text", { x: cx, y: cy - 2, "text-anchor": "middle", class: "pie-center-val" }); t1.textContent = compact(total); s.appendChild(t1);
     const t2 = svg("text", { x: cx, y: cy + 14, "text-anchor": "middle", class: "pie-center-lbl" }); t2.textContent = "spent"; s.appendChild(t2);

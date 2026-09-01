@@ -544,19 +544,22 @@ button.btn-icon:hover { color: var(--neg); background: var(--accent-soft); }
 }
 
 /* ── WALLET HOME ── */
-/* The settings icon sits beside the wallet title. align-items:center keeps it
-   optically level with the heading instead of needing a magic top margin. */
-.wallet-head { display: flex; align-items: center; gap: 14px; }
+/* The settings button sits beside the wallet title card. align-items:stretch
+   makes it match that card's height exactly, so the pair reads as one balanced
+   row rather than a big card with a small button floating next to it. */
+.wallet-head { display: flex; align-items: stretch; gap: 14px; }
 .wallet-head .page-header-shell { margin-top: 0; }
 
 .icon-btn {
-  width: 40px; height: 40px; flex: 0 0 auto; border-radius: 11px;
+  width: 64px; flex: 0 0 auto; border-radius: 20px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--accent-soft); color: var(--accent);
-  border: 1px solid var(--border); cursor: pointer; transition: all 0.2s;
+  background: var(--shell); color: var(--accent);
+  border: 1px solid var(--shell-border);
+  box-shadow: 0 4px 32px var(--glass-shadow);
+  cursor: pointer; transition: all 0.2s;
 }
 .icon-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
-.icon-btn svg { width: 19px; height: 19px; display: block; }
+.icon-btn svg { width: 22px; height: 22px; display: block; }
 
 .balance-head { text-align: center; padding: 6px 0 4px; }
 .balance-lbl { font-size: 0.85rem; color: var(--text-muted); }
