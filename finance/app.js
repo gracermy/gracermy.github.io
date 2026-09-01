@@ -1724,21 +1724,10 @@
       el("h1", {}, "New wallet"),
       el("p", {}, "A shared book for one group of people.")));
 
-    const EMOJIS = ["👛", "🏠", "🎉", "❤️", "✈️", "🍜", "🚗", "🐱", "🎓", "☕"];
-    let emoji = "👛";
     const nameIn = el("input", { placeholder: "Flatmate, Friends, Japan trip…" });
     const myNameIn = el("input", { placeholder: "your name in this wallet", value: defaultMyName() });
     const curIn = currencySelect(base());
-
-    const picker = el("div", { class: "emoji-picker" });
-    EMOJIS.forEach((e) => {
-      const b = el("button", { class: "emoji-opt" + (e === emoji ? " active" : ""), type: "button" }, e);
-      b.addEventListener("click", () => {
-        emoji = e;
-        [...picker.children].forEach((c) => c.classList.toggle("active", c === b));
-      });
-      picker.append(b);
-    });
+    const picker = emojiPicker("👛");
 
     // People added before the wallet exists; written once it's created.
     const people = [];
@@ -1777,7 +1766,7 @@
       saveBtn.disabled = true;
       try {
         const wallet = await Split.createWallet({
-          name, emoji, baseCurrency: curIn.value, myName: myNameIn.value.trim() || "Me",
+          name, emoji: picker.value, baseCurrency: curIn.value, myName: myNameIn.value.trim() || "Me",
         });
         for (const p of people) await Split.addMember(wallet.id, p);
         routeTo("wallet", wallet.id);
@@ -1804,6 +1793,27 @@
         el("button", { class: "btn btn-ghost", onClick: () => routeTo("wallets") }, "Cancel")),
       err));
   });
+
+  // Emoji picker for a wallet's icon. Shared by the new-wallet form and wallet
+  // settings so both offer the same set. Read the choice with `picker.value`.
+  const WALLET_EMOJIS = ["👛", "🏠", "🎉", "❤️", "✈️", "🍜", "🚗", "🐱", "🎓", "☕"];
+  function emojiPicker(selected) {
+    const picker = el("div", { class: "emoji-picker" });
+    // A wallet created before an emoji was in the list must still show its own
+    // icon as the selected one, rather than silently offering to change it.
+    const list = WALLET_EMOJIS.includes(selected)
+      ? WALLET_EMOJIS : [selected, ...WALLET_EMOJIS];
+    picker.value = selected;
+    list.forEach((e) => {
+      const b = el("button", { class: "emoji-opt" + (e === selected ? " active" : ""), type: "button" }, e);
+      b.addEventListener("click", () => {
+        picker.value = e;
+        [...picker.children].forEach((c) => c.classList.toggle("active", c === b));
+      });
+      picker.append(b);
+    });
+    return picker;
+  }
 
   // A sensible default for "your name in this wallet": the part of your email
   // before the @, capitalised.
@@ -2349,17 +2359,23 @@
     // ── Wallet admin ──
     if (isOwner) {
       const nameIn = el("input", { value: w.name });
+      const iconIn = emojiPicker(w.emoji || "👛");
       const curIn = currencySelect(w.base_currency);
       const admErr = el("div", { class: "error-msg" });
       app.append(el("div", { class: "shell fade-up" },
         el("h3", {}, "Wallet settings"),
         el("div", { class: "field" }, el("label", {}, "Name"), nameIn),
+        el("div", { class: "field" }, el("label", {}, "Icon"), iconIn),
         el("div", { class: "field" }, el("label", {}, "Currency"), curIn),
         el("div", { class: "btn-row" },
           el("button", { class: "btn", onClick: async () => {
             admErr.textContent = "";
             try {
-              await Split.updateWallet(w.id, { name: nameIn.value.trim() || w.name, base_currency: curIn.value });
+              await Split.updateWallet(w.id, {
+                name: nameIn.value.trim() || w.name,
+                emoji: iconIn.value,
+                base_currency: curIn.value,
+              });
               routeTo("walletSettings", w.id);
             } catch (e) { admErr.textContent = e.message || "Couldn't save."; }
           } }, "Save"),
