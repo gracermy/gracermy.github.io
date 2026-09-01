@@ -1510,7 +1510,7 @@
         el("p", {}, w.activeMembers.map((m) => m.display_name).join(", "))),
       el("button", { class: "icon-btn", type: "button", title: "Wallet settings",
         "aria-label": "Wallet settings",
-        onClick: () => routeTo("walletSettings", w.id),
+        onClick: () => openWalletSettings(w),
         html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>' })));
 
     const { expenses, shares, settlements, balances } = await loadWalletLedger(w);
@@ -1793,6 +1793,143 @@
         el("button", { class: "btn btn-ghost", onClick: () => routeTo("wallets") }, "Cancel")),
       err));
   });
+
+  // Quick wallet edits in a modal: name, icon, currency, archive. The people
+  // list stays a full page, since it is a list with per-row actions and its own
+  // confirm dialogs, which would nest badly inside a modal.
+  function openWalletSettings(w) {
+    const isOwner = !!(w.myMember && w.myMember.is_owner);
+
+    if (!isOwner) {
+      // Non-owners can't change anything here, so send them straight to the
+      // page, which shows the roster read-only.
+      routeTo("walletSettings", w.id);
+      return;
+    }
+
+    const nameIn = el("input", { value: w.name });
+    const iconIn = emojiPicker(w.emoji || "👛");
+    const curIn = currencySelect(w.base_currency);
+    const err = el("div", { class: "error-msg" });
+
+    const body = el("div", {},
+      el("div", { class: "field" }, el("label", {}, "Name"), nameIn),
+      el("div", { class: "field" }, el("label", {}, "Icon"), iconIn),
+      el("div", { class: "field" }, el("label", {}, "Currency"), curIn),
+      el("hr", { class: "divider" }),
+      el("button", { class: "modal-link", type: "button",
+        onClick: () => { modal.close(); routeTo("walletSettings", w.id); } },
+        el("span", {}, "People"),
+        el("span", { class: "muted" },
+          w.activeMembers.length + (w.activeMembers.length === 1 ? " person" : " people") + " ›")),
+      err);
+
+    const saveBtn = el("button", { class: "btn" }, "Save");
+    saveBtn.addEventListener("click", async () => {
+      err.textContent = "";
+      saveBtn.disabled = true;
+      try {
+        await Split.updateWallet(w.id, {
+          name: nameIn.value.trim() || w.name,
+          emoji: iconIn.value,
+          base_currency: curIn.value,
+        });
+        modal.close();
+        routeTo("wallet", w.id);
+      } catch (e) {
+        err.textContent = e.message || "Couldn't save.";
+        saveBtn.disabled = false;
+      }
+    });
+
+    const archiveBtn = el("button", { class: "btn btn-ghost" }, w.archived ? "Unarchive" : "Archive");
+    archiveBtn.addEventListener("click", async () => {
+      try {
+        await Split.archiveWallet(w.id, !w.archived);
+        modal.close();
+        routeTo("wallets");
+      } catch (e) { err.textContent = e.message || "Couldn't archive."; }
+    });
+
+    const modal = openModal({
+      title: "Wallet settings",
+      body,
+      footer: el("div", { class: "btn-row", style: "margin:0" }, saveBtn, archiveBtn),
+    });
+  }
+
+  // ── Modal ─────────────────────────────────────────────
+  // Bloom's first non-route UI, so it has to cover what a route gave for free:
+  // Escape and backdrop to dismiss, focus moved in and restored on close, the
+  // page behind locked from scrolling, and Android's back button closing the
+  // modal instead of leaving the wallet.
+  function openModal({ title, body, footer }) {
+    const previouslyFocused = document.activeElement;
+    const scrollY = window.scrollY;
+
+    const panel = el("div", { class: "modal-panel", role: "dialog",
+      "aria-modal": "true", "aria-label": title });
+    const backdrop = el("div", { class: "modal-backdrop" }, panel);
+
+    let closed = false;
+    function close() {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("popstate", onPop);
+      document.body.classList.remove("modal-open");
+      document.body.style.top = "";
+      window.scrollTo(0, scrollY);
+      backdrop.remove();
+      if (previouslyFocused && previouslyFocused.focus) previouslyFocused.focus();
+      // Drop the history entry we pushed, unless the back button is what
+      // closed us (then it's already gone).
+      if (history.state && history.state.__modal) history.back();
+    }
+
+    function onKey(e) {
+      if (e.key === "Escape") { e.preventDefault(); close(); return; }
+      if (e.key !== "Tab") return;
+      // Focus trap: keep Tab inside the panel.
+      const items = panel.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (!items.length) return;
+      const first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    function onPop() { closed = true; close(); }
+
+    backdrop.addEventListener("click", (e) => { if (e.target === backdrop) close(); });
+    document.addEventListener("keydown", onKey, true);
+    // A pushed state means Android's back gesture dismisses the modal rather
+    // than navigating away from the wallet.
+    history.pushState({ __modal: true }, "");
+    window.addEventListener("popstate", onPop);
+
+    panel.append(
+      el("div", { class: "modal-head" },
+        el("h3", {}, title),
+        el("button", { class: "modal-x", type: "button", "aria-label": "Close",
+          onClick: close }, "✕")),
+      el("div", { class: "modal-body" }, body),
+      footer ? el("div", { class: "modal-foot" }, footer) : null);
+
+    // Lock the page behind without it jumping to the top.
+    document.body.style.top = `-${scrollY}px`;
+    document.body.classList.add("modal-open");
+    document.body.appendChild(backdrop);
+
+    // Focus the first real field, not the close button. querySelector returns
+    // DOM order, and the ✕ sits in the header, so searching the body first is
+    // what puts the cursor where someone actually wants to type.
+    const bodyEl = panel.querySelector(".modal-body");
+    const focusable = (bodyEl && bodyEl.querySelector("input, select, textarea"))
+      || panel.querySelector("button");
+    if (focusable) focusable.focus();
+
+    return { close, panel };
+  }
 
   // Emoji picker for a wallet's icon. Shared by the new-wallet form and wallet
   // settings so both offer the same set. Read the choice with `picker.value`.
@@ -2274,7 +2411,7 @@
 
     app.append(backBar(w.name, "wallet", w.id));
     app.append(el("div", { class: "page-header-shell fade-up fd1" },
-      el("h1", {}, "Settings"),
+      el("h1", {}, "People"),
       el("p", {}, w.archived ? "Archived wallet." : (w.emoji || "👛") + " " + w.name)));
 
     const { balances } = await loadWalletLedger(w);
@@ -2356,34 +2493,13 @@
     }
     app.append(shell);
 
-    // ── Wallet admin ──
+    // Name, icon, currency and archive now live in the settings modal on the
+    // wallet screen; this page is the people roster.
     if (isOwner) {
-      const nameIn = el("input", { value: w.name });
-      const iconIn = emojiPicker(w.emoji || "👛");
-      const curIn = currencySelect(w.base_currency);
-      const admErr = el("div", { class: "error-msg" });
-      app.append(el("div", { class: "shell fade-up" },
-        el("h3", {}, "Wallet settings"),
-        el("div", { class: "field" }, el("label", {}, "Name"), nameIn),
-        el("div", { class: "field" }, el("label", {}, "Icon"), iconIn),
-        el("div", { class: "field" }, el("label", {}, "Currency"), curIn),
-        el("div", { class: "btn-row" },
-          el("button", { class: "btn", onClick: async () => {
-            admErr.textContent = "";
-            try {
-              await Split.updateWallet(w.id, {
-                name: nameIn.value.trim() || w.name,
-                emoji: iconIn.value,
-                base_currency: curIn.value,
-              });
-              routeTo("walletSettings", w.id);
-            } catch (e) { admErr.textContent = e.message || "Couldn't save."; }
-          } }, "Save"),
-          el("button", { class: "btn btn-ghost", onClick: async () => {
-            try { await Split.archiveWallet(w.id, !w.archived); routeTo("wallets"); }
-            catch (e) { admErr.textContent = e.message || "Couldn't archive."; }
-          } }, w.archived ? "Unarchive" : "Archive")),
-        admErr));
+      app.append(el("div", { class: "btn-row fade-up", style: "margin-top:16px" },
+        el("button", { class: "btn btn-ghost", type: "button",
+          onClick: () => { routeTo("wallet", w.id); setTimeout(() => openWalletSettings(w), 0); } },
+          "Wallet settings")));
     }
   });
 
