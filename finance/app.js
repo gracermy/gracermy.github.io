@@ -1794,9 +1794,93 @@
       err));
   });
 
-  // Quick wallet edits in a modal: name, icon, currency, archive. The people
-  // list stays a full page, since it is a list with per-row actions and its own
-  // confirm dialogs, which would nest badly inside a modal.
+  // The people roster, stacked on top of the settings modal. Changes re-render
+  // the list in place rather than navigating, so you stay where you were.
+  function openPeopleModal(w, onClosed) {
+    const isOwner = !!(w.myMember && w.myMember.is_owner);
+    const body = el("div", {});
+    const err = el("div", { class: "error-msg" });
+    let modal;
+
+    // Reload the wallet and repaint the list without closing the modal.
+    async function refresh() {
+      const fresh = await Split.loadWallet(w.id);
+      if (fresh) w = fresh;
+      draw();
+    }
+
+    function draw() {
+      body.innerHTML = "";
+      body.append(el("div", { class: "section-hint" },
+        isOwner ? "Only you, as the wallet owner, can add or remove people."
+                : "Only the wallet owner can add or remove people."));
+
+      const rows = el("div", { class: "line-list" });
+      w.activeMembers.forEach((m) => {
+        const status = Split.memberStatus(m);
+        const isMe = w.myMember && m.id === w.myMember.id;
+        const label = { joined: "joined", invited: "invited, not yet joined", "name-only": "name only" }[status];
+
+        const actions = el("span", { class: "member-actions" });
+        if (isOwner && !isMe) {
+          if (status !== "joined") {
+            actions.append(el("button", { class: "btn btn-ghost btn-sm", type: "button",
+              onClick: () => promptEmail(m) }, m.invite_email ? "Change email" : "Invite by email"));
+          }
+          actions.append(el("button", { class: "btn btn-ghost btn-sm", type: "button",
+            onClick: async () => {
+              if (!confirm(`Remove ${m.display_name} from ${w.name}? Their past expenses stay, but they won't be in new splits.`)) return;
+              err.textContent = "";
+              try { await Split.removeMember(m.id); await refresh(); }
+              catch (e) { err.textContent = e.message || "Couldn't remove them."; }
+            } }, "Remove"));
+        }
+
+        rows.append(el("div", { class: "line-item member-item" },
+          memberAvatar(m.display_name),
+          el("span", { class: "li-name" },
+            m.display_name, isMe ? el("span", { class: "tag" }, "you") : null,
+            m.is_owner ? el("span", { class: "tag" }, "owner") : null,
+            el("span", { class: "member-status " + status }, label,
+              m.invite_email && status === "invited" ? " (" + m.invite_email + ")" : "")),
+          actions));
+      });
+      body.append(rows);
+
+      if (isOwner) {
+        const nIn = el("input", { placeholder: "name" });
+        const eIn = el("input", { type: "email", placeholder: "email (optional)" });
+        const doAdd = async () => {
+          err.textContent = "";
+          const name = nIn.value.trim();
+          if (!name) { err.textContent = "Enter a name."; return; }
+          try { await Split.addMember(w.id, { name, email: eIn.value.trim() }); await refresh(); }
+          catch (e) { err.textContent = e.message || "Couldn't add them."; }
+        };
+        eIn.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
+        nIn.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
+        body.append(el("div", { class: "li-inputs", style: "margin-top:12px" }, nIn, eIn,
+          el("button", { class: "btn btn-ghost", type: "button", onClick: doAdd }, "Add")));
+      }
+      body.append(err);
+    }
+
+    function promptEmail(m) {
+      const v = prompt(`Email to invite ${m.display_name} with:`, m.invite_email || "");
+      if (v === null) return;
+      err.textContent = "";
+      Split.updateMember(m.id, { invite_email: v })
+        .then(refresh)
+        .catch((e) => { err.textContent = e.message || "Couldn't save that email."; });
+    }
+
+    draw();
+    modal = openModal({ title: "People", body, onClose: onClosed });
+    return modal;
+  }
+
+  // Quick wallet edits in a modal: name, icon, currency, archive. People opens
+  // as a second modal layered on top, so you never leave the wallet screen.
   function openWalletSettings(w) {
     const isOwner = !!(w.myMember && w.myMember.is_owner);
 
@@ -1812,16 +1896,26 @@
     const curIn = currencySelect(w.base_currency);
     const err = el("div", { class: "error-msg" });
 
+    const countLabel = (wal) =>
+      wal.activeMembers.length + (wal.activeMembers.length === 1 ? " person" : " people") + " ›";
+    const peopleCount = el("span", { class: "muted" }, countLabel(w));
+
     const body = el("div", {},
       el("div", { class: "field" }, el("label", {}, "Name"), nameIn),
       el("div", { class: "field" }, el("label", {}, "Icon"), iconIn),
       el("div", { class: "field" }, el("label", {}, "Currency"), curIn),
       el("hr", { class: "divider" }),
       el("button", { class: "modal-link", type: "button",
-        onClick: () => { modal.close(); routeTo("walletSettings", w.id); } },
+        onClick: () => {
+          // Stack People on top rather than replacing this modal, so closing it
+          // returns here instead of dumping you back on the wallet.
+          openPeopleModal(w, async () => {
+            const fresh = await Split.loadWallet(w.id);
+            if (fresh) { w = fresh; peopleCount.textContent = countLabel(w); }
+          });
+        } },
         el("span", {}, "People"),
-        el("span", { class: "muted" },
-          w.activeMembers.length + (w.activeMembers.length === 1 ? " person" : " people") + " ›")),
+        peopleCount),
       err);
 
     const saveBtn = el("button", { class: "btn" }, "Save");
@@ -1863,31 +1957,63 @@
   // Escape and backdrop to dismiss, focus moved in and restored on close, the
   // page behind locked from scrolling, and Android's back button closing the
   // modal instead of leaving the wallet.
-  function openModal({ title, body, footer }) {
+  // Open modals, outermost first. Lets a stacked modal know it is not the one
+  // that locked the page, and keeps Escape aimed at the topmost only.
+  const modalStack = [];
+  // history.back() calls we made ourselves while closing a modal. The popstate
+  // they trigger is our own bookkeeping, not the user pressing Back, so it must
+  // be swallowed rather than closing the modal underneath.
+  let selfPops = 0;
+
+  function openModal({ title, body, footer, onClose }) {
     const previouslyFocused = document.activeElement;
-    const scrollY = window.scrollY;
+    // Modals stack (settings -> people). Only the FIRST one locks the page and
+    // owns the saved scroll position; only the LAST one to close restores it.
+    // Without this the inner modal's close would unlock the page while the
+    // outer one is still open, and the page behind would jump.
+    const depth = modalStack.length;
+    const scrollY = depth === 0 ? window.scrollY : modalStack[0].scrollY;
 
     const panel = el("div", { class: "modal-panel", role: "dialog",
       "aria-modal": "true", "aria-label": title });
     const backdrop = el("div", { class: "modal-backdrop" }, panel);
+    // Sit above any modal already open.
+    backdrop.style.zIndex = String(100 + depth * 10);
+
+    const entry = { scrollY, close: () => close() };
+    modalStack.push(entry);
 
     let closed = false;
+    let poppedByHistory = false;
     function close() {
       if (closed) return;
       closed = true;
       document.removeEventListener("keydown", onKey, true);
       window.removeEventListener("popstate", onPop);
-      document.body.classList.remove("modal-open");
-      document.body.style.top = "";
-      window.scrollTo(0, scrollY);
+      const i = modalStack.indexOf(entry);
+      if (i >= 0) modalStack.splice(i, 1);
+
+      // Only release the page lock once nothing is left open.
+      if (!modalStack.length) {
+        document.body.classList.remove("modal-open");
+        document.body.style.top = "";
+        window.scrollTo(0, scrollY);
+      }
       backdrop.remove();
       if (previouslyFocused && previouslyFocused.focus) previouslyFocused.focus();
-      // Drop the history entry we pushed, unless the back button is what
-      // closed us (then it's already gone).
-      if (history.state && history.state.__modal) history.back();
+      // Drop the history entry we pushed, unless the back gesture is what
+      // closed us, in which case it is already gone. Count it so the popstate
+      // it fires is recognised as ours.
+      if (!poppedByHistory && history.state && history.state.__modal) {
+        selfPops++;
+        history.back();
+      }
+      if (onClose) onClose();
     }
 
     function onKey(e) {
+      // Only the topmost modal reacts, or Escape would close the whole stack.
+      if (modalStack[modalStack.length - 1] !== entry) return;
       if (e.key === "Escape") { e.preventDefault(); close(); return; }
       if (e.key !== "Tab") return;
       // Focus trap: keep Tab inside the panel.
@@ -1898,7 +2024,22 @@
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
-    function onPop() { closed = true; close(); }
+    // The back gesture already consumed our history entry, so close without
+    // calling history.back() again. (Setting `closed` here would make close()
+    // return immediately and never clean up.)
+    //
+    // A popstate we caused ourselves (closing a stacked modal) is swallowed,
+    // so it cannot cascade into closing the modal underneath. Only a real back
+    // gesture reaches the topmost modal.
+    function onPop() {
+      // Only the topmost open modal handles a popstate at all; the ones
+      // beneath ignore it entirely, so exactly one listener consumes each
+      // event and the counter cannot be decremented more than once.
+      if (modalStack[modalStack.length - 1] !== entry) return;
+      if (selfPops > 0) { selfPops--; return; }
+      poppedByHistory = true;
+      close();
+    }
 
     backdrop.addEventListener("click", (e) => { if (e.target === backdrop) close(); });
     document.addEventListener("keydown", onKey, true);
@@ -1915,9 +2056,12 @@
       el("div", { class: "modal-body" }, body),
       footer ? el("div", { class: "modal-foot" }, footer) : null);
 
-    // Lock the page behind without it jumping to the top.
-    document.body.style.top = `-${scrollY}px`;
-    document.body.classList.add("modal-open");
+    // Lock the page behind without it jumping to the top. Only the first modal
+    // does this; re-applying it for a stacked one would reset the offset.
+    if (depth === 0) {
+      document.body.style.top = `-${scrollY}px`;
+      document.body.classList.add("modal-open");
+    }
     document.body.appendChild(backdrop);
 
     // Focus the first real field, not the close button. querySelector returns
