@@ -1,4 +1,26 @@
 /* ═══════════════════════════════════════
+   STRIP GEOMETRY
+
+   Sized to the real photobooth standard so prints fit a normal strip album:
+   2 x 6 inches at 300 DPI = 600 x 1800 px. That is the classic arcade format
+   and also roughly what Korean "4 cuts" booths print (about 5 cm wide).
+
+   The arithmetic is forced. Once the strip is 600 wide with 24px margins, the
+   frames are 552 wide; fitting four of them plus the gaps and footer into
+   1800 leaves 400px each. So the photos are 552 x 400 (about 4:3 landscape),
+   NOT square. Square photos are what made the old strip 2 x 7.9 inches.
+════════════════════════════════════════ */
+const STRIP_DPI    = 300;
+const STRIP_W      = 2 * STRIP_DPI;   // 600px  = 2in
+const STRIP_H      = 6 * STRIP_DPI;   // 1800px = 6in
+const STRIP_PAD    = 24;
+const STRIP_GAP    = 10;
+const STRIP_FOOTER = 146;
+const PHOTO_W      = STRIP_W - STRIP_PAD * 2;                                  // 552
+const PHOTO_H      = (STRIP_H - STRIP_PAD - STRIP_FOOTER - STRIP_GAP * 3) / 4; // 400
+const FRAME_RATIO  = PHOTO_W / PHOTO_H;                                        // ~1.38
+
+/* ═══════════════════════════════════════
    FILTER PIPELINE
 ════════════════════════════════════════ */
 function sCurve(val, strength) {
@@ -385,21 +407,25 @@ function capturePhoto(index) {
   flash.classList.add('firing');
 
   const video = document.getElementById('captureVideo');
-  const SIZE = 600;
+  // Photos are captured at the strip's frame ratio (see PHOTO_W/PHOTO_H), not
+  // square, so that four of them plus the footer fill a real 2x6in strip.
   const c = document.createElement('canvas');
-  c.width = SIZE; c.height = SIZE;
+  c.width = PHOTO_W; c.height = PHOTO_H;
   const ctx = c.getContext('2d');
   const vw = video.videoWidth, vh = video.videoHeight;
-  const minDim = Math.min(vw, vh);
-  const sx = (vw - minDim) / 2, sy = (vh - minDim) / 2;
-  if (facing === 'user') { ctx.translate(SIZE, 0); ctx.scale(-1, 1); }
-  ctx.drawImage(video, sx, sy, minDim, minDim, 0, 0, SIZE, SIZE);
+  // Centre-crop the video to the frame ratio, taking the largest region that
+  // fits so we never letterbox.
+  let cw = vw, ch = vw / FRAME_RATIO;
+  if (ch > vh) { ch = vh; cw = vh * FRAME_RATIO; }
+  const sx = (vw - cw) / 2, sy = (vh - ch) / 2;
+  if (facing === 'user') { ctx.translate(PHOTO_W, 0); ctx.scale(-1, 1); }
+  ctx.drawImage(video, sx, sy, cw, ch, 0, 0, PHOTO_W, PHOTO_H);
   capturedPhotos.push(c);
 
   const mini = document.getElementById('csm' + index);
   const thumb = document.createElement('canvas');
-  thumb.width = 54; thumb.height = 54;
-  thumb.getContext('2d').drawImage(c, 0, 0, 54, 54);
+  thumb.width = 54; thumb.height = Math.round(54 / FRAME_RATIO);
+  thumb.getContext('2d').drawImage(c, 0, 0, thumb.width, thumb.height);
   mini.innerHTML = '';
   mini.appendChild(thumb);
   mini.classList.add('done');
@@ -449,9 +475,8 @@ function showResult() {
    DOWNLOAD MODAL
 ════════════════════════════════════════ */
 function buildFullStripCanvas() {
-  const FRAME_SIZE = 600, PADDING = 28, FRAME_GAP = 14, FOOTER_H = 120;
-  const W = FRAME_SIZE + PADDING * 2;
-  const H = PADDING + (FRAME_SIZE + FRAME_GAP) * 4 - FRAME_GAP + FOOTER_H;
+  const PADDING = STRIP_PAD, FRAME_GAP = STRIP_GAP;
+  const W = STRIP_W, H = STRIP_H;
 
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
@@ -470,27 +495,27 @@ function buildFullStripCanvas() {
   }
 
   for (let i = 0; i < 4; i++) {
-    const y = PADDING + i * (FRAME_SIZE + FRAME_GAP);
-    ctx.drawImage(document.getElementById('finalCanvas' + i), PADDING, y, FRAME_SIZE, FRAME_SIZE);
+    const y = PADDING + i * (PHOTO_H + FRAME_GAP);
+    ctx.drawImage(document.getElementById('finalCanvas' + i), PADDING, y, PHOTO_W, PHOTO_H);
   }
 
-  const footerY = PADDING + (FRAME_SIZE + FRAME_GAP) * 4 - FRAME_GAP + 36;
+  const footerY = PADDING + (PHOTO_H + FRAME_GAP) * 4 - FRAME_GAP + 40;
   ctx.fillStyle = fc.text;
-  ctx.font = 'italic 28px Georgia, serif';
+  ctx.font = 'italic 26px Georgia, serif';
   ctx.textAlign = 'center';
   ctx.fillText(FILTERS[currentFilter].quote, W / 2, footerY);
 
   ctx.globalAlpha = 0.7;
-  ctx.font = '15px "Courier New", monospace';
+  ctx.font = '14px "Courier New", monospace';
   const now = new Date();
   ctx.fillText(
     `${now.getFullYear()} · ${String(now.getMonth()+1).padStart(2,'0')} · ${String(now.getDate()).padStart(2,'0')}`,
     W / 2, footerY + 26
   );
   ctx.globalAlpha = 0.5;
-  ctx.font = '13px "Courier New", monospace';
+  ctx.font = '12px "Courier New", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('@gracermy', W - PADDING + 8, H - 12);
+  ctx.fillText('@gracermy', W - PADDING, H - 14);
   ctx.globalAlpha = 1;
 
   fullStripCanvas = canvas;
@@ -536,7 +561,9 @@ function triggerDownload() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `photobooth_${Date.now()}.png`;
+    // Name it with the print size, so it is obvious at the print shop which
+    // paper this is meant for.
+    a.download = `photobooth_2x6in_${Date.now()}.png`;
     a.click();
     URL.revokeObjectURL(url);
   }, 'image/png');

@@ -167,8 +167,9 @@ body::before {
 .strip-preview.fc-sage    { background: var(--fc-sage); }
 .strip-preview.fc-midnight{ background: var(--fc-midnight); }
 
+/* Same 552/400 frame ratio as the printed strip. */
 .sp-frame {
-  width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: 1px; background: #1a1410;
+  width: 100%; aspect-ratio: 552 / 400; overflow: hidden; border-radius: 1px; background: #1a1410;
 }
 .sp-frame-live { position: relative; }
 .sp-frame-live video { width: 100%; height: 100%; object-fit: cover; display: block; transform: scaleX(-1); }
@@ -259,8 +260,10 @@ body::before {
 #screen-capture { justify-content: center; padding: 16px; gap: 14px; }
 .cap-layout { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 460px; }
 .cap-status { font-family: 'Special Elite', monospace; font-size: 0.8rem; color: var(--text-soft); letter-spacing: 0.1em; text-transform: uppercase; }
+/* The viewfinder must match the capture crop (552/400), or you would frame a
+   shot that gets cropped differently when taken. */
 .viewfinder {
-  width: 100%; aspect-ratio: 1; background: #1a1410; border-radius: 8px;
+  width: 100%; aspect-ratio: 552 / 400; background: #1a1410; border-radius: 8px;
   position: relative; overflow: hidden;
   box-shadow: 0 8px 28px var(--shadow), inset 0 0 0 6px var(--paper), inset 0 0 0 7px var(--border-strong);
 }
@@ -289,8 +292,9 @@ body::before {
 @keyframes flashAnim { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
 
 .cap-strip-mini { display: flex; gap: 6px; align-items: center; }
+/* Landscape like the frames themselves; a square box would squash the thumb. */
 .csm-frame {
-  width: 56px; height: 56px; border-radius: 3px;
+  width: 56px; height: 41px; border-radius: 3px;
   background: rgba(0,0,0,0.15); border: 1px solid var(--border);
   overflow: hidden; transition: all 0.3s;
 }
@@ -356,7 +360,9 @@ body::before {
   100% { transform: translateY(-100%) scaleY(1); opacity: 1; }
 }
 
-.rs-frame { width: 100%; aspect-ratio: 1; background: #1a1410; overflow: hidden; }
+/* 552/400 — matches PHOTO_W/PHOTO_H in booth.js, so the on-screen strip is a
+   true preview of the 2x6in print rather than a differently-shaped one. */
+.rs-frame { width: 100%; aspect-ratio: 552 / 400; background: #1a1410; overflow: hidden; }
 .rs-frame canvas { width: 100%; height: 100%; display: block; }
 .rs-footer { margin-top: 4px; padding: 0 2px; text-align: center; position: relative; }
 .rs-quote { font-family: 'Instrument Serif', serif; font-size: 0.5rem; font-style: italic; line-height: 1.3; margin-bottom: 1px; }
@@ -446,6 +452,12 @@ body::before {
 }
 .dl-modal-strip canvas { width: 100%; height: auto; display: block; }
 .dl-modal-strip img { width: 100%; display: block; }
+
+.dl-modal-size {
+  font-family: 'Special Elite', monospace; font-size: 0.62rem;
+  color: var(--text-dim); letter-spacing: 0.06em;
+  text-align: center; margin: 10px 0 12px;
+}
 
 .dl-modal-actions { display: flex; flex-direction: column; gap: 8px; }
 
