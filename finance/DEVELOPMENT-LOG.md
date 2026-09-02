@@ -1,11 +1,218 @@
-# Finance Tracker — Development log
+# Bloom: development log
 
-A running record of what we built for the private finance growth tracker at
-`/finance`, why, and how. Most-recent first. Mirrors the style of
-`docs/development-log.md`.
+A running record of what we built at `/finance`, why, and how. Most-recent
+first. Mirrors the style of `docs/development-log.md`.
 
-The full approved implementation plan (all decisions + rationale) is preserved in
-`finance/PLAN.md` — read that first for the complete design context.
+Bloom is now **two independent trackers** behind one login:
+
+- **Asset Tracker**: the original net-worth engine (snapshots, derived
+  spending, charts, AI statement reading). Plan: `finance/PLAN.md`.
+- **Expense Tracker**: bill splitting with shared wallets. Plan:
+  `finance/SPLIT-PLAN.md`.
+
+They share no math and never appear on the same screen. Read the relevant plan
+first for the complete design context.
+
+Setup docs: `setup/SETUP.md`, `setup/schema.sql` (asset tracker),
+`setup/split-schema.sql` (wallets), `setup/push-schema.sql` +
+`setup/NOTIFICATIONS.md` (notifications).
+
+---
+
+## Settings as modals, centred (BUILT, 2026-09-02)
+
+Trial of a more app-like UI, built on a branch so it could be dropped. Grace
+kept it.
+
+**Wallet settings in a modal.** The gear icon on a wallet opens name, icon,
+currency and archive in a modal instead of navigating to a page, so you change
+one thing and stay where you were. **People opens as a second modal stacked on
+top**, so adding, removing or re-inviting someone repaints the list in place
+and closing it returns to settings with the member count refreshed. The
+`walletSettings` route still exists as the people page (reachable, and used for
+non-owners).
+
+**First non-route UI in Bloom**, so `openModal()` had to cover what routing gave
+for free: Escape and backdrop dismiss, focus trap for Tab, focus restored on
+close, page behind locked without losing scroll position, and a pushed history
+entry so Android's back gesture closes the modal rather than leaving the wallet.
+
+**Three stacking bugs, all found by exercising it in a real browser** (they all
+looked fine in the source):
+1. The page lock was released by whichever modal closed first, so closing People
+   unlocked the page while settings was still open. Fixed with a `modalStack`:
+   the first modal owns the lock and the last to close restores scroll.
+2. `onPop` set `closed = true` before calling `close()`, which made `close()`
+   return early and never clean up, so Escape silently stopped working on the
+   outer modal.
+3. Closing the inner modal calls `history.back()`, and that `popstate` cascaded
+   into closing the outer one, so one Escape dismissed both. Self-triggered pops
+   are now counted (`selfPops`) and swallowed, and only the topmost modal
+   handles a popstate at all.
+
+**Bottom sheet reverted to a centred card.** The phone breakpoint originally
+anchored the modal to the bottom edge; with the icon grid wrapping to two rows
+it grew taller than the screen and the Save button fell off. Now a floating
+centred card at every width, with tighter padding on phones.
+
+**Still open:** Remove uses a native `confirm()`, which now appears over two
+modals. Works, but it's the least app-like part of the flow.
+
+---
+
+## Expense Tracker UI fixes (BUILT, 2026-09-01)
+
+Round of fixes after Grace used it for real.
+
+**The missing pie chart, two separate causes.** First fix addressed empty
+"Your share" data (viewer not a linked member, or no share row in any expense):
+it now falls back to the whole-wallet view, and the Your share / Whole wallet
+toggle only appears when both views have data. But the real cause was different
+and only found by **measuring the rendered DOM**: with a single category the
+slice spans the full circle, so its arc starts and ends at the same point, and
+**SVG treats a zero-length arc as a no-op that paints nothing**. The legend and
+centre total rendered normally, so it read as "no chart" rather than an error.
+The path's bounding box was 0×27 inside a healthy 150×150 svg. A full-circle
+slice is now drawn as two concentric circles with an even-odd fill rule.
+
+**Editable payments.** Tapping a recorded settlement opens an editor with Save
+and Delete, from both the activity feed and the past-payments list. Balances
+recalculate on their own since they are always derived. Members who have since
+left still render in the From/To pickers, or their old payments could not be
+edited at all.
+
+**Notifications toggle** replaced the explanatory card with one compact bar at
+the top of the Expense Tracker: label left, switch right. Only states the app
+cannot act on (iOS not installed, permission blocked) still carry text.
+
+**Wallet icon editable in settings.** The new-wallet form had an emoji picker
+but settings did not. Extracted into a shared `emojiPicker()` so the two cannot
+drift; an emoji not in the offered list is prepended rather than silently
+replaced on save.
+
+**Spacing and overflow.** Several flex text columns had `flex: 1` without
+`min-width: 0`; a flex item defaults to `min-width: auto`, so a long name or
+email refused to shrink and pushed its row past the card edge. Also: `.shell`
+had a top-only margin so cards sat flush against following button rows, the
+back button collided with page titles, and the settings control became a gear
+icon matched to the title card's height via `align-items: stretch`.
+
+---
+
+## Push notifications (BUILT, 2026-08-31)
+
+Four notification types, all free-tier:
+
+| Trigger | Notification |
+|---|---|
+| Expense added | "Alex added Groceries HK$420" |
+| Settlement recorded | "Becca paid Grace HK$200" |
+| Someone joins a wallet | "Becca joined the wallet" |
+| Weekly (Mon 6pm HK) | "12 expenses across 2 wallets. HK$3,400 spent, your share HK$1,700." |
+
+**Architecture:** `push_subscriptions` (one row per **device**, not per person:
+the same user on a phone and laptop has two, expiring independently),
+`wallet_push_targets()` returning everyone in a wallet except the actor, and a
+`send-push` Edge Function invoked by Database Webhooks. Sending is server-side
+with the service_role key because it must read other people's subscriptions; a
+browser must never be able to. The function also requires a shared secret
+header, so knowing its URL is not enough to invoke it.
+
+**Insert only, deliberately** for expenses and settlements. Notifying on every
+edit would ping everyone for each typo correction. A join is the exception: it
+is an UPDATE (the member row already exists and joining fills in `user_id`), so
+the function checks for exactly that `null → user_id` transition. Adding a
+name-only member, renaming one, or adding an email all stay silent.
+
+**Weekly digest** runs on `pg_cron` rather than a table event. A quiet week
+sends nothing rather than a "you spent nothing" ping.
+
+**Config bug found while wiring this up:** `saveConfig()` only writes the fields
+the setup screen asks about, so on any device that had used that screen the
+spread in `config()` overrode `VAPID_PUBLIC_KEY` with `undefined` and
+notifications would have silently never appeared. The merge now skips only
+`undefined`, so a saved `false` still wins.
+
+**Setup gotchas** (both "feature not enabled yet", not real errors): creating a
+webhook failed with `schema "supabase_functions" does not exist` until webhooks
+were enabled; `cron.schedule` failed until
+`create extension if not exists pg_cron with schema extensions;`.
+
+---
+
+## Installable app / PWA (BUILT, 2026-08-31)
+
+Manifest, service worker and a blossom icon set, so Bloom can be added to the
+Home Screen and launch full-screen. **This is also the prerequisite for
+notifications: Apple only allows web push for PWAs installed to the Home
+Screen**, which is why install came first.
+
+The service worker is deliberately conservative, since the way one can really
+hurt is by serving stale or wrong responses: only same-origin GETs for our own
+static files are cached, **Supabase REST and auth and the CDN are never
+intercepted** (so no session data can end up in a cache), HTML is network-first
+so a deploy is picked up on the next load, and bumping `CACHE_VERSION` drops
+every older cache. Registration failures are swallowed: a PWA that will not install is a lost
+convenience, but a crash on load would be a broken app.
+
+iOS gives no automatic install prompt, so the home screen shows a dismissible
+card explaining Share → Add to Home Screen. Android and desktop capture
+`beforeinstallprompt` and install in one tap.
+
+**Why PWA over native:** shipping to iOS through the App Store needs a paid
+Apple Developer account at $99/year regardless of how the app is built. A PWA
+is the only genuinely free way to get an app icon on an iPhone, and it keeps
+the existing database, auth and every line of app code unchanged.
+
+---
+
+## Expense Tracker: bill splitting (BUILT, 2026-08-28)
+
+Bloom becomes two trackers behind one login, forked from a new `home` route.
+Full design in `finance/SPLIT-PLAN.md`.
+
+**Deliberate separation.** Shared expenses are their own ledger and never touch
+`snapshots` / `balances` / derived expense. Net worth already reflects shared
+spending (paying for dinner lowers your bank balance), so linking them would
+double-count. Vocabulary is kept distinct on purpose: the Asset Tracker says
+"spending", the Expense Tracker says "spent" / "your share", so the same word
+never means two things.
+
+**Model.** A **wallet** is one shared book per group (flatmate, friends, a
+trip), fully independent: a debt in one never nets against another, because in
+real life you pay them separately. A **member** is a named seat with a
+*nullable* `user_id`: name-only, invited-by-email (auto-linked on signup via
+`claim_wallet_invites()`), or linked later. **Expenses reference `member_id`,
+never `user_id`**, so linking an account or leaving never rewrites history.
+Equal split by default with a per-person override; `expense_shares` is a real
+table so history freezes (adding a 4th housemate in March must not rewrite
+February's 3-way splits) and rounding is cent-exact ($10/3 → 3.34 + 3.33 +
+3.33). Balances simplify to the fewest transfers. Settlements offset balances
+rather than deleting anything, so the category pie is unaffected by settling up.
+
+**Key architectural difference:** these tables use **membership-based RLS**
+(`is_wallet_member()`, a `security definer` function to avoid the policy on
+`wallet_members` recursing into itself), not the owner-only
+`user_id = auth.uid()` of `schema.sql`, because several people must read and
+write the same rows.
+
+**Bugs found while building:**
+- The `wallets` select policy must also match `created_by`. Creating a wallet
+  does `insert … select()`, and at that instant the creator has no member row,
+  so a membership-only test returned zero rows and creation appeared to fail.
+- `count(*)` returns `bigint`, assigned into an `integer` in
+  `claim_wallet_invites()`. Replaced with `GET DIAGNOSTICS`.
+- The home card summed positions across wallets and formatted them in the base
+  currency, so an HKD and a USD wallet were added as raw numbers. It now only
+  totals when the outstanding wallets share a currency.
+
+**Verified:** 38 unit tests over the math: cent-exact allocation, balances
+summing to zero, someone excluded from an expense, partial settlements,
+multi-currency in both balances and category totals, and the exact-split edges.
+
+**Still unverified:** the membership RLS was never tested against two real
+accounts (specifically that a non-member gets zero rows from a direct query),
+and end-to-end push delivery was never observed from the dev side.
 
 ---
 

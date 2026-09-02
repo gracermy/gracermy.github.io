@@ -1,5 +1,13 @@
 # Finance Growth Tracker — Implementation Plan
 
+> **STATUS: BUILT and in daily use.** All phases shipped (auth, accounts,
+> snapshots, derived expense, charts, AI statement reading). This file is the
+> design record for the **Asset Tracker** half of Bloom.
+>
+> Bloom has since gained a second, independent tracker for splitting bills:
+> see `SPLIT-PLAN.md`. The two share no math. Day-to-day history for both is in
+> `DEVELOPMENT-LOG.md`.
+
 ## Context
 
 Grace tracks her financial growth with a manual, low-effort system: at the end of each period she snapshots the balances of all her banks/e-wallets/cash (liquid) plus contributions to illiquid assets (MPF, stocks, deposits, recorded at cost — never marked to market), records her income, and *derives* her expense from the change in net worth rather than logging transactions. She wants this as a private, multi-user web app on her GitHub Pages site, accessible from any device, with AI reading her uploaded bank/credit-card statements to eliminate manual data entry and categorize spending.

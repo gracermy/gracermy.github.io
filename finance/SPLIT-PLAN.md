@@ -266,7 +266,10 @@ fixing a typo your partner made. `created_by` keeps authorship visible.
 
 ---
 
-# PHASE 1 — Build spec
+# PHASE 1 — Build spec  ✅ BUILT
+
+> Kept as the design record. See **STATUS** at the end of this file for what
+> shipped, including work beyond the original plan.
 
 Goal: **the two-tracker structure exists, and wallets can be created, shared,
 and joined.** No expenses yet. This phase is where the risk lives (new security
@@ -400,3 +403,35 @@ Asset Tracker keeps working throughout.
   `Charts.spendingPie(items, cur)`, which already takes exactly the
   `[{label, amount}]` shape the aggregation produces. Month and category filters.
 - **Phase 5 — Polish.** Recurring expenses, quick-add, CSV export.
+
+---
+
+# STATUS (as of 2026-09-02)
+
+**Phases 1 to 4 are built and in daily use.** Phase 5 was dropped as not needed.
+Day-to-day history now lives in `DEVELOPMENT-LOG.md`; this file stays as the
+design rationale.
+
+Built beyond the original plan:
+
+- **Installable app (PWA)** — manifest, service worker, icons.
+- **Push notifications** — expense added, settlement recorded, someone joins a
+  wallet, plus a weekly digest. See `setup/NOTIFICATIONS.md`.
+- **Modal settings** — wallet settings open in a modal, with People stacked on
+  top, rather than navigating to a page.
+- **Editable settlements** — tapping a recorded payment opens an editor with
+  delete; balances recalculate since they are always derived.
+
+Two things remain **unverified from the development side** and rest on Grace's
+own testing:
+
+1. The membership RLS was never exercised with two real accounts — specifically
+   that a non-member gets **zero rows from a direct query**, not merely an empty
+   screen. Worth checking next time someone new is added to a wallet.
+2. End-to-end push delivery was never observed here, only the routing logic and
+   the setup steps.
+
+If picking this up later, the natural next steps are: replacing the native
+`confirm()` on member removal with an inline confirmation (the least app-like
+part of the flow), and extending the modal pattern to the expense form and
+settle-up if the direction proves right.
