@@ -1214,9 +1214,13 @@
     // statement that says 3,000 feels wrong. This sets the field to 0 rather
     // than hiding a value, so what's stored is always what you actually owe:
     // the money has already left your bank, so the debt is genuinely gone.
+    //
+    // Nothing about your spending is lost by doing this. The AMOUNT you spent
+    // is already visible as the drop in your bank balance, and WHAT you spent
+    // it on lives in expense_lines, a separate table this field never feeds.
     const paidBtn = account.type === "liability"
       ? el("button", { class: "btn btn-ghost btn-sm", type: "button",
-          title: "You've already paid this bill, so nothing is owed now",
+          title: "Already paid, so nothing is owed now. Your spending is still recorded: the amount shows as the drop in your bank balance, and the categories are kept separately below.",
           onClick: () => { amtIn.value = 0; amtIn.dispatchEvent(new Event("input")); } }, "Paid it")
       : null;
 
@@ -2100,6 +2104,7 @@
         "<strong>Credit cards: enter what you owe today, not the statement balance.</strong><br><br>" +
         "A statement shows what you owed on its closing date, often weeks before this snapshot. If you've since paid it, that money has already left your bank account, so entering the old figure counts it twice and makes your net worth look lower than it is.<br><br>" +
         "Paying a card never changes your net worth: cash goes down, debt goes down, and they cancel out. Bank 50,000 with 3,000 owed is the same 47,000 as bank 47,000 with nothing owed.<br><br>" +
+        "<strong>You don't lose the expense by entering 0.</strong> The amount you spent already shows as the drop in your bank balance, and the categories are recorded separately in the spending section below. Leaving a paid bill in as a debt doesn't record it better, it just counts the same money twice and makes your expense read too high.<br><br>" +
         "So: <strong>bill already paid → enter 0</strong> (or whatever you've charged since). <strong>Still outstanding → enter what's owed.</strong>" }));
     close.addEventListener("click", () => pop.classList.add("hidden"));
     const btn = el("button", { class: "info-btn", type: "button", title: "How should I enter a credit card?",
