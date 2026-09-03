@@ -216,13 +216,23 @@ const Statements = (() => {
     // is stored on the object as _acct ("" | account id | "__new__").
     function balanceRow(obj, wantTypes, onDelete) {
       const inputs = el("div", { class: "li-inputs" });
+      let amountInput = null;
       // name + amount + currency
       ["name", "amount", "currency"].forEach((f) => {
         const inp = el("input", { value: obj[f] == null ? "" : obj[f], style: f === "name" ? "flex:2" : "max-width:90px" });
-        if (f === "amount") inp.type = "number";
+        if (f === "amount") { inp.type = "number"; amountInput = inp; }
         inp.addEventListener("input", () => { obj[f] = f === "amount" ? Number(inp.value) : inp.value; });
         inputs.append(inp);
       });
+      // The parsed figure is the statement balance. If the bill is already
+      // paid, the money has left the bank and nothing is owed now, so this
+      // zeroes the amount rather than marking it "paid" and keeping a debt
+      // that no longer exists.
+      if (wantTypes.includes("liability")) {
+        inputs.append(el("button", { class: "btn btn-ghost btn-sm", type: "button",
+          title: "Already paid this bill? Set it to 0.",
+          onClick: () => { amountInput.value = 0; obj.amount = 0; } }, "Paid it"));
+      }
       // account assignment dropdown
       const sel = el("select", { style: "max-width:150px" });
       const pool = accounts.filter((a) => wantTypes.includes(a.type));

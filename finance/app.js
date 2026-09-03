@@ -1210,13 +1210,24 @@
     const amtIn = el("input", { type: "number", step: "0.01", placeholder: "0", value: prior ? prior.amount : "" });
     const rateIn = el("input", { type: "number", step: "0.000001", placeholder: "rate → " + base(), value: prior ? prior.exchange_rate : (isForeign ? "" : 1) });
     if (!isForeign) rateIn.value = 1;
+    // For a card, "I've paid it" is the common case and typing 0 next to a
+    // statement that says 3,000 feels wrong. This sets the field to 0 rather
+    // than hiding a value, so what's stored is always what you actually owe:
+    // the money has already left your bank, so the debt is genuinely gone.
+    const paidBtn = account.type === "liability"
+      ? el("button", { class: "btn btn-ghost btn-sm", type: "button",
+          title: "You've already paid this bill, so nothing is owed now",
+          onClick: () => { amtIn.value = 0; amtIn.dispatchEvent(new Event("input")); } }, "Paid it")
+      : null;
+
     const node = el("div", { class: "line-item" },
       el("span", { class: "li-name" }, account.name,
         account.type === "liability" ? el("span", { class: "tag", style: "margin-left:6px;background:rgba(192,68,63,0.12);color:var(--neg)" }, "owe") : null),
       el("div", { class: "li-inputs" },
         amtIn,
         el("span", { class: "tag", style: "align-self:center" }, account.currency),
-        isForeign ? rateIn : null
+        isForeign ? rateIn : null,
+        paidBtn
       )
     );
     return {
