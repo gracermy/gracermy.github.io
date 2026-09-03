@@ -1145,7 +1145,9 @@
 
     app.append(el("div", { class: "shell fade-up fd2" },
       el("h3", {}, "Balances"),
-      el("div", { class: "section-hint" }, "Enter each closing balance. Liabilities = what you owe. Foreign accounts: set the rate to " + base() + "."),
+      el("div", { class: "section-hint" },
+        "Enter what each account showed on the day of this snapshot. For a credit card, that's what you still owe right now: if you've already paid the bill, enter 0. Foreign accounts: set the rate to " + base() + "."),
+      liabilityInfo(),
       el("div", { class: "line-list" }, balRows.map((r) => r.node))
     ));
 
@@ -2073,6 +2075,28 @@
     if (focusable) focusable.focus();
 
     return { close, panel };
+  }
+
+  // Explains why a paid-off card should be entered as 0, which is the single
+  // most common way to get net worth wrong. Paying a card moves money out of a
+  // bank AND clears the debt, so net worth is unchanged; entering a stale
+  // statement balance next to a post-payment bank balance counts it twice.
+  function liabilityInfo() {
+    const close = el("button", { class: "info-close", type: "button", title: "Close" }, "✕");
+    const pop = el("div", { class: "info-pop hidden" },
+      close,
+      el("span", { html:
+        "<strong>Credit cards: enter what you owe today, not the statement balance.</strong><br><br>" +
+        "A statement shows what you owed on its closing date, often weeks before this snapshot. If you've since paid it, that money has already left your bank account, so entering the old figure counts it twice and makes your net worth look lower than it is.<br><br>" +
+        "Paying a card never changes your net worth: cash goes down, debt goes down, and they cancel out. Bank 50,000 with 3,000 owed is the same 47,000 as bank 47,000 with nothing owed.<br><br>" +
+        "So: <strong>bill already paid → enter 0</strong> (or whatever you've charged since). <strong>Still outstanding → enter what's owed.</strong>" }));
+    close.addEventListener("click", () => pop.classList.add("hidden"));
+    const btn = el("button", { class: "info-btn", type: "button", title: "How should I enter a credit card?",
+      onClick: () => pop.classList.toggle("hidden") }, "i");
+    return el("div", { style: "margin:-6px 0 12px" },
+      el("span", { class: "info-anchor" }, btn,
+        el("span", { class: "section-hint", style: "display:inline;margin-left:7px" }, "Paid your card already? Enter 0."),
+        pop));
   }
 
   // Emoji picker for a wallet's icon. Shared by the new-wallet form and wallet

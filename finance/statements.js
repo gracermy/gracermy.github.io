@@ -162,6 +162,12 @@ const Statements = (() => {
       // Liabilities → liability account
       if (draft.liabilities.length) {
         reviewWrap.append(groupHeader("Liabilities (you owe)", "var(--neg)"));
+        // The statement balance is what was owed on the statement's CLOSING
+        // date, which is usually weeks before this snapshot. If the bill has
+        // since been paid, that money has already left the bank account, so
+        // keeping the old figure would count it twice.
+        reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" },
+          "This is the statement balance. If you've already paid this bill, change it to 0 so it isn't counted twice."));
         draft.liabilities.forEach((b) => reviewWrap.append(balanceRow(b, ["liability"], () => { arrRemove(draft.liabilities, b); renderReview(); })));
       }
       // Illiquid market values → illiquid account
