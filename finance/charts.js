@@ -36,6 +36,8 @@ const Charts = (() => {
   function netWorthChart(timeline, cur) {
     const W = 680, H = 300, padL = 52, padR = 18, padT = 20, padB = 40;
     const wrap = el("div", { class: "chart-card" });
+    // Plots netWorth (at cost), the same basis as the stat tiles, so the line
+    // and the numbers can never disagree.
     wrap.appendChild(el("h3", {}, "Net worth over time"));
     if (timeline.length < 2) { wrap.appendChild(el("div", { class: "chart-empty" }, "Add another month to see the trend.")); return wrap; }
 

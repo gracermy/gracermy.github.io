@@ -358,7 +358,8 @@
       const timeline = Model.computeTimeline(snapshots, allMoves);
       if (timeline.length) {
         const latest = timeline[timeline.length - 1];
-        assetValue = fmt(latest.hasMarket ? latest.marketNetWorth : latest.netWorth, base());
+        // At-cost, matching every other net-worth figure in the app.
+        assetValue = fmt(latest.netWorth, base());
         assetHint = "net worth, " + periodLabel(latest.snapshot.period_year, latest.snapshot.period_month);
       } else { assetValue = "Get started"; assetHint = "add your first month"; }
     }
@@ -556,11 +557,12 @@
       const list = el("div", {});
       recent.slice(1).forEach((t) => {
         const monthLabel = periodLabel(t.snapshot.period_year, t.snapshot.period_month);
-        const fullNW = t.hasMarket ? t.marketNetWorth : t.netWorth;
+        // At-cost, matching the tiles and the chart, so month-to-month
+        // differences equal the Growth figure shown beside them.
         list.append(el("div", { class: "month-card", onClick: () => routeTo("summary", t.snapshot.id) },
           el("div", { class: "month-card-head" },
             el("span", { class: "month-name" }, monthLabel),
-            el("span", { class: "month-nw" }, "net worth ", el("b", {}, fmt(fullNW, c)))),
+            el("span", { class: "month-nw" }, "net worth ", el("b", {}, fmt(t.netWorth, c)))),
           calcLine(t)));
       });
       app.append(el("div", { class: "shell fade-up" },
@@ -590,17 +592,33 @@
   // tiles (flows 3-across on PC, 2 on phone). Shared by dashboard + summary.
   function monthStatTiles(t) {
     const c = base();
-    // Full net worth = liquid + illiquid(market where entered, else at-cost) − liabilities.
-    const fullNW = t.hasMarket ? t.marketNetWorth : t.netWorth;
-    return [el("div", { class: "stat-grid" },
-      statTile("Total net worth", fmt(fullNW, c), null, "all assets − liabilities"),
+    // ONE basis for the headline row, always at-cost. Mixing bases is what made
+    // these numbers look arbitrary: the total was market value while Growth was
+    // the at-cost change, so "net worth 184,069, growth +8,624" could not be
+    // reconciled by subtracting last month's total.
+    //
+    // At-cost is the basis to lead with because it is the one the whole model
+    // rests on: Expense = Income − Growth, and that only holds if Growth
+    // excludes market swings. A stock rising 5,000 is not 5,000 you failed to
+    // spend. Market value is shown separately as an informational tile.
+    const tiles = [
+      statTile("Net worth", fmt(t.netWorth, c), null, "what you put in, at cost"),
       statTile("Growth", t.deltaNW === null ? "—" : fmtSigned(t.deltaNW, c), t.deltaNW, "vs previous month"),
       statTile("Income", t.income ? fmt(t.income, c) : fmt(0, c), null, "this month"),
       statTile("Expense", t.expense === null ? "not yet" : fmt(t.expense, c), t.expense === null ? null : -1, "income minus growth"),
-      statTile("Liquid", fmt(t.liquid, c)),
-      statTile(t.hasMarket ? "Illiquid (market)" : "Illiquid (at cost)", fmt(t.hasMarket ? t.illiquidMarket : t.illiquidCost, c)),
-      statTile("Liabilities", t.liabilities ? fmt(-t.liabilities, c) : fmt(0, c), t.liabilities ? -1 : 0),
-    )];
+      statTile("Liquid", fmt(t.liquid, c), null, "banks, wallets, cash"),
+      statTile("Illiquid (at cost)", fmt(t.illiquidCost, c), null, "what you contributed"),
+      statTile("Liabilities", t.liabilities ? fmt(-t.liabilities, c) : fmt(0, c), t.liabilities ? -1 : 0,
+        t.paidLiabilities ? "excludes " + fmt(t.paidLiabilities, c) + " already paid" : "what you still owe"),
+    ];
+    // Market value is informational and deliberately last, so it never gets
+    // mistaken for the figure the expense math uses.
+    if (t.hasMarket) {
+      const gain = t.marketNetWorth - t.netWorth;
+      tiles.push(statTile("Net worth (market)", fmt(t.marketNetWorth, c), null,
+        (gain >= 0 ? "+" : "") + fmt(gain, c) + " unrealised"));
+    }
+    return [el("div", { class: "stat-grid" }, ...tiles)];
   }
 
   // The "Income − Growth = Spent" line for a month.
@@ -623,44 +641,6 @@
       by[cat] = (by[cat] || 0) + (Number(e.amount) || 0);
     });
     return Object.entries(by).map(([label, amount]) => ({ label, amount })).sort((a, b) => b.amount - a.amount);
-  }
-
-  // Compares the categorised breakdown against the derived expense and says
-  // plainly whether it can be trusted. The derived figure is computed from
-  // balances, so a transfer between your own accounts cancels out and cannot
-  // inflate it. The breakdown is per-statement and CAN double-count: money
-  // moved from a bank to a wallet is a debit on one statement and a credit on
-  // the other, so if the AI misreads it the same spend is counted twice.
-  function reconcileLine(t, agg) {
-    if (t.expense === null) return el("div", { class: "hidden" });
-    const c = base();
-    const breakdown = agg.reduce((s, x) => s + (Number(x.amount) || 0), 0);
-    if (breakdown <= 0) {
-      return el("div", { class: "reconcile" },
-        el("span", { class: "muted" },
-          "No categories recorded for this month. Your total spending of ",
-          el("b", {}, fmt(t.expense, c)), " is still correct: it comes from your balances."));
-    }
-
-    const diff = breakdown - t.expense;
-    const pct = t.expense > 0 ? Math.abs(diff) / t.expense * 100 : 0;
-    const close = Math.abs(diff) < 1 || pct < 5;
-
-    const head = el("div", { class: "reconcile-head" },
-      el("span", {}, "Categories add up to ", el("b", {}, fmt(breakdown, c))),
-      el("span", { class: "muted" }, "vs ", el("b", {}, fmt(t.expense, c)), " actual"));
-
-    if (close) {
-      return el("div", { class: "reconcile ok" }, head,
-        el("span", { class: "reconcile-note" }, "These agree, so the breakdown is reliable."));
-    }
-
-    const over = diff > 0;
-    return el("div", { class: "reconcile warn" }, head,
-      el("span", { class: "reconcile-note" },
-        over
-          ? "The categories are " + fmt(diff, c) + " higher than you actually spent. The usual cause is a transfer between your own accounts being counted as spending on both statements. Your actual total is still right."
-          : "The categories are " + fmt(-diff, c) + " lower than you actually spent, so some spending has not been categorised yet. Your actual total is still right."));
   }
 
   // Icon action-cards — the dashboard's navigation hub (replaces top tabs).
@@ -719,7 +699,6 @@
       const agg = aggregateExpenses(t);
       const pieShell = el("div", { class: "shell fade-up fd3" });
       pieShell.appendChild(Charts.spendingPie(agg, c));
-      pieShell.appendChild(reconcileLine(t, agg));
       app.append(pieShell);
     }
 

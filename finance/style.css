@@ -584,18 +584,6 @@ body.modal-open { position: fixed; left: 0; right: 0; overflow: hidden; }
 }
 .paid-lbl.on { color: var(--pos); }
 
-/* Reconciliation between the categorised breakdown and the derived expense. */
-.reconcile {
-  display: flex; flex-direction: column; gap: 4px;
-  margin-top: 14px; padding: 11px 13px; border-radius: 10px;
-  font-size: 0.83rem; border: 1px solid var(--border); background: var(--field-bg);
-}
-.reconcile-head { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.reconcile-head b { font-family: 'JetBrains Mono', monospace; }
-.reconcile-note { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5; }
-.reconcile.ok { border-color: rgba(47,143,91,0.35); }
-.reconcile.ok .reconcile-note { color: var(--pos); }
-.reconcile.warn { border-color: rgba(192,68,63,0.35); background: rgba(192,68,63,0.05); }
 .wallet-row:hover { border-color: var(--border-hover); transform: translateY(-2px); }
 .wallet-emoji { font-size: 1.5rem; flex: 0 0 auto; line-height: 1; }
 .wallet-main { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
