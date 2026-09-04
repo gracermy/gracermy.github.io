@@ -625,6 +625,44 @@
     return Object.entries(by).map(([label, amount]) => ({ label, amount })).sort((a, b) => b.amount - a.amount);
   }
 
+  // Compares the categorised breakdown against the derived expense and says
+  // plainly whether it can be trusted. The derived figure is computed from
+  // balances, so a transfer between your own accounts cancels out and cannot
+  // inflate it. The breakdown is per-statement and CAN double-count: money
+  // moved from a bank to a wallet is a debit on one statement and a credit on
+  // the other, so if the AI misreads it the same spend is counted twice.
+  function reconcileLine(t, agg) {
+    if (t.expense === null) return el("div", { class: "hidden" });
+    const c = base();
+    const breakdown = agg.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+    if (breakdown <= 0) {
+      return el("div", { class: "reconcile" },
+        el("span", { class: "muted" },
+          "No categories recorded for this month. Your total spending of ",
+          el("b", {}, fmt(t.expense, c)), " is still correct: it comes from your balances."));
+    }
+
+    const diff = breakdown - t.expense;
+    const pct = t.expense > 0 ? Math.abs(diff) / t.expense * 100 : 0;
+    const close = Math.abs(diff) < 1 || pct < 5;
+
+    const head = el("div", { class: "reconcile-head" },
+      el("span", {}, "Categories add up to ", el("b", {}, fmt(breakdown, c))),
+      el("span", { class: "muted" }, "vs ", el("b", {}, fmt(t.expense, c)), " actual"));
+
+    if (close) {
+      return el("div", { class: "reconcile ok" }, head,
+        el("span", { class: "reconcile-note" }, "These agree, so the breakdown is reliable."));
+    }
+
+    const over = diff > 0;
+    return el("div", { class: "reconcile warn" }, head,
+      el("span", { class: "reconcile-note" },
+        over
+          ? "The categories are " + fmt(diff, c) + " higher than you actually spent. The usual cause is a transfer between your own accounts being counted as spending on both statements. Your actual total is still right."
+          : "The categories are " + fmt(-diff, c) + " lower than you actually spent, so some spending has not been categorised yet. Your actual total is still right."));
+  }
+
   // Icon action-cards — the dashboard's navigation hub (replaces top tabs).
   function actionCards() {
     const card = (icon, title, sub, onClick) => el("button", { class: "action-card", type: "button", onClick },
@@ -671,11 +709,17 @@
       el("div", { style: "margin-top:14px" }, calcLine(t))
     ));
 
-    // Spending breakdown pie (aggregated expense lines).
+    // Spending breakdown pie (aggregated expense lines), with a reconciliation
+    // against the derived expense. These are two INDEPENDENT numbers: the
+    // derived figure comes from balances and cannot double-count a transfer,
+    // while the breakdown is whatever was categorised from statements. When
+    // they disagree, the breakdown is the one to distrust, and saying so is
+    // the difference between a number you can act on and one that feels random.
     if (window.Charts) {
       const agg = aggregateExpenses(t);
       const pieShell = el("div", { class: "shell fade-up fd3" });
       pieShell.appendChild(Charts.spendingPie(agg, c));
+      pieShell.appendChild(reconcileLine(t, agg));
       app.append(pieShell);
     }
 

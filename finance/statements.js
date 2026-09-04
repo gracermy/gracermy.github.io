@@ -183,6 +183,24 @@ const Statements = (() => {
       // Spending split by calendar month. Only the CURRENT month's portion is
       // applied; other months are shown so you know to apply them separately.
       const MONTHS = window.MONTH_NAMES || ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      // Transfers between your own accounts are the main way spending gets
+      // double-counted: money leaving a bank and arriving in a wallet appears
+      // as a debit on one statement and a credit on the other. Showing them
+      // makes the exclusion auditable instead of silent.
+      const transfers = Array.isArray(draft.transfers) ? draft.transfers : [];
+      const maybeTransfers = Array.isArray(draft.possible_transfers) ? draft.possible_transfers : [];
+      if (transfers.length || maybeTransfers.length) {
+        reviewWrap.append(groupHeader("Transfers (not counted as spending)"));
+        reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" },
+          "Money moved between your own accounts, so it isn't spending. Check the list: anything wrongly here means real spending is missing, and anything missing from it will be counted twice."));
+        transfers.forEach((tr) => reviewWrap.append(transferRow(tr, false)));
+        if (maybeTransfers.length) {
+          reviewWrap.append(el("div", { class: "section-hint", style: "margin:8px 0 4px" },
+            "These look like transfers but were counted as spending. If any is a transfer to your own account, delete it from the categories below."));
+          maybeTransfers.forEach((tr) => reviewWrap.append(transferRow(tr, true)));
+        }
+      }
+
       const cur = curPeriod();
       if ((draft._months || []).length) {
         const crossMonth = draft._months.length > 1;
@@ -243,6 +261,18 @@ const Statements = (() => {
       // Highlight rows that still need a choice.
       if (!obj._acct) wrap.style.borderColor = "var(--accent)";
       return wrap;
+    }
+
+    // A read-only transfer line. `suspect` marks one the AI kept as spending
+    // but that looks like a self-transfer, so it needs a human decision.
+    function transferRow(tr, suspect) {
+      const amt = Math.round(Number(tr.amount) || 0).toLocaleString();
+      return el("div", { class: "line-item", style: suspect ? "border-color:rgba(192,68,63,0.35)" : "" },
+        el("span", { class: "li-name", style: "font-size:0.85rem" },
+          tr.description || "(no description)",
+          tr.date ? el("span", { class: "member-status" }, tr.date) : null),
+        el("span", { class: "li-amt" }, amt),
+        suspect ? el("span", { class: "tag", style: "background:rgba(192,68,63,0.12);color:var(--neg)" }, "check") : null);
     }
 
     // Editable spending-category row (rename category, edit amount, delete).

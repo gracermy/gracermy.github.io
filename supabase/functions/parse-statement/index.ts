@@ -53,6 +53,12 @@ Return an object with these fields:
   "total_out": <number or null>,             // sum of ALL debits/withdrawals (money leaving the account)
   "income_in": <number or null>,             // salary / genuine income credited during the period (0 if none)
   "self_transfer_out": <number or null>,     // debits that are NOT spending: cash withdrawn that was later re-deposited, money moved to your own other account/wallet, paying your own card bill, and any debit whose matching credit also appears (round-trips). Sum of those debits.
+  "transfers": [                              // EVERY debit you classified as a self-transfer above, listed individually so the user can check them. This is the single most common source of double-counted spending, so it must be auditable rather than hidden inside a total.
+    { "date": "<YYYY-MM-DD or null>", "description": "<as printed>", "amount": <positive number in BASE_CURRENCY> }
+  ],
+  "possible_transfers": [                     // debits you did NOT exclude but that LOOK like they might be transfers to your own account or e-wallet (e.g. to Octopus, PayMe, Alipay, WeChat Pay, a named wallet, or another bank in your own name). Listing them lets the user confirm. Do not also put these in "transfers".
+    { "date": "<YYYY-MM-DD or null>", "description": "<as printed>", "amount": <positive number in BASE_CURRENCY> }
+  ],
   "monthly_breakdown": [                      // spending split by the CALENDAR MONTH of each transaction's date. A statement window that crosses months (e.g. 5 Jun–4 Jul) produces two entries. Amounts are rough — the app rescales.
     { "year": <YYYY>, "month": <1-12>, "categories": [ { "category": "<one of: ${CATEGORIES.join(", ")}>", "amount": <positive number in BASE_CURRENCY> } ] }
   ]
