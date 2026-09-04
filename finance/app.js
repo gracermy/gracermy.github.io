@@ -579,13 +579,66 @@
     }
   });
 
-  function statTile(label, value, signHint, sub) {
+  // `onOpen` makes the tile a button that shows how the figure was reached.
+  // Every number in this app is derived, so being able to see the arithmetic
+  // is the difference between trusting it and guessing at it.
+  function statTile(label, value, signHint, sub, onOpen) {
     const cls = signHint == null ? "" : signHint > 0 ? "pos" : signHint < 0 ? "neg" : "";
-    return el("div", { class: "stat" },
+    const kids = [
       el("div", { class: "stat-label" }, label),
       el("div", { class: "stat-value " + cls }, value),
-      sub ? el("div", { class: "stat-sub" }, sub) : null
-    );
+      sub ? el("div", { class: "stat-sub" }, sub) : null,
+    ];
+    if (!onOpen) return el("div", { class: "stat" }, ...kids);
+    return el("button", { class: "stat stat-tappable", type: "button",
+      title: "See how " + label + " is calculated", onClick: onOpen },
+      ...kids, el("span", { class: "stat-more" }, "i"));
+  }
+
+  // ── Breakdown modal ───────────────────────────────────
+  // Renders a list of lines and a total, so each tile can show its own working.
+  // `lines` = [{label, note, amount, sign}] where sign -1 renders as a
+  // subtraction. `foot` is an optional closing explanation.
+  function breakdownModal(title, lines, total, totalLabel, foot) {
+    const c = base();
+    const body = el("div", {});
+    const list = el("div", { class: "bd-list" });
+
+    if (!lines.length) {
+      list.append(el("div", { class: "empty-state", style: "padding:18px" },
+        "Nothing recorded for this."));
+    }
+    lines.forEach((ln) => {
+      list.append(el("div", { class: "bd-row" },
+        el("span", { class: "bd-name" }, ln.label,
+          ln.note ? el("span", { class: "bd-note" }, ln.note) : null),
+        el("span", { class: "bd-amt " + (ln.sign < 0 ? "neg" : "") },
+          (ln.sign < 0 ? "− " : "") + fmt(Math.abs(ln.amount), c))));
+    });
+    body.append(list);
+
+    if (total != null) {
+      body.append(el("div", { class: "bd-total" },
+        el("span", {}, totalLabel || "Total"),
+        el("span", { class: "bd-amt" }, fmt(total, c))));
+    }
+    if (foot) body.append(el("div", { class: "bd-foot" }, foot));
+
+    openModal({ title, body });
+  }
+
+  // Account name for a balance/move row, falling back gracefully if the
+  // account was renamed or removed after the snapshot was saved.
+  function acctName(id) {
+    const a = acctById(id);
+    return a ? a.name : "(removed account)";
+  }
+
+  // Converted value plus a note showing the original when it was foreign.
+  function fxNote(row) {
+    const rate = Number(row.exchange_rate) || 1;
+    if (rate === 1) return null;
+    return `${Number(row.amount).toLocaleString()} ${row.currency} @ ${rate}`;
   }
 
   // The full stat grid for a month `t` — ONE compact responsive grid of all
@@ -602,23 +655,117 @@
     // excludes market swings. A stock rising 5,000 is not 5,000 you failed to
     // spend. Market value is shown separately as an informational tile.
     const tiles = [
-      statTile("Net worth", fmt(t.netWorth, c), null, "what you put in, at cost"),
-      statTile("Growth", t.deltaNW === null ? "—" : fmtSigned(t.deltaNW, c), t.deltaNW, "vs previous month"),
-      statTile("Income", t.income ? fmt(t.income, c) : fmt(0, c), null, "this month"),
-      statTile("Expense", t.expense === null ? "not yet" : fmt(t.expense, c), t.expense === null ? null : -1, "income minus growth"),
-      statTile("Liquid", fmt(t.liquid, c), null, "banks, wallets, cash"),
-      statTile("Illiquid (at cost)", fmt(t.illiquidCost, c), null, "what you contributed"),
+      statTile("Net worth", fmt(t.netWorth, c), null, "what you put in, at cost",
+        () => showNetWorthBreakdown(t)),
+      statTile("Growth", t.deltaNW === null ? "—" : fmtSigned(t.deltaNW, c), t.deltaNW, "vs previous month",
+        t.deltaNW === null ? null : () => showGrowthBreakdown(t)),
+      statTile("Income", t.income ? fmt(t.income, c) : fmt(0, c), null, "this month",
+        () => showIncomeBreakdown(t)),
+      statTile("Expense", t.expense === null ? "not yet" : fmt(t.expense, c), t.expense === null ? null : -1, "income minus growth",
+        t.expense === null ? null : () => showExpenseBreakdown(t)),
+      statTile("Liquid", fmt(t.liquid, c), null, "banks, wallets, cash",
+        () => showLiquidBreakdown(t)),
+      statTile("Illiquid (at cost)", fmt(t.illiquidCost, c), null, "what you contributed",
+        () => showIlliquidBreakdown(t)),
       statTile("Liabilities", t.liabilities ? fmt(-t.liabilities, c) : fmt(0, c), t.liabilities ? -1 : 0,
-        t.paidLiabilities ? "excludes " + fmt(t.paidLiabilities, c) + " already paid" : "what you still owe"),
+        t.paidLiabilities ? "excludes " + fmt(t.paidLiabilities, c) + " already paid" : "what you still owe",
+        () => showLiabilitiesBreakdown(t)),
     ];
     // Market value is informational and deliberately last, so it never gets
     // mistaken for the figure the expense math uses.
     if (t.hasMarket) {
       const gain = t.marketNetWorth - t.netWorth;
       tiles.push(statTile("Net worth (market)", fmt(t.marketNetWorth, c), null,
-        (gain >= 0 ? "+" : "") + fmt(gain, c) + " unrealised"));
+        (gain >= 0 ? "+" : "") + fmt(gain, c) + " unrealised",
+        () => showMarketBreakdown(t)));
     }
     return [el("div", { class: "stat-grid" }, ...tiles)];
+  }
+
+  // ── Per-tile breakdowns ───────────────────────────────
+  const liquidLines = (t) => (t.snapshot.balances || [])
+    .filter((b) => b._accountType !== "liability")
+    .map((b) => ({ label: acctName(b.account_id), note: fxNote(b),
+                   amount: Model.toBase(b.amount, b.exchange_rate) }));
+
+  const owedLines = (t) => (t.snapshot.balances || [])
+    .filter((b) => b._accountType === "liability" && !b.is_paid)
+    .map((b) => ({ label: acctName(b.account_id), note: fxNote(b),
+                   amount: Model.toBase(b.amount, b.exchange_rate), sign: -1 }));
+
+  const paidLines = (t) => (t.snapshot.balances || [])
+    .filter((b) => b._accountType === "liability" && b.is_paid)
+    .map((b) => ({ label: acctName(b.account_id), note: "already paid, not subtracted",
+                   amount: Model.toBase(b.amount, b.exchange_rate) }));
+
+  function showNetWorthBreakdown(t) {
+    breakdownModal("Net worth", [
+      ...liquidLines(t),
+      { label: "Illiquid (at cost)", note: "everything you've contributed, all months", amount: t.illiquidCost },
+      ...owedLines(t),
+    ], t.netWorth, "Net worth",
+      "Illiquid is counted at what you put in, not what it's worth today, so market swings don't distort your expense. The market figure is its own tile.");
+  }
+
+  function showLiquidBreakdown(t) {
+    breakdownModal("Liquid", liquidLines(t), t.liquid, "Total liquid",
+      "Banks, e-wallets and cash on the day of this snapshot.");
+  }
+
+  function showLiabilitiesBreakdown(t) {
+    const paid = paidLines(t);
+    breakdownModal("Liabilities",
+      [...owedLines(t).map((l) => ({ ...l, sign: 0 })), ...paid],
+      t.liabilities, "Still owed",
+      paid.length
+        ? "Cards marked paid are listed for reference but not subtracted: that money has already left your bank account, so counting it again would count the same spending twice."
+        : "What you still owe on the day of this snapshot.");
+  }
+
+  function showIlliquidBreakdown(t) {
+    // Cumulative per-account contributions up to this month.
+    const byAcct = t.snapshot._illiquidCostByAcct || {};
+    const lines = Object.entries(byAcct)
+      .filter(([, v]) => Math.abs(v) > 0.005)
+      .map(([id, v]) => ({ label: acctName(id), note: "contributed to date", amount: v }));
+    breakdownModal("Illiquid (at cost)", lines, t.illiquidCost, "Total at cost",
+      "Every contribution you've made up to and including this month, minus any withdrawals. It doesn't change when the market moves.");
+  }
+
+  function showIncomeBreakdown(t) {
+    const lines = (t.snapshot.income || []).map((i) => ({
+      label: i.label || (i.kind === "fixed" ? "Fixed income" : "Side income"),
+      note: fxNote(i) || (i.kind === "fixed" ? "fixed" : "side"),
+      amount: Model.toBase(i.amount, i.exchange_rate),
+    }));
+    breakdownModal("Income", lines, t.income, "Total income",
+      "Money that came in this month. Transfers between your own accounts are not income.");
+  }
+
+  function showGrowthBreakdown(t) {
+    const prev = t.netWorth - t.deltaNW;
+    breakdownModal("Growth", [
+      { label: "Net worth this month", amount: t.netWorth },
+      { label: "Net worth last month", amount: prev, sign: -1 },
+    ], t.deltaNW, "Growth",
+      "How much your net worth changed, both months measured at cost. If this looks small next to a rising market value, that's why: unrealised gains are excluded on purpose, since a stock going up isn't money you saved.");
+  }
+
+  function showExpenseBreakdown(t) {
+    breakdownModal("Expense", [
+      { label: "Income this month", amount: t.income },
+      { label: "Growth in net worth", amount: t.deltaNW, sign: t.deltaNW >= 0 ? -1 : 1 },
+    ], t.expense, "Spent",
+      "Your spending is worked out from what you kept, not by adding up receipts: money that came in but didn't end up in an account was spent. The category pie is a separate, rougher estimate from your statements.");
+  }
+
+  function showMarketBreakdown(t) {
+    const gain = t.marketNetWorth - t.netWorth;
+    breakdownModal("Net worth (market)", [
+      { label: "Net worth at cost", amount: t.netWorth },
+      { label: "Unrealised gain on illiquid", note: "market value minus what you paid", amount: gain },
+    ], t.marketNetWorth, "Market net worth",
+      "What everything would be worth if sold today. This is the truer picture of your wealth, but it is deliberately kept out of the expense math: a stock rising isn't money you failed to spend.");
   }
 
   // The "Income − Growth = Spent" line for a month.
