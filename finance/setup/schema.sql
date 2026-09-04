@@ -71,8 +71,16 @@ create table if not exists public.balances (
   -- value in base currency = amount * exchange_rate
   -- (rate of 1 means same currency as base)
   exchange_rate numeric not null default 1,
+  -- LIABILITY ACCOUNTS ONLY. Lets you keep a card's statement balance on record
+  -- while telling the app the bill has already been settled, so it is NOT
+  -- subtracted from net worth (the money has already left your bank account).
+  -- Ignored for liquid accounts. Default false = still owed.
+  is_paid       boolean not null default false,
   created_at    timestamptz not null default now()
 );
+
+-- Additive migration for databases created before is_paid existed.
+alter table public.balances add column if not exists is_paid boolean not null default false;
 
 -- ─────────────────────────────────────────────────────────────
 -- ILLIQUID MOVES: contribution/withdrawal at cost within a snapshot

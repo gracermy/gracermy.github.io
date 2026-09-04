@@ -43,11 +43,17 @@ const Model = (() => {
   // Given one snapshot's fully-loaded rows, compute its components.
   // `illiquidCost` is passed in (cumulative, computed at a higher level).
   function computeSnapshot(snap, illiquidCost) {
-    let liquid = 0, liabilities = 0, income = 0;
+    let liquid = 0, liabilities = 0, income = 0, paidLiabilities = 0;
     for (const b of snap.balances || []) {
       const acctType = b._accountType;
       const v = toBase(b.amount, b.exchange_rate);
-      if (acctType === "liability") liabilities += v;
+      if (acctType === "liability") {
+        // A card marked paid keeps its statement balance on record (so you can
+        // see what the bill was) but is NOT owed any more: that money already
+        // left the bank account, so subtracting it too would count it twice.
+        if (b.is_paid) paidLiabilities += v;
+        else liabilities += v;
+      }
       else liquid += v; // liquid accounts
     }
     for (const inc of snap.income || []) {
@@ -70,9 +76,12 @@ const Model = (() => {
       illiquidMarket += (id in marketByAcct) ? marketByAcct[id] : (costByAcct[id] || 0);
     }
 
+    // `liabilities` counts only what is still OWED; paid-off cards are excluded
+    // above. `paidLiabilities` is kept for display, so a settled bill can still
+    // be shown without affecting any total.
     const netWorth = liquid + illiquidCost - liabilities;                 // at-cost (drives expense)
     const marketNetWorth = liquid + illiquidMarket - liabilities;         // market (informational)
-    return { liquid, illiquidCost, illiquidMarket, hasMarket, liabilities, income, netWorth, marketNetWorth };
+    return { liquid, illiquidCost, illiquidMarket, hasMarket, liabilities, paidLiabilities, income, netWorth, marketNetWorth };
   }
 
   // Compute a full timeline: array of snapshots (ascending by date) each with

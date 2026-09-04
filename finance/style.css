@@ -571,6 +571,18 @@ body.modal-open { position: fixed; left: 0; right: 0; overflow: hidden; }
   transition: transform 0.2s;
 }
 .switch.on .switch-knob { transform: translateX(19px); }
+
+/* Compact switch used inline on a credit-card balance row. */
+.switch-sm { width: 38px; height: 22px; }
+.switch-sm .switch-knob { width: 16px; height: 16px; }
+.switch-sm.on .switch-knob { transform: translateX(16px); }
+
+.paid-wrap { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; align-self: center; }
+.paid-lbl {
+  font-size: 0.72rem; color: var(--neg); font-weight: 500;
+  letter-spacing: 0.02em; min-width: 32px; text-align: right;
+}
+.paid-lbl.on { color: var(--pos); }
 .wallet-row:hover { border-color: var(--border-hover); transform: translateY(-2px); }
 .wallet-emoji { font-size: 1.5rem; flex: 0 0 auto; line-height: 1; }
 .wallet-main { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }

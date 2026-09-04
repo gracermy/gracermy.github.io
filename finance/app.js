@@ -1026,7 +1026,7 @@
 
         // balances
         const balPayload = balRows.map((r) => r.read()).filter((r) => r.amount !== null)
-          .map((r) => ({ snapshot_id: sid, account_id: r.account_id, amount: r.amount, currency: r.currency, exchange_rate: r.exchange_rate }));
+          .map((r) => ({ snapshot_id: sid, account_id: r.account_id, amount: r.amount, currency: r.currency, exchange_rate: r.exchange_rate, is_paid: r.is_paid }));
         if (balPayload.length) { const { error } = await sb.from("balances").insert(balPayload); if (error) throw error; }
 
         // illiquid moves (+ auto-routes on new snapshots)
@@ -1146,7 +1146,7 @@
     app.append(el("div", { class: "shell fade-up fd2" },
       el("h3", {}, "Balances"),
       el("div", { class: "section-hint" },
-        "Enter what each account showed on the day of this snapshot. For a credit card, that's what you still owe right now: if you've already paid the bill, enter 0. Foreign accounts: set the rate to " + base() + "."),
+        "Enter what each account showed on the day of this snapshot. For a credit card, keep the statement balance and flip the switch to paid once you've settled the bill. Foreign accounts: set the rate to " + base() + "."),
       liabilityInfo(),
       el("div", { class: "line-list" }, balRows.map((r) => r.node))
     ));
@@ -1210,19 +1210,32 @@
     const amtIn = el("input", { type: "number", step: "0.01", placeholder: "0", value: prior ? prior.amount : "" });
     const rateIn = el("input", { type: "number", step: "0.000001", placeholder: "rate → " + base(), value: prior ? prior.exchange_rate : (isForeign ? "" : 1) });
     if (!isForeign) rateIn.value = 1;
-    // For a card, "I've paid it" is the common case and typing 0 next to a
-    // statement that says 3,000 feels wrong. This sets the field to 0 rather
-    // than hiding a value, so what's stored is always what you actually owe:
-    // the money has already left your bank, so the debt is genuinely gone.
-    //
-    // Nothing about your spending is lost by doing this. The AMOUNT you spent
-    // is already visible as the drop in your bank balance, and WHAT you spent
-    // it on lives in expense_lines, a separate table this field never feeds.
-    const paidBtn = account.type === "liability"
-      ? el("button", { class: "btn btn-ghost btn-sm", type: "button",
-          title: "Already paid, so nothing is owed now. Your spending is still recorded: the amount shows as the drop in your bank balance, and the categories are kept separately below.",
-          onClick: () => { amtIn.value = 0; amtIn.dispatchEvent(new Event("input")); } }, "Paid it")
+    // Cards keep their statement balance on record, with a switch saying
+    // whether the bill is settled. Paid means it is NOT subtracted from net
+    // worth: that money already left the bank account, so counting the debt as
+    // well would count the same spending twice.
+    const isLiability = account.type === "liability";
+    let paid = prior ? !!prior.is_paid : false;
+    const paidSw = isLiability
+      ? el("button", {
+          class: "switch switch-sm" + (paid ? " on" : ""), type: "button",
+          role: "switch", "aria-checked": paid ? "true" : "false",
+          "aria-label": "Bill already paid",
+          title: "On = already paid, so it is not subtracted from your net worth. Off = still owed.",
+        }, el("span", { class: "switch-knob" }))
       : null;
+    const paidLbl = isLiability
+      ? el("span", { class: "paid-lbl" + (paid ? " on" : "") }, paid ? "paid" : "owed")
+      : null;
+    if (paidSw) {
+      paidSw.addEventListener("click", () => {
+        paid = !paid;
+        paidSw.classList.toggle("on", paid);
+        paidSw.setAttribute("aria-checked", paid ? "true" : "false");
+        paidLbl.textContent = paid ? "paid" : "owed";
+        paidLbl.classList.toggle("on", paid);
+      });
+    }
 
     const node = el("div", { class: "line-item" },
       el("span", { class: "li-name" }, account.name,
@@ -1231,7 +1244,7 @@
         amtIn,
         el("span", { class: "tag", style: "align-self:center" }, account.currency),
         isForeign ? rateIn : null,
-        paidBtn
+        paidSw ? el("span", { class: "paid-wrap" }, paidLbl, paidSw) : null
       )
     );
     return {
@@ -1240,11 +1253,13 @@
       read() {
         const amount = amtIn.value === "" ? null : Number(amtIn.value);
         const exchange_rate = isForeign ? (Number(rateIn.value) || 1) : 1;
-        return { account_id: account.id, amount, currency: account.currency, exchange_rate };
+        return { account_id: account.id, amount, currency: account.currency, exchange_rate,
+                 is_paid: isLiability ? paid : false };
       },
-      set(amount, rate) {
+      set(amount, rate, isPaid) {
         if (amount != null && isFinite(amount)) amtIn.value = amount;
         if (isForeign && rate != null && isFinite(rate)) rateIn.value = rate;
+        if (paidSw && isPaid != null && !!isPaid !== paid) paidSw.click();
       },
     };
   }
@@ -2101,11 +2116,11 @@
     const pop = el("div", { class: "info-pop hidden" },
       close,
       el("span", { html:
-        "<strong>Credit cards: enter what you owe today, not the statement balance.</strong><br><br>" +
-        "A statement shows what you owed on its closing date, often weeks before this snapshot. If you've since paid it, that money has already left your bank account, so entering the old figure counts it twice and makes your net worth look lower than it is.<br><br>" +
-        "Paying a card never changes your net worth: cash goes down, debt goes down, and they cancel out. Bank 50,000 with 3,000 owed is the same 47,000 as bank 47,000 with nothing owed.<br><br>" +
-        "<strong>You don't lose the expense by entering 0.</strong> The amount you spent already shows as the drop in your bank balance, and the categories are recorded separately in the spending section below. Leaving a paid bill in as a debt doesn't record it better, it just counts the same money twice and makes your expense read too high.<br><br>" +
-        "So: <strong>bill already paid → enter 0</strong> (or whatever you've charged since). <strong>Still outstanding → enter what's owed.</strong>" }));
+        "<strong>Keep the statement balance, then say whether it's been paid.</strong><br><br>" +
+        "<strong>Owed</strong> (default): you still owe this, so it is subtracted from your net worth.<br>" +
+        "<strong>Paid</strong>: the bill is settled. The amount stays on record so you can see what the bill was, but it is <strong>not</strong> subtracted, because that money has already left your bank account.<br><br>" +
+        "Why it matters: paying a card never changes your net worth. Cash goes down and debt goes down together. Bank 50,000 owing 3,000 is the same 47,000 as bank 47,000 owing nothing. If the bill is paid but still counted as a debt, the same money is counted twice and both your net worth and your expense come out wrong.<br><br>" +
+        "If you've paid the statement and charged more since, set the amount to what you owe now and leave it on <strong>owed</strong>." }));
     close.addEventListener("click", () => pop.classList.add("hidden"));
     const btn = el("button", { class: "info-btn", type: "button", title: "How should I enter a credit card?",
       onClick: () => pop.classList.toggle("hidden") }, "i");

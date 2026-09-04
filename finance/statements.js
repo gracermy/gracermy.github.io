@@ -167,7 +167,7 @@ const Statements = (() => {
         // since been paid, that money has already left the bank account, so
         // keeping the old figure would count it twice.
         reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" },
-          "This is the statement balance. If you've already paid this bill, change it to 0 so it isn't counted twice."));
+          "This is the statement balance. Keep it as is; if you've already paid the bill, flip it to paid on the snapshot form so it isn't subtracted twice."));
         draft.liabilities.forEach((b) => reviewWrap.append(balanceRow(b, ["liability"], () => { arrRemove(draft.liabilities, b); renderReview(); })));
       }
       // Illiquid market values → illiquid account
@@ -216,23 +216,16 @@ const Statements = (() => {
     // is stored on the object as _acct ("" | account id | "__new__").
     function balanceRow(obj, wantTypes, onDelete) {
       const inputs = el("div", { class: "li-inputs" });
-      let amountInput = null;
       // name + amount + currency
       ["name", "amount", "currency"].forEach((f) => {
         const inp = el("input", { value: obj[f] == null ? "" : obj[f], style: f === "name" ? "flex:2" : "max-width:90px" });
-        if (f === "amount") { inp.type = "number"; amountInput = inp; }
+        if (f === "amount") inp.type = "number";
         inp.addEventListener("input", () => { obj[f] = f === "amount" ? Number(inp.value) : inp.value; });
         inputs.append(inp);
       });
-      // The parsed figure is the statement balance. If the bill is already
-      // paid, the money has left the bank and nothing is owed now, so this
-      // zeroes the amount rather than marking it "paid" and keeping a debt
-      // that no longer exists.
-      if (wantTypes.includes("liability")) {
-        inputs.append(el("button", { class: "btn btn-ghost btn-sm", type: "button",
-          title: "Already paid this bill? Set it to 0.",
-          onClick: () => { amountInput.value = 0; obj.amount = 0; } }, "Paid it"));
-      }
+      // The parsed figure is the statement balance and is kept as-is. Whether
+      // it has been paid is set on the snapshot form's owed/paid switch, so
+      // there is one place that decision lives.
       // account assignment dropdown
       const sel = el("select", { style: "max-width:150px" });
       const pool = accounts.filter((a) => wantTypes.includes(a.type));
