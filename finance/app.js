@@ -759,13 +759,42 @@
       "Your spending is worked out from what you kept, not by adding up receipts: money that came in but didn't end up in an account was spent. The category pie is a separate, rougher estimate from your statements.");
   }
 
+  // Shows the unrealised gain PER HOLDING, so the total is traceable to the
+  // accounts that produced it rather than appearing as one unexplained lump.
   function showMarketBreakdown(t) {
-    const gain = t.marketNetWorth - t.netWorth;
-    breakdownModal("Net worth (market)", [
-      { label: "Net worth at cost", amount: t.netWorth },
-      { label: "Unrealised gain on illiquid", note: "market value minus what you paid", amount: gain },
-    ], t.marketNetWorth, "Market net worth",
-      "What everything would be worth if sold today. This is the truer picture of your wealth, but it is deliberately kept out of the expense math: a stock rising isn't money you failed to spend.");
+    const c = base();
+    const costByAcct = t.snapshot._illiquidCostByAcct || {};
+    const marketByAcct = {};
+    (t.snapshot.marketValues || []).forEach((m) => {
+      marketByAcct[m.account_id] = (marketByAcct[m.account_id] || 0) + Model.toBase(m.amount, m.exchange_rate);
+    });
+
+    const lines = [];
+    // Every holding that has either a cost or a recorded market value.
+    const ids = [...new Set([...Object.keys(costByAcct), ...Object.keys(marketByAcct)])];
+    ids.forEach((id) => {
+      const cost = costByAcct[id] || 0;
+      const hasMkt = id in marketByAcct;
+      // A holding with no market value entered falls back to cost, so its gain
+      // is zero by definition. Saying so beats showing a silent 0.
+      const market = hasMkt ? marketByAcct[id] : cost;
+      const gain = market - cost;
+      lines.push({
+        label: acctName(id),
+        note: hasMkt
+          ? `worth ${fmt(market, c)}, cost ${fmt(cost, c)}`
+          : "no market value entered, counted at cost",
+        amount: gain,
+        sign: gain < 0 ? -1 : 1,
+      });
+    });
+    lines.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+
+    const totalGain = t.marketNetWorth - t.netWorth;
+    lines.push({ label: "Net worth at cost", note: "liquid + contributions − liabilities", amount: t.netWorth });
+
+    breakdownModal("Net worth (market)", lines, t.marketNetWorth, "Market net worth",
+      "What everything would be worth if sold today. The gain on each holding is its current value minus what you paid in. This is kept out of the expense math on purpose: a stock rising isn't money you failed to spend.");
   }
 
   // The "Income − Growth = Spent" line for a month.
