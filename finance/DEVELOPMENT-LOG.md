@@ -19,6 +19,67 @@ Setup docs: `setup/SETUP.md`, `setup/schema.sql` (asset tracker),
 
 ---
 
+## Digest frequency, per person (BUILT, 2026-09-09)
+
+**First, a real bug.** The weekly digest was scheduled `0 10 * * 1` — 10:00
+**UTC**, which is 18:00 in Hong Kong. It had been arriving Monday evening, not
+Monday morning. Now `0 2 * * 1` = 10:00 HKT. Hong Kong is UTC+8 year-round with
+no DST (checked: January and July both map 10:00 HKT to 02:00 UTC), so the hour
+never drifts.
+
+**Per person, not per wallet.** The digest is deliberately ONE notification
+covering all your wallets ("3 expenses across 2 wallets"). A per-wallet frequency
+would force one push per wallet, which is precisely the spam a single digest
+exists to prevent, and would need a rule for when a daily and a weekly wallet
+collide. Muting one wallet, if ever wanted, is a boolean — not a second
+frequency.
+
+**`notification_prefs`**: one row per user, `digest` in `off | daily | weekly`,
+owner-only RLS. **A missing row means weekly**, so both existing users kept
+today's behaviour with no backfill — and the weekly query has to match NULL as
+well as `'weekly'`, which is the one easy thing to get wrong here.
+
+`'off'` stops **the digest only**. Expense-added, settlement and join pings still
+arrive; the per-device switch remains the way to silence everything. The digest
+is the part people tire of first, so it gets its own control.
+
+**`weekly_summaries()` → `digest_summaries(window_days, want)`.** Same query,
+parameterised window, plus a join on the preference so each run only serves the
+people who chose that cadence. `weekly_summaries()` survives as a thin wrapper so
+the function and the cron jobs could be updated in either order without a window
+where the digest broke.
+
+**The date boundary is not incidental.** `spent_on` is a bare DATE and
+`current_date` evaluates in the DB's timezone (UTC). Between 00:00 and 08:00 HKT
+the UTC date is still yesterday, so a *daily* window computed in UTC would cover
+the wrong day. The window is anchored to the Hong Kong date explicitly rather
+than relying on the two coinciding, which they do only by luck.
+
+**Two cron jobs**, both 02:00 UTC (10:00 HKT): `bloom-weekly-summary` Mondays,
+`bloom-daily-summary` every day. Mutually exclusive by preference.
+
+**Verified against the real database** (rolled-back transactions, impersonating a
+logged-in user):
+
+- no prefs row -> weekly targets 2 people, daily targets 0
+- set to daily -> leaves the weekly run (0), appears in the daily run
+- set to off -> in neither run
+- users in BOTH runs simultaneously: **0**
+- `weekly_summaries()` wrapper matches `digest_summaries(7,'weekly')`
+- a today-dated expense produces a correct daily payload (1 expense, HKD 120)
+  while the weekly run separately covers the other user's 4
+- RLS: own row visible, others' invisible, cross-user write refused, an invalid
+  `digest` value rejected by the check constraint
+
+Afterwards: 0 prefs rows, 6 expenses, 2 wallets, no test residue.
+
+**A daily digest is silent on quiet days** (`having count(...) > 0`). With 0
+expenses in the last 24h at the time of writing, daily correctly targeted nobody.
+That is the design, not a failure — worth remembering before debugging a
+"missing" daily notification.
+
+---
+
 ## Wallet delete made atomic in Postgres (BUILT, 2026-09-09)
 
 The client-side delete worked but was **not atomic**: five separate PostgREST

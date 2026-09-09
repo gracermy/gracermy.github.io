@@ -453,6 +453,35 @@ const Split = (() => {
     return true;
   }
 
+  // ── Digest preference (per person, not per device) ────
+  // The on/off switch above is per DEVICE (a push subscription is one browser).
+  // This is per PERSON: how often the summary digest arrives, across all their
+  // devices and all their wallets. 'off' stops the digest only — expense-added,
+  // settlement and join notifications still come through, since those are the
+  // ones people actually want kept.
+  //
+  // No row means 'weekly', matching the SQL default, so a user who has never
+  // touched this setting behaves exactly as before.
+  async function getDigestPref() {
+    const { data, error } = await sb()
+      .from("notification_prefs").select("digest").maybeSingle();
+    if (error) throw error;
+    return (data && data.digest) || "weekly";
+  }
+
+  async function setDigestPref(digest) {
+    if (!["off", "daily", "weekly"].includes(digest)) throw new Error("Unknown digest option.");
+    const { data: sess } = await sb().auth.getUser();
+    const uid = sess && sess.user && sess.user.id;
+    if (!uid) throw new Error("Please sign in again.");
+    // upsert, since the row may not exist yet (the common case).
+    const { error } = await sb().from("notification_prefs")
+      .upsert({ user_id: uid, digest, updated_at: new Date().toISOString() },
+              { onConflict: "user_id" });
+    if (error) throw error;
+    return digest;
+  }
+
   // ── Balances ──────────────────────────────────────────
   //   paid    = Σ expenses this member paid for
   //   owed    = Σ their shares across all expenses
@@ -531,6 +560,7 @@ const Split = (() => {
     saveExpense, deleteExpense, loadExpense, categoryTotals,
     saveSettlement, updateSettlement, loadSettlement, deleteSettlement,
     pushStatus, enablePush, disablePush, pushSupported,
+    getDigestPref, setDigestPref,
     computeBalances, simplifyDebts, myPosition,
     toBase,
   };

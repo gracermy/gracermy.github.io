@@ -138,11 +138,18 @@ async function pushToTargets(targets: Target[], message: unknown) {
   return { sent, pruned: expired.length };
 }
 
-// The weekly digest: one notification per person summarising the last 7 days.
-// Sent to everyone who has notifications on and had activity; people with a
-// quiet week get nothing rather than a "you spent nothing" ping.
-async function sendWeeklySummaries() {
-  const { data: rows, error } = await db.rpc("weekly_summaries");
+// The digest: one notification per person summarising a window of activity.
+// Sent to everyone who has notifications on, chose THIS cadence, and had
+// activity; a quiet period sends nothing rather than a "you spent nothing" ping.
+// A daily digest is silent most days by design — that is not a failure.
+//
+// The two cadences are mutually exclusive in SQL (a user with no preference row
+// counts as weekly), so nobody can receive both runs.
+async function sendDigest(window: "daily" | "weekly") {
+  const days = window === "daily" ? 1 : 7;
+  const { data: rows, error } = await db.rpc("digest_summaries", {
+    window_days: days, want: window,
+  });
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500, headers: { "Content-Type": "application/json" },
@@ -161,7 +168,7 @@ async function sendWeeklySummaries() {
     const where = wallets === 1 ? "1 wallet" : `${wallets} wallets`;
 
     const result = await pushToTargets(targets as Target[], {
-      title: "Your week in Bloom",
+      title: window === "daily" ? "Your day in Bloom" : "Your week in Bloom",
       body: `${n} ${n === 1 ? "expense" : "expenses"} across ${where}. ${total} spent, your share ${share}.`,
       url: "/finance/#wallets",
     });
@@ -190,6 +197,7 @@ Deno.serve(async (req) => {
     record?: Record<string, unknown>;
     old_record?: Record<string, unknown>;
     job?: string;
+    window?: string;
   };
   try {
     payload = await req.json();
@@ -197,9 +205,12 @@ Deno.serve(async (req) => {
     return new Response("Bad JSON", { status: 400 });
   }
 
-  // The weekly digest is triggered by pg_cron rather than a table event.
-  if (payload.job === "weekly-summary") {
-    return await sendWeeklySummaries();
+  // Digests are triggered by pg_cron rather than a table event. The old
+  // "weekly-summary" job name keeps working so the function and the cron jobs
+  // can be updated in either order without a window where the digest breaks.
+  if (payload.job === "digest" || payload.job === "weekly-summary") {
+    const window = payload.window === "daily" ? "daily" : "weekly";
+    return await sendDigest(window);
   }
 
   if (!payload.record || !payload.table) {

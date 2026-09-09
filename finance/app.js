@@ -1707,7 +1707,58 @@
     });
 
     row.append(label, sw);
-    return row;
+
+    // With notifications off there is nothing to schedule, so the frequency
+    // control would be a setting with no effect. Only show it when it means
+    // something.
+    if (!on) return row;
+
+    const wrap = el("div", { class: "notif-group fade-up" }, row);
+    const digestRow = el("div", { class: "notif-bar notif-sub" });
+    const digestNote = el("span", { class: "notif-note" }, "");
+    const pills = el("div", { class: "pill-row" });
+
+    const OPTS = [
+      ["daily",  "Daily",  "A summary each morning, on days with activity."],
+      ["weekly", "Weekly", "One summary on Monday mornings."],
+      ["off",    "Off",    "No summary. You still get alerts for new expenses and payments."],
+    ];
+
+    let current = "weekly";
+    const paint = () => {
+      [...pills.children].forEach((p) => p.classList.toggle("active", p.dataset.v === current));
+      const found = OPTS.find((o) => o[0] === current);
+      digestNote.textContent = found ? found[2] : "";
+    };
+
+    OPTS.forEach(([value, text]) => {
+      const p = el("button", { class: "pill", type: "button" }, text);
+      p.dataset.v = value;
+      p.addEventListener("click", async () => {
+        if (current === value) return;
+        const prev = current;
+        current = value;            // optimistic: the control should feel instant
+        paint();
+        try {
+          await Split.setDigestPref(value);
+        } catch (e) {
+          current = prev;           // put it back if the save didn't land
+          paint();
+          digestNote.textContent = e.message || "Couldn't save that.";
+          digestNote.classList.add("neg");
+        }
+      });
+      pills.append(p);
+    });
+
+    digestRow.append(el("span", { class: "notif-label" }, "Summary"), pills);
+    wrap.append(digestRow, digestNote);
+
+    // Load the saved choice after painting, so the card renders immediately
+    // rather than waiting on a round trip.
+    Split.getDigestPref().then((v) => { current = v; paint(); }).catch(() => paint());
+    paint();
+    return wrap;
   }
 
   // One row in the wallets list: emoji, name, members, your position.

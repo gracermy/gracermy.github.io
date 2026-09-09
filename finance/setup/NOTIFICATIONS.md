@@ -119,23 +119,48 @@ with your project ref and your `PUSH_HOOK_SECRET`.
 
 ```sql
 -- pg_cron and pg_net are already enabled on Supabase.
+-- TWO jobs: one per cadence. A user's notification_prefs.digest decides which
+-- one reaches them, and the SQL makes the two sets mutually exclusive, so
+-- nobody ever receives both. No preference row means weekly.
+--
+-- 02:00 UTC = 10:00 Hong Kong. HK is UTC+8 year-round with no DST, so this
+-- hour never drifts. (The original job used 0 10 * * 1, which was 10:00 UTC =
+-- 6pm HKT — the digest was arriving in the evening, not the morning.)
 select cron.schedule(
   'bloom-weekly-summary',
-  '0 10 * * 1',          -- Mondays at 10:00 UTC
+  '0 2 * * 1',           -- Mondays 10:00 HKT
   $$
   select net.http_post(
     url     := 'https://YOUR-PROJECT-REF.supabase.co/functions/v1/send-push',
     headers := jsonb_build_object(
                  'Content-Type', 'application/json',
                  'x-push-secret', 'YOUR_PUSH_HOOK_SECRET'),
-    body    := jsonb_build_object('job', 'weekly-summary')
+    body    := jsonb_build_object('job', 'digest', 'window', 'weekly')
+  );
+  $$
+);
+
+select cron.schedule(
+  'bloom-daily-summary',
+  '0 2 * * *',           -- every day 10:00 HKT
+  $$
+  select net.http_post(
+    url     := 'https://YOUR-PROJECT-REF.supabase.co/functions/v1/send-push',
+    headers := jsonb_build_object(
+                 'Content-Type', 'application/json',
+                 'x-push-secret', 'YOUR_PUSH_HOOK_SECRET'),
+    body    := jsonb_build_object('job', 'digest', 'window', 'daily')
   );
   $$
 );
 ```
 
-The cron time is in **UTC**. Hong Kong is UTC+8, so `0 10 * * 1` arrives Monday
-6pm your time. Adjust the hour to taste.
+A daily digest is **silent on days with no activity** (the summary function has
+`having count(...) > 0`), so most days send nothing. That is intended, not a
+fault.
+
+The cron time is in **UTC**, so every schedule here is written as UTC and the
+comment gives the Hong Kong time. `0 2 * * 1` = Monday 10:00 HKT.
 
 To check or change it later:
 
