@@ -123,11 +123,35 @@ window.__mockDraft = {
   ],
   liabilities:[{name:'Mox Credit Card', amount:2100, currency:'HKD'}],
   illiquid_balances:[{name:'MPF (SuperTrust)', amount:35940.41, currency:'HKD'}],
-  transactions:[
-    {date:'2026-08-05', description:'Keeta', amount:108.3, currency:'HKD', category:'food', is_transfer:false},
-    {date:'2026-08-06', description:'UNIQLO', amount:208, currency:'HKD', category:'shopping', is_transfer:false},
-    {date:'2026-08-07', description:'OCTOPUS top-up', amount:500, currency:'HKD', category:'transport', is_transfer:true},
-    {date:'2026-08-08', description:'ClassPass', amount:158, currency:'HKD', category:'fitness', is_transfer:false},
+  spending_total: 4397.7,
+  // Mirrors the deployed Edge Function: monthly_breakdown categories carrying
+  // their own per-line detail, already split by calendar month.
+  monthly_breakdown:[
+    {year:2026, month:8, categories:[
+      {category:'food', amount:505.7, lines:[
+        {date:'2026-08-05', time:'12:41', description:'Keeta', amount:108.3},
+        {date:'2026-08-05', time:'20:15', description:'CITYSUPER TSTOWER', amount:264.5},
+        {date:'2026-08-19', time:'21:48', description:'Deliveroo HK', amount:132.9},
+      ]},
+      {category:'shopping', amount:208, lines:[
+        {date:'2026-08-06', time:'14:02', description:'UNIQLO', amount:208},
+      ]},
+      {category:'fitness', amount:158, lines:[
+        {date:'2026-08-08', time:'07:30', description:'ClassPass', amount:158},
+      ]},
+      {category:'transport', amount:46, lines:[
+        {date:'2026-08-11', time:null, description:'MTR Corporation', amount:46},
+      ]},
+    ]},
+    // A line in the NEXT calendar month, so the cross-month split is exercised.
+    {year:2026, month:9, categories:[
+      {category:'travel', amount:3480, lines:[
+        {date:'2026-09-02', time:'19:05', description:'Cathay Pacific', amount:3480},
+      ]},
+    ]},
+  ],
+  transfers:[
+    {date:'2026-08-07', description:'OCTOPUS top-up', amount:500},
   ],
 };
 </script>

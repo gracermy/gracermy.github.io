@@ -60,7 +60,14 @@ Return an object with these fields:
     { "date": "<YYYY-MM-DD or null>", "description": "<as printed>", "amount": <positive number in BASE_CURRENCY> }
   ],
   "monthly_breakdown": [                      // spending split by the CALENDAR MONTH of each transaction's date. A statement window that crosses months (e.g. 5 Jun–4 Jul) produces two entries. Amounts are rough — the app rescales.
-    { "year": <YYYY>, "month": <1-12>, "categories": [ { "category": "<one of: ${CATEGORIES.join(", ")}>", "amount": <positive number in BASE_CURRENCY> } ] }
+    { "year": <YYYY>, "month": <1-12>, "categories": [
+        { "category": "<one of: ${CATEGORIES.join(", ")}>", "amount": <positive number in BASE_CURRENCY>,
+          "lines": [                          // EVERY individual statement line that makes up this category amount, in the order printed. The user reads these to check the statement line by line.
+            { "date": "<YYYY-MM-DD or null>", "time": "<HH:MM 24-hour, or null if the statement prints no time>",
+              "description": "<the merchant / reference name as printed on the statement>",
+              "amount": <positive number in BASE_CURRENCY> }
+          ] }
+      ] }
   ]
 }
 
@@ -92,12 +99,16 @@ monthly_breakdown rules — THE GUIDING PRINCIPLE: only label what is CLEARLY a 
     streaming / bars / cinemas -> entertainment;
     rent -> rent; utilities / telecom -> bills.
 - Put in "other" (do NOT guess a specific category): any transfer or FPS payment to/from a PERSON's name, generic references, bank-to-bank transfers, ATM/cash withdrawals, ambiguous merchant names, or anything you are not confident about. A bank/savings statement that is mostly person-to-person transfers should be almost entirely "other".
+- ITEMISE: every category MUST carry a "lines" array holding the individual statement lines behind its amount, and a category's lines must add up to its amount. Never merge, group or summarise several printed lines into one entry, even when they share a merchant or a date: one printed line = one array entry. The user reads this list to see where the rough total came from, so an unitemised category is useless to them.
+- "description" is the reference name as printed. Tidy up spacing and ALL-CAPS runs if you like, but never replace it with a generic label like "purchase", "transaction", or the category name.
+- Include "time" only if the statement actually prints a time for that line. Never guess one; use null.
+- Lines belong to the month entry matching their own transaction date, exactly as the category amounts do.
 - EXCLUDE entirely (not spending at all): salary/income, paying your own credit-card bill, moving money between your own accounts, wallet top-ups, and cash withdrawn then re-deposited.
 
 Other rules:
 - If the statement prints an exchange rate for a foreign-currency line, put it in exchange_rate_to_hkd.
 - A credit-card "statement balance" is a liability (amount owed) -> put it under "liabilities", positive.
-- Do not include a "transactions" list; only the aggregate fields above.
+- Do not include a separate top-level "transactions" list; the per-category "lines" arrays inside monthly_breakdown are where individual transactions go.
 - Output ONLY the JSON object, no prose.`;
 
 Deno.serve(async (req) => {
@@ -137,7 +148,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5",
-        max_tokens: 4096,
+        max_tokens: 16000,   // itemised lines make the response far longer than the old aggregate-only summary
         system: buildPrompt(baseCurrency),
         messages: [{
           role: "user",

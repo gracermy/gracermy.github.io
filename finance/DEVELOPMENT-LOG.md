@@ -19,6 +19,150 @@ Setup docs: `setup/SETUP.md`, `setup/schema.sql` (asset tracker),
 
 ---
 
+## Wallet delete made atomic in Postgres (BUILT, 2026-09-09)
+
+The client-side delete worked but was **not atomic**: five separate PostgREST
+calls, so a connection dropped midway left a wallet whose expenses were gone but
+which still appeared in the list. Now a single `delete_wallet(wid)` SECURITY
+DEFINER function does all five deletes in one implicit transaction — all or
+nothing. `Split.deleteWallet()` is one `rpc()` call.
+
+**The owner check is load-bearing.** SECURITY DEFINER means RLS does not filter
+what the function touches, so `is_wallet_owner()` at the top is the only thing
+between a caller and someone else's wallet. It raises `42501` for a non-owner
+rather than deleting nothing, so the client can tell refusal apart from an
+already-deleted wallet. Execute is revoked from `public` and granted only to
+`authenticated`.
+
+**Verified against the real database** (each test inside a transaction that
+rolls back, impersonating a logged-in user with `set_config('request.jwt.claims',…)`
+since the SQL console has no `auth.uid()`):
+
+- naive `delete from wallets` FAILS -> `violates foreign key constraint
+  expense_shares_member_id_fkey` — the exact reason the ordering exists
+- ordered delete succeeds, leaving 0 rows across all five tables
+- also on a deeper wallet (3 members incl. one who had **left**, 4 expenses,
+  12 shares, 2 settlements)
+- `delete_wallet()` in one call: clean, nothing orphaned
+- non-owner call **refused**, and the wallet it targeted still exists
+
+Grace's real data was checked untouched afterwards (2 wallets, 3 members,
+5 expenses, 9 shares).
+
+**Applied to the live DB already.** Re-running `split-schema.sql` is safe and
+idempotent (`create or replace`), but not required.
+
+---
+
+## Delete a wallet + the Edge Function that nearly got reverted (BUILT, 2026-09-09)
+
+**Delete wallet.** Wallet settings offered only Archive, so a wallet made by
+mistake stayed forever. There is now a red **Delete** beside Archive, owner-only
+(the `wallets_delete` / `wm_delete` RLS policies already enforced that server-side;
+the button just stops offering what would be refused).
+
+Deleting is not archiving, so the confirmation is deliberately heavier than the
+`confirm()` used elsewhere: it names what will be destroyed (`It holds 7 expenses
+and 2 payments`), says so explicitly when others are in the wallet (*it disappears
+for them too*), points at archiving as the reversible option, and requires the
+wallet's **name to be typed**. A wallet holds other people's records, so a
+reflexive OK is not consent.
+
+**`deleteWallet()` deletes in dependency order, and has to.** A plain
+`delete from wallets` fails: wallets cascades to `wallet_members`, but
+`expense_shares.member_id` and `settlements.from/to_member_id` are
+**ON DELETE RESTRICT**, so the cascade hits the restriction and the whole delete
+is rejected. Order is shares (reached through their parent expenses, since
+`expense_shares` has no `wallet_id`) → settlements → expenses → members → wallet.
+Any failure throws rather than leaving a half-deleted wallet.
+
+---
+
+**The Edge Function copy that was a month stale.** `finance/setup/edge-functions/`
+turned out to be a doc mirror, not the deploy source — the real one is
+`/supabase/functions/` at the **repo root**, and the mirror was ~1 month behind.
+Deploying from it would have silently reverted: base-currency conversion, the
+`spending_total = total_out - self_transfer_out` formula, the transfers /
+possible_transfers audit lists, and the cross-month `monthly_breakdown`. Caught by
+diffing the two before deploying. The mirror is now synced and carries
+`README-SOURCE.md` saying which copy is real.
+
+**So the itemisation from 2026-09-08 was ported onto the live prompt properly**,
+as a `lines` array *inside* each `monthly_breakdown` category rather than the flat
+top-level `transactions` list the stale copy used. That keeps every existing
+guarantee — lines arrive already split by calendar month and already converted to
+the base currency — and `buildMonths()` prefers them, falling back to
+`transactions`, then to aggregate-only categories. All three shapes were tested,
+including the aggregate-only one that was live at the time, so the site kept
+working before the deploy as well as after.
+
+Deployed with `supabase functions deploy parse-statement --project-ref <ref>`
+(the explicit ref is needed: there is no `supabase/config.toml`, so the CLI
+can't find the link on its own).
+
+---
+
+## Statement review: itemised lines grouped by category (BUILT, 2026-09-08)
+
+The AI statement review used to collapse a statement into one editable row per
+category (`food 506`, `shopping 208`). The number was right but the *sources*
+were invisible: you had to trust the total, and correcting it meant editing an
+aggregate you couldn't audit. The draft is a rough estimate by design, so the
+value of showing it at all is being able to see where it came from.
+
+**Now the review lists every line on the statement, grouped under its
+category.** Each line reads `date and time || reference name || amount`, with a
+category dropdown and a delete button:
+
+```
+Food                                  506
+  2026-08-05 12:41  Keeta             108   [food ▾] ✕
+  2026-08-05 20:15  CITYSUPER TSTOWER 265   [food ▾] ✕
+  2026-08-19 21:48  Deliveroo HK      133   [food ▾] ✕
+Shopping                              208
+  2026-08-06 14:02  UNIQLO            208   [shopping ▾] ✕
+```
+
+**The category total is derived, never stored.** `categorise()` regroups the
+surviving lines on every render, so deleting a line or moving it to another
+category updates both category totals and the month total immediately. The old
+UI stored a category amount alongside its name, which meant the displayed total
+could silently disagree with the lines it claimed to summarise. There is no
+longer an editable per-category amount, because there is nothing for it to mean.
+
+**On Apply, each line becomes its own `expense_lines` row**, labelled with the
+reference name as printed rather than with the category name repeated. So the
+saved breakdown says `food / Deliveroo HK / 133`, not `food / food / 506`. A
+line whose category isn't one of `EXPENSE_CATS` falls back to `other`, since the
+snapshot form's dropdown can only hold real categories.
+
+**Edge Function changes** (`setup/edge-functions/parse-statement/index.ts`,
+needs a redeploy to take effect): the prompt now asks for a `time` field, tells
+the model to emit **every** printed line rather than merging purchases that
+share a merchant or date, and to keep `description` as the reference name as
+printed instead of a generic label. `max_tokens` went 4096 → 16000, because a
+fully itemised statement is much longer than a category summary.
+
+**Kept as-is:** transfers are still excluded and still listed separately above
+(they're what makes the exclusion auditable); the cross-month split still shows
+each calendar month separately and applies only the month being added; a printed
+`spending_total` still wins, scaling the lines proportionally so the itemisation
+adds up to the statement's own figure. Older drafts with no line detail
+(`category_breakdown` / `monthly_breakdown`) still render, as one line per
+category.
+
+**Checked in a real browser** (headless Chrome against `preview.html`, whose
+mock draft now has times, several lines per category and a line in the next
+month): grouping, deleting, re-categorising, the cross-month notice, Apply
+producing one labelled expense row per line, plus dark mode and a 430px phone
+where the line wraps to two rows instead of three.
+
+**Note:** `transactions` is a real table in `schema.sql` but nothing writes to
+it. The line detail lives only in the browser during review and is discarded
+after Apply, so the saved `expense_lines` labels are the only record of it.
+
+---
+
 ## Settings as modals, centred (BUILT, 2026-09-02)
 
 Trial of a more app-like UI, built on a branch so it could be dropped. Grace

@@ -296,6 +296,41 @@ button.stat-tappable:hover .stat-more { color: var(--accent); border-color: var(
 .li-inputs { display: flex; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
 .li-inputs input, .li-inputs select { width: auto; flex: 1; min-width: 90px; }
 
+/* ── AI STATEMENT REVIEW: expense lines grouped by category ──
+   The read-a-statement draft lists every line on the statement under its
+   category heading, so the rough total is still auditable line by line. */
+.stmt-cat-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin: 12px 0 5px; padding: 0 2px;
+  border-bottom: 1px solid var(--border);
+}
+.stmt-cat-name {
+  font-size: 0.8rem; font-weight: 600; text-transform: capitalize;
+  letter-spacing: 0.02em;
+}
+.stmt-cat-total { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-muted); }
+/* Lines sit slightly indented under their heading so the grouping reads at a
+   glance, and tighter than a normal row since there can be dozens of them. */
+.line-item.stmt-line { padding: 7px 10px; margin-left: 10px; gap: 9px; }
+.stmt-line + .stmt-cat-head { margin-top: 16px; }
+.stmt-line-when {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-muted);
+  flex: 0 0 auto; white-space: nowrap;
+}
+/* The reference name is the flexible column, so it truncates rather than
+   pushing the amount and the category dropdown off the card. */
+.stmt-line-ref {
+  flex: 1; min-width: 0; font-size: 0.84rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Fixed width and right-aligned so the amounts form one money column down the
+   page instead of each sitting wherever its reference name ends. */
+.stmt-line-amt {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.84rem;
+  flex: 0 0 auto; white-space: nowrap; width: 74px; text-align: right;
+}
+.stmt-line-cat { flex: 0 0 auto; width: 118px; font-size: 0.78rem; padding: 4px 6px; }
+
 .history-item {
   display: flex; align-items: center; gap: 14px;
   padding: 14px 16px; border: 1px solid var(--border);
@@ -567,6 +602,11 @@ body.modal-open { position: fixed; left: 0; right: 0; overflow: hidden; }
 }
 .modal-link:hover { border-color: var(--accent); background: var(--accent-soft); }
 
+/* Destructive action in a footer full of safe ones. Ghost-weight so it doesn't
+   compete with Save, but unmistakably red once you look at it. */
+.btn.btn-danger { color: var(--neg); border-color: var(--neg); }
+.btn.btn-danger:hover:not(:disabled) { background: rgba(192, 68, 63, 0.1); border-color: var(--neg); }
+
 @keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modal-rise {
   from { opacity: 0; transform: translateY(12px) scale(0.98); }
@@ -791,6 +831,13 @@ body.modal-open { position: fixed; left: 0; right: 0; overflow: hidden; }
   .debt-row { padding: 10px 11px; gap: 8px; }
   /* Stack the per-person amount box under the name rather than squeezing both. */
   .split-input { width: 92px; }
+  /* On a phone the line wraps to two rows: the reference name on top, then
+     date, amount, category and delete together underneath. The ✕ must stay on
+     that second row, or it drops to a third and wastes a line per expense. */
+  .line-item.stmt-line { flex-wrap: wrap; margin-left: 0; row-gap: 4px; gap: 7px; padding: 8px 9px; }
+  .stmt-line-ref { flex: 1 1 100%; order: -1; white-space: normal; overflow-wrap: break-word; }
+  .stmt-line-amt { flex: 1 1 auto; }
+  .stmt-line-cat { width: auto; max-width: 116px; flex: 0 1 auto; }
   .field-row { flex-wrap: wrap; }
   .field-row > * { min-width: 140px; }
 }

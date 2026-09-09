@@ -23,6 +23,7 @@
 -- cascade;
 -- drop function if exists public.is_wallet_member(uuid);
 -- drop function if exists public.is_wallet_owner(uuid);
+-- drop function if exists public.delete_wallet(uuid);
 -- drop function if exists public.claim_wallet_invites();
 -- ─────────────────────────────────────────────────────────────
 
@@ -324,6 +325,55 @@ create policy st_all on public.settlements
   for all using (public.is_wallet_member(wallet_id))
       with check (public.is_wallet_member(wallet_id));
 
+
+-- ─────────────────────────────────────────────────────────────
+-- DELETE WALLET: remove a wallet and everything inside it, atomically.
+--
+-- WHY THIS IS A FUNCTION AND NOT FIVE CLIENT DELETES:
+--   1. ATOMICITY. The rows must be removed in dependency order, and a client
+--      cannot wrap five separate PostgREST calls in one transaction. If the
+--      network dropped midway, the wallet was left half-deleted (expenses gone,
+--      wallet still listed). Inside a function every delete shares one implicit
+--      transaction, so it either all happens or none of it does.
+--   2. ORDER IS MANDATORY. `delete from wallets` alone FAILS: wallets cascades
+--      to wallet_members, but expense_shares.member_id and
+--      settlements.from/to_member_id are ON DELETE RESTRICT, so the cascade hits
+--      the restriction and Postgres rejects the whole statement with
+--      "violates foreign key constraint expense_shares_member_id_fkey".
+--      Clearing the rows that reference members first is what makes it work.
+--
+-- SECURITY: this is SECURITY DEFINER, so it runs with elevated rights and RLS
+-- does NOT filter what it touches. The owner check below is therefore the ONLY
+-- thing standing between a caller and someone else's wallet, and it must come
+-- first. is_wallet_owner() reads auth.uid(), so a caller can only ever pass its
+-- own identity. A non-owner (or a non-member) gets an exception, not a no-op,
+-- so the client can tell refusal apart from an already-deleted wallet.
+-- ─────────────────────────────────────────────────────────────
+create or replace function public.delete_wallet(wid uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_wallet_owner(wid) then
+    raise exception 'Only a wallet owner can delete this wallet'
+      using errcode = '42501';  -- insufficient_privilege
+  end if;
+
+  -- Deepest dependency first. expense_shares has no wallet_id of its own, so
+  -- it is reached through its parent expenses.
+  delete from public.expense_shares
+   where expense_id in (select id from public.shared_expenses where wallet_id = wid);
+  delete from public.settlements     where wallet_id = wid;
+  delete from public.shared_expenses where wallet_id = wid;
+  delete from public.wallet_members  where wallet_id = wid;
+  delete from public.wallets         where id = wid;
+end;
+$$;
+
+revoke all on function public.delete_wallet(uuid) from public;
+grant execute on function public.delete_wallet(uuid) to authenticated;
 
 -- ─────────────────────────────────────────────────────────────
 -- Indexes

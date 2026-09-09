@@ -109,6 +109,38 @@ const Split = (() => {
     return updateWallet(walletId, { archived: !!archived });
   }
 
+  // What a wallet actually holds, so the delete confirmation can say what is
+  // about to be lost instead of asking you to delete an unknown quantity.
+  async function walletContents(walletId) {
+    const client = sb();
+    const [exp, set] = await Promise.all([
+      client.from("shared_expenses").select("id", { count: "exact", head: true }).eq("wallet_id", walletId),
+      client.from("settlements").select("id", { count: "exact", head: true }).eq("wallet_id", walletId),
+    ]);
+    return { expenses: exp.count || 0, settlements: set.count || 0 };
+  }
+
+  // Permanently delete a wallet and everything inside it. Owner-only.
+  //
+  // One RPC, not five deletes from here: the rows have to go in dependency
+  // order (expense_shares.member_id and the settlement member columns are ON
+  // DELETE RESTRICT, so a plain wallet delete is rejected), and PostgREST
+  // cannot wrap five calls in a transaction. Doing it in delete_wallet() makes
+  // the whole thing atomic, so a dropped connection can no longer leave a
+  // wallet with its expenses gone but the wallet still listed.
+  //
+  // The function raises 42501 for a non-owner rather than deleting nothing, so
+  // "you can't do that" stays distinguishable from "it was already gone".
+  async function deleteWallet(walletId) {
+    const { error } = await sb().rpc("delete_wallet", { wid: walletId });
+    if (error) {
+      if (error.code === "42501" || /owner/i.test(error.message || "")) {
+        throw new Error("Only a wallet owner can delete this wallet.");
+      }
+      throw error;
+    }
+  }
+
   // ── Members ───────────────────────────────────────────
   // Three ways a person joins, all producing the same kind of row:
   //   name only        -> they can't log in, but you can track what they owe
@@ -493,7 +525,7 @@ const Split = (() => {
 
   return {
     claimInvites, loadWallets, loadWallet, currentUserId,
-    createWallet, updateWallet, archiveWallet,
+    createWallet, updateWallet, archiveWallet, deleteWallet, walletContents,
     addMember, updateMember, removeMember, memberStatus,
     allocateEqual, allocateShares,
     saveExpense, deleteExpense, loadExpense, categoryTotals,

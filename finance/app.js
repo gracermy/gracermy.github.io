@@ -1322,19 +1322,27 @@
       (draft.illiquid_balances || []).forEach((b) => { const r = byId(marketRows, b._acct); if (r) r.set(b.amount); });
       // Apply ONLY the current month's spending portion (cross-month statements
       // split into multiple month groups; other months are applied when you add
-      // them). Fall back to a flat _categories list for legacy drafts.
+      // them). The reviewed month is a list of individual statement lines, so
+      // each surviving line becomes its own expense row, labelled with the
+      // reference name it had on the statement. Fall back to a flat
+      // _categories list for legacy drafts.
       const curY = Number(yearSel.value), curM = Number(monthSel.value);
-      let cats = [];
+      const monthLines = (g) => Array.isArray(g.lines) ? g.lines : [];
+      let lines = [];
       if (Array.isArray(draft._months)) {
         const mg = draft._months.find((g) => g.year === curY && g.month === curM);
-        cats = mg ? mg.categories : [];
+        lines = mg ? monthLines(mg) : [];
       } else {
-        cats = draft._categories || [];
+        lines = (draft._categories || []).map((c) => ({ category: c.category, description: c.category, amount: c.amount }));
       }
-      cats.filter((c) => c.category && Number(c.amount) > 0)
-        .forEach((c) => addExpRow({ category: c.category, label: c.category, amount: Math.round(Number(c.amount)) }));
+      lines.filter((l) => l.category && Number(l.amount) > 0)
+        .forEach((l) => addExpRow({
+          category: EXPENSE_CATS.includes(l.category) ? l.category : "other",
+          label: l.description || l.category,
+          amount: Math.round(Number(l.amount)),
+        }));
       err.className = "ok-msg";
-      const other = Array.isArray(draft._months) && draft._months.some((g) => (g.year !== curY || g.month !== curM) && g.total > 0);
+      const other = Array.isArray(draft._months) && draft._months.some((g) => (g.year !== curY || g.month !== curM) && monthLines(g).reduce((s, l) => s + (Number(l.amount) || 0), 0) > 0);
       err.textContent = "Draft applied." + (other ? " Note: this statement also has spending in another month. Open that month to apply its part." : " Review below, then save.");
       err.scrollIntoView({ behavior: "smooth", block: "center" });
     }
@@ -2176,10 +2184,44 @@
       } catch (e) { err.textContent = e.message || "Couldn't archive."; }
     });
 
+    // Deleting is not archiving: it destroys the shared history for EVERYONE in
+    // the wallet, not just this account's view of it, and there is no undo. So
+    // it says exactly what will be lost, and asks for the wallet's name to be
+    // typed rather than relying on a reflexive OK.
+    const deleteBtn = el("button", { class: "btn btn-ghost btn-danger" }, "Delete");
+    deleteBtn.addEventListener("click", async () => {
+      err.textContent = "";
+      const people = w.activeMembers.length;
+      const counts = await Split.walletContents(w.id).catch(() => null);
+      const bits = [];
+      if (counts) {
+        if (counts.expenses) bits.push(counts.expenses + (counts.expenses === 1 ? " expense" : " expenses"));
+        if (counts.settlements) bits.push(counts.settlements + (counts.settlements === 1 ? " payment" : " payments"));
+      }
+      const carries = bits.length ? bits.join(" and ") : "no expenses yet";
+      const shared = people > 1 ? `\n\nThis wallet is shared with ${people - 1} other ${people === 2 ? "person" : "people"}. It disappears for them too.` : "";
+      const typed = prompt(
+        `Delete "${w.name}" permanently?\n\nIt holds ${carries}. All of it is erased and this cannot be undone.${shared}\n\nArchiving instead keeps the history and just hides the wallet.\n\nType the wallet's name to confirm:`);
+      if (typed == null) return;
+      if (typed.trim().toLowerCase() !== w.name.trim().toLowerCase()) {
+        err.textContent = "That didn't match the wallet's name, so nothing was deleted.";
+        return;
+      }
+      deleteBtn.disabled = true;
+      try {
+        await Split.deleteWallet(w.id);
+        modal.close();
+        routeTo("wallets");
+      } catch (e) {
+        err.textContent = e.message || "Couldn't delete this wallet.";
+        deleteBtn.disabled = false;
+      }
+    });
+
     const modal = openModal({
       title: "Wallet settings",
       body,
-      footer: el("div", { class: "btn-row", style: "margin:0" }, saveBtn, archiveBtn),
+      footer: el("div", { class: "btn-row", style: "margin:0" }, saveBtn, archiveBtn, deleteBtn),
     });
   }
 

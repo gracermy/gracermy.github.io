@@ -7,6 +7,9 @@
 
 const Statements = (() => {
   const db = window.FinanceDB;
+  // Must match EXPENSE_CATS in app.js and CATEGORIES in the parse-statement
+  // Edge Function, so a re-categorised line still maps to a real expense row.
+  const CATEGORIES = ["rent", "food", "transport", "shopping", "travel", "entertainment", "fitness", "gift", "bills", "other"];
 
   function el(tag, props = {}, ...kids) {
     const n = document.createElement(tag);
@@ -91,6 +94,116 @@ const Statements = (() => {
       }
     });
 
+    // Turn the AI draft into month groups of individual spending LINES.
+    // Preference order: explicit line items (transactions) -> the newer
+    // monthly_breakdown / category_breakdown summaries (older drafts, which
+    // carry no line detail, so each category becomes a single unnamed line).
+    function buildMonths(d) {
+      const MONTHS_IN = [];
+      const groupFor = (year, month) => {
+        const y = Number(year) || d.period_year || 0, m = Number(month) || d.period_month || 0;
+        let g = MONTHS_IN.find((x) => x.year === y && x.month === m);
+        if (!g) { g = { year: y, month: m, lines: [] }; MONTHS_IN.push(g); }
+        return g;
+      };
+
+      // Preferred shape: monthly_breakdown categories each carrying their own
+      // "lines". Those are already split by calendar month and converted to the
+      // base currency by the Edge Function, so they need no further work.
+      const mbLines = Array.isArray(d.monthly_breakdown)
+        && d.monthly_breakdown.some((g) => (g.categories || []).some((c) => Array.isArray(c.lines) && c.lines.length));
+      if (mbLines) {
+        d.monthly_breakdown.forEach((g) => (g.categories || []).forEach((c, ci) => {
+          const cat = c.category || "other";
+          (c.lines || []).forEach((l, li) => {
+            const amount = Math.max(0, Number(l.amount) || 0);
+            if (!amount) return;
+            groupFor(g.year, g.month).lines.push({
+              _id: "m" + g.year + "-" + g.month + "-" + ci + "-" + li,
+              date: l.date || null, time: l.time || null,
+              description: l.description || "",
+              amount, category: cat,
+            });
+          });
+        }));
+      } else if (Array.isArray(d.transactions) && d.transactions.length) {
+        // Real line items. Self-transfers are dropped here (they're listed
+        // separately above as transfers), everything else becomes a line.
+        d.transactions.forEach((t, i) => {
+          if (t.is_transfer) return;
+          const amount = Math.max(0, Number(t.amount) || 0);
+          if (!amount) return;
+          const date = t.date || null;
+          const [yy, mm] = date ? date.split("-") : [];
+          groupFor(yy, mm).lines.push({
+            _id: "t" + i,
+            date, time: t.time || null,
+            description: t.description || "",
+            amount,
+            category: t.category || "other",
+          });
+        });
+      } else {
+        // Legacy/summary drafts: no line detail exists, so a category total is
+        // shown as one line with the category as its own reference name.
+        const fromCats = (cats, year, month) => (cats || []).forEach((c, i) => {
+          const amount = Math.max(0, Number(c.amount) || 0);
+          if (!amount) return;
+          groupFor(year, month).lines.push({
+            _id: "c" + year + "-" + month + "-" + i,
+            date: null, time: null,
+            description: c.category || "other",
+            amount,
+            category: c.category || "other",
+          });
+        });
+        if (Array.isArray(d.monthly_breakdown) && d.monthly_breakdown.length) {
+          d.monthly_breakdown.forEach((g) => fromCats(g.categories, g.year, g.month));
+        } else {
+          fromCats(d.category_breakdown, d.period_year, d.period_month);
+        }
+      }
+
+      // If the statement printed a stable spending total, scale the lines so
+      // they add up to it: the AI's per-line figures are the breakdown, the
+      // printed total is the authority.
+      const rawTotal = MONTHS_IN.reduce((sum, g) => sum + g.lines.reduce((x, l) => x + l.amount, 0), 0);
+      const stated = (d.spending_total != null && isFinite(d.spending_total) && Number(d.spending_total) >= 0)
+        ? Number(d.spending_total) : null;
+      if (stated != null && rawTotal > 0 && Math.abs(stated - rawTotal) > 1) {
+        const factor = stated / rawTotal;
+        MONTHS_IN.forEach((g) => g.lines.forEach((l) => { l.amount = l.amount * factor; }));
+      }
+      // Nothing itemised but a total is known: one "other" line in the closing month.
+      if (!MONTHS_IN.length && stated > 0) {
+        groupFor(d.period_year, d.period_month).lines.push({
+          _id: "total", date: null, time: null, description: "Statement total", amount: stated, category: "other",
+        });
+      }
+
+      MONTHS_IN.forEach((g) => g.lines.sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")) || String(a.time || "").localeCompare(String(b.time || ""))));
+      MONTHS_IN.sort((a, b) => (a.year - b.year) || (a.month - b.month));
+      return MONTHS_IN;
+    }
+
+    // Group one month's surviving lines by category, in descending size, and
+    // give each category the sum of its lines. Recomputed on every render so
+    // deletes and category changes are reflected immediately.
+    function categorise(mg) {
+      const map = new Map();
+      mg.lines.forEach((l) => {
+        const key = (l.category || "other").trim() || "other";
+        if (!map.has(key)) map.set(key, { category: key, amount: 0, lines: [] });
+        const g = map.get(key);
+        g.amount += l.amount;
+        g.lines.push(l);
+      });
+      return [...map.values()].sort((a, b) => b.amount - a.amount);
+    }
+
+    const monthTotal = (mg) => mg.lines.reduce((s, l) => s + l.amount, 0);
+    const draftTotal = () => (draft._months || []).reduce((s, g) => s + monthTotal(g), 0);
+
     function renderReview() {
       reviewWrap.innerHTML = "";
       if (!draft) return;
@@ -98,41 +211,12 @@ const Statements = (() => {
       draft.balances = draft.balances || [];
       draft.liabilities = draft.liabilities || [];
       draft.illiquid_balances = draft.illiquid_balances || [];
-      // Build per-CALENDAR-MONTH category breakdowns ONCE, scaled so the total
-      // across all months equals the stable spending_total. A cross-month
-      // statement (e.g. 5 Jun–4 Jul) yields two month groups.
-      if (!draft._months) {
-        // Gather raw month groups from monthly_breakdown (new) or fall back to a
-        // single group from category_breakdown / transactions (legacy).
-        let groups = [];
-        if (Array.isArray(draft.monthly_breakdown) && draft.monthly_breakdown.length) {
-          groups = draft.monthly_breakdown.map((g) => ({
-            year: Number(g.year) || draft.period_year, month: Number(g.month) || draft.period_month,
-            cats: (g.categories || []).map((c) => ({ category: c.category || "other", amount: Math.max(0, Number(c.amount) || 0) })),
-          }));
-        } else {
-          let raw = (draft.category_breakdown || []).map((c) => ({ category: c.category || "other", amount: Math.max(0, Number(c.amount) || 0) }));
-          if (raw.length === 0 && Array.isArray(draft.transactions)) {
-            const byCat = {};
-            draft.transactions.filter((t) => !t.is_transfer).forEach((t) => { byCat[t.category || "other"] = (byCat[t.category || "other"] || 0) + (Number(t.amount) || 0); });
-            raw = Object.entries(byCat).map(([category, amount]) => ({ category, amount }));
-          }
-          groups = [{ year: draft.period_year, month: draft.period_month, cats: raw }];
-        }
-        const grandRaw = groups.reduce((s, g) => s + g.cats.reduce((x, c) => x + c.amount, 0), 0);
-        draft._total = (draft.spending_total != null && isFinite(draft.spending_total) && draft.spending_total >= 0)
-          ? Number(draft.spending_total) : (grandRaw || 0);
-        // Scale every category by the same factor so all months sum to _total.
-        const factor = grandRaw > 0 ? draft._total / grandRaw : 0;
-        draft._months = groups.map((g) => {
-          const cats = g.cats.map((c) => ({ category: c.category, amount: Math.round(c.amount * factor) })).sort((a, b) => b.amount - a.amount);
-          return { year: g.year, month: g.month, categories: cats, total: cats.reduce((s, c) => s + c.amount, 0) };
-        });
-        // If nothing scaled but there's a total, put it all as "other" in the closing month.
-        if (draft._months.length === 0 && draft._total > 0) {
-          draft._months = [{ year: draft.period_year, month: draft.period_month, categories: [{ category: "other", amount: Math.round(draft._total) }], total: Math.round(draft._total) }];
-        }
-      }
+      // Build the per-CALENDAR-MONTH breakdown ONCE. Each month group holds the
+      // individual statement LINES (date/time, reference name, amount), and the
+      // categories are derived from those lines every render — so deleting a
+      // line or moving it to another category updates the totals for free.
+      // A cross-month statement (e.g. 5 Jun–4 Jul) yields two month groups.
+      if (!draft._months) draft._months = buildMonths(draft);
 
       const kind = draft.statement_kind === "spending" ? "Spending statement (credit card)" : "Asset statement (bank)";
       reviewWrap.append(el("div", { class: "section-hint" },
@@ -204,20 +288,23 @@ const Statements = (() => {
       const cur = curPeriod();
       if ((draft._months || []).length) {
         const crossMonth = draft._months.length > 1;
-        reviewWrap.append(groupHeader(`Spending from this statement: ${Math.round(draft._total).toLocaleString()}`));
+        reviewWrap.append(groupHeader(`Spending from this statement: ${Math.round(draftTotal()).toLocaleString()}`));
         if (crossMonth) {
           reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" },
-            "This statement crosses months. Each month's spending is shown separately — only the month you're adding now is applied. Come back to the other month to apply its part."));
-        } else {
-          reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" },
-            "Clear shops are labeled; transfers go to 'other'. Edit or delete any line."));
+            "This statement crosses months. Each month's spending is shown separately, and only the month you're adding now is applied. Come back to the other month to apply its part."));
         }
+        reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" },
+          "Every line on the statement, grouped by category. Move a line to another category or delete it, and the totals follow."));
         draft._months.forEach((mg) => {
           const isCurrent = mg.year === cur.year && mg.month === cur.month;
-          const label = `${MONTHS[(mg.month || 1) - 1]} ${mg.year} — ${Math.round(mg.total).toLocaleString()}` + (isCurrent ? "  (this month → applied)" : "  (apply when you add this month)");
-          reviewWrap.append(el("div", { style: `font-weight:600;margin:10px 0 4px;font-size:0.8rem;${isCurrent ? "color:var(--accent)" : "color:var(--text-muted)"}` }, label));
+          const label = `${MONTHS[(mg.month || 1) - 1]} ${mg.year} — ${Math.round(monthTotal(mg)).toLocaleString()}` + (isCurrent ? "  (this month, applied)" : "  (apply when you add this month)");
+          reviewWrap.append(el("div", { style: `font-weight:600;margin:14px 0 4px;font-size:0.8rem;${isCurrent ? "color:var(--accent)" : "color:var(--text-muted)"}` }, label));
           const wrapMg = el("div", isCurrent ? {} : { style: "opacity:0.6" });
-          mg.categories.forEach((c) => wrapMg.append(catRow(c, () => { arrRemove(mg.categories, c); renderReview(); })));
+          categorise(mg).forEach((c) => {
+            wrapMg.append(catHeader(c));
+            c.lines.forEach((l) => wrapMg.append(lineRow(l, () => { arrRemove(mg.lines, l); renderReview(); })));
+          });
+          if (!mg.lines.length) wrapMg.append(el("div", { class: "section-hint", style: "margin-top:0" }, "No spending lines left in this month."));
           reviewWrap.append(wrapMg);
         });
       }
@@ -275,15 +362,33 @@ const Statements = (() => {
         suspect ? el("span", { class: "tag", style: "background:rgba(192,68,63,0.12);color:var(--neg)" }, "check") : null);
     }
 
-    // Editable spending-category row (rename category, edit amount, delete).
-    function catRow(c, onDelete) {
-      const nameIn = el("input", { value: c.category, style: "flex:2" });
-      const amtIn = el("input", { type: "number", value: c.amount, style: "max-width:110px" });
-      nameIn.addEventListener("input", () => { c.category = nameIn.value; });
-      amtIn.addEventListener("input", () => { c.amount = Number(amtIn.value) || 0; });
-      return el("div", { class: "line-item" },
-        el("div", { class: "li-inputs" }, nameIn, amtIn),
-        el("button", { class: "btn-icon", type: "button", title: "Remove", onClick: onDelete }, "✕"));
+    // A category heading inside a month: the category name and the sum of the
+    // lines under it. Not editable: the total is whatever its lines add up to,
+    // so it can never disagree with the list beneath it.
+    function catHeader(c) {
+      return el("div", { class: "stmt-cat-head" },
+        el("span", { class: "stmt-cat-name" }, c.category),
+        el("span", { class: "stmt-cat-total" }, Math.round(c.amount).toLocaleString()));
+    }
+
+    // One statement line: date and time, the reference name as printed, and the
+    // amount. The category dropdown moves it to another group; ✕ drops it.
+    function lineRow(l, onDelete) {
+      const when = [l.date || "", l.time || ""].filter(Boolean).join(" ");
+      const catSel = el("select", { class: "stmt-line-cat" });
+      // The app's own categories, plus whatever the AI came back with so an
+      // unrecognised category is still selectable rather than silently reset.
+      const cats = [...CATEGORIES];
+      if (l.category && !cats.includes(l.category)) cats.unshift(l.category);
+      cats.forEach((c) => catSel.append(el("option", { value: c, ...(c === l.category ? { selected: "" } : {}) }, c)));
+      catSel.addEventListener("change", () => { l.category = catSel.value; renderReview(); });
+
+      return el("div", { class: "line-item stmt-line" },
+        el("span", { class: "stmt-line-when" }, when || "—"),
+        el("span", { class: "stmt-line-ref", title: l.description }, l.description || "(no reference)"),
+        el("span", { class: "stmt-line-amt" }, Math.round(l.amount).toLocaleString()),
+        catSel,
+        el("button", { class: "btn-icon", type: "button", title: "Remove this line", onClick: onDelete }, "✕"));
     }
 
     return el("div", { class: "shell", style: "margin-top:12px" },
