@@ -749,6 +749,12 @@ body.modal-open { position: fixed; left: 0; right: 0; overflow: hidden; }
 .icon-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 .icon-btn svg { width: 22px; height: 22px; display: block; }
 
+/* The privacy eye sits beside a page header that is much taller than a wallet
+   title, and .wallet-head stretches its children. Pin it to a square at the top
+   so it reads as a button rather than a tall blank panel. */
+.privacy-head { align-items: flex-start; }
+.privacy-head .icon-btn { height: 64px; align-self: flex-start; }
+
 .balance-head { text-align: center; padding: 6px 0 4px; }
 .balance-lbl { font-size: 0.85rem; color: var(--text-muted); }
 .balance-val {

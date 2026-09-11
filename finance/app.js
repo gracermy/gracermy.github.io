@@ -302,8 +302,12 @@
   // ── Router ────────────────────────────────────────────
   const routes = {};
   function route(name, fn) { routes[name] = fn; }
+  // Where we are now, so a control can repaint the current screen without
+  // knowing which one it is (the privacy toggle does exactly this).
+  let currentRoute = "home", currentArg;
   async function routeTo(name, arg) {
     const app = $("#app");
+    currentRoute = name; currentArg = arg;
     app.innerHTML = "";
     $$(".nav-links a").forEach((a) => a.classList.toggle("active", a.dataset.route === name));
     await routes[name](app, arg);
@@ -341,10 +345,10 @@
   // and never share math: the asset tracker derives spending from net worth,
   // the expense tracker splits shared costs between people.
   route("home", async (app) => {
-    app.append(el("div", { class: "page-header-shell fade-up fd1" },
+    app.append(withPrivacyToggle(el("div", { class: "page-header-shell" },
       el("h1", {}, "Bloom"),
       el("p", {}, "Give your money room to bloom. Pick a tracker to get started.")
-    ));
+    )));
 
     const installCard = installPrompt();
     if (installCard) app.append(installCard);
@@ -502,10 +506,10 @@
   // ── DASHBOARD (Asset Tracker home) ────────────────────
   route("dashboard", async (app) => {
     app.append(backBar("Home", "home"));
-    app.append(el("div", { class: "page-header-shell fade-up fd1" },
+    app.append(withPrivacyToggle(el("div", { class: "page-header-shell" },
       el("h1", {}, "Asset Tracker"),
       el("p", {}, "Your assets, growth, and spending, all in one calm place.")
-    ));
+    )));
 
     if (accounts.length === 0) {
       app.append(el("div", { class: "shell fade-up fd2" },
@@ -638,7 +642,11 @@
   function fxNote(row) {
     const rate = Number(row.exchange_rate) || 1;
     if (rate === 1) return null;
-    return `${Number(row.amount).toLocaleString()} ${row.currency} @ ${rate}`;
+    // The original amount is a real figure too, so it hides with the rest.
+    // The rate itself is not private and stays visible.
+    const amt = (window.isPrivate && window.isPrivate())
+      ? "••••" : Number(row.amount).toLocaleString();
+    return `${amt} ${row.currency} @ ${rate}`;
   }
 
   // The full stat grid for a month `t` — ONE compact responsive grid of all
@@ -836,6 +844,31 @@
   }
 
   // A prominent top back-bar for sub-pages (→ dashboard by default).
+  // The eye toggle for private mode. Wraps a page header so the button sits
+  // beside the title, reusing the wallet-head layout.
+  //
+  // Re-renders the current route on toggle rather than walking the DOM: every
+  // figure is produced by fmt()/fmtSigned(), so a fresh render is already
+  // correct everywhere, and nothing can be missed.
+  const EYE_OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const EYE_OFF  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+  function withPrivacyToggle(header) {
+    const hidden = window.isPrivate && window.isPrivate();
+    const btn = el("button", {
+      class: "icon-btn", type: "button",
+      title: hidden ? "Show amounts" : "Hide amounts",
+      "aria-label": hidden ? "Show amounts" : "Hide amounts",
+      "aria-pressed": hidden ? "true" : "false",
+      html: hidden ? EYE_OFF : EYE_OPEN,
+    });
+    btn.addEventListener("click", () => {
+      window.setPrivate(!(window.isPrivate && window.isPrivate()));
+      routeTo(currentRoute, currentArg);   // repaint with the new setting
+    });
+    return el("div", { class: "wallet-head privacy-head fade-up fd1" }, header, btn);
+  }
+
   function backBar(label, route, arg) {
     const back = el("button", { class: "back-bar", type: "button",
       onClick: () => routeTo(route || "dashboard", arg) },

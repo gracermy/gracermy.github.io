@@ -19,6 +19,50 @@ Setup docs: `setup/SETUP.md`, `setup/schema.sql` (asset tracker),
 
 ---
 
+## Hide the numbers (BUILT, 2026-09-11)
+
+An eye button beside the title on **Home** and the **Asset Tracker dashboard**
+replaces every money figure with `••••`, so the app can be shown to someone
+without showing what you actually have.
+
+**Enforced in `fmt()` / `fmtSigned()`, not at the call sites.** All 39 money
+figures in the app already route through those two functions, so masking there
+covers the dashboard, the tracker cards, every stat tile, the breakdown modals
+and the charts in one place — and a figure added later is hidden automatically
+instead of leaking because someone forgot to wrap it.
+
+**Two things bypassed the formatters and had to be fixed:**
+- `charts.js` has its own `compact()` for axis ticks; a chart labelled `101k`
+  gives away precisely the number the dashboard is hiding. Now `•••`, so the
+  curve's shape still reads while the scale does not.
+- `fxNote()` printed the original foreign amount (`120 USD @ 7.84`) with a raw
+  `toLocaleString()`. The amount hides; the rate stays, since a rate is not private.
+
+`fmtSigned()` keeps its `+`/`−` so "grew" vs "fell" still reads with the amount
+hidden. The mask keeps a plausible width so the layout doesn't jump on toggle.
+
+**Per device (localStorage), like the theme** — hiding on the laptop you are
+showing someone should not blank your phone. The class is applied to `<html>` at
+load so the first paint is already correct rather than flashing the real figures.
+
+Toggling re-renders the current route (a new `currentRoute`/`currentArg` pair in
+`routeTo`) rather than walking the DOM: a fresh render is correct by construction.
+
+**This is privacy, not security.** The figures are still in memory and in the
+network responses; it stops someone reading over your shoulder, nothing more.
+
+**Deliberately not applied to the Expense Tracker**: wallet balances are shared
+amounts the other members already see, so hiding them protects nothing. Easy to
+extend if that turns out to be wanted.
+
+Checked in a real browser: on the dashboard, money-looking lines went 19 -> 4
+(the 4 being month labels and an "updated" date), and numeric axis ticks
+`0 25k 50k 75k 101k` went to `•••` while the month labels stayed. Verified on
+home and dashboard, light and dark, 900px and 430px, no console errors and no
+horizontal overflow.
+
+---
+
 ## Digest frequency, per person (BUILT, 2026-09-09)
 
 **First, a real bug.** The weekly digest was scheduled `0 10 * * 1` — 10:00

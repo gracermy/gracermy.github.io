@@ -15,7 +15,11 @@ const Charts = (() => {
   const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
   // Compact money for axis ticks / labels, e.g. 100,661 -> "101k"
+  // Respects private mode: axis ticks are money too, and a chart labelled
+  // "101k" would give away the figure the dashboard is busy hiding. The curve
+  // shape stays, which is the part worth showing someone.
   function compact(n) {
+    if (window.isPrivate && window.isPrivate()) return "•••";
     const a = Math.abs(n);
     if (a >= 1e6) return (n / 1e6).toFixed(a >= 1e7 ? 0 : 1).replace(/\.0$/, "") + "M";
     if (a >= 1e3) return Math.round(n / 1e3) + "k";

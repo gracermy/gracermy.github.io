@@ -108,9 +108,38 @@ const Model = (() => {
   return { toBase, computeTimeline, computeSnapshot, illiquidCostUpTo, illiquidCostByAcctUpTo };
 })();
 
+// ── Private mode ──────────────────────────────────────
+// Hides every money figure behind dots so the app can be shown to someone
+// without showing what you actually have. Deliberately enforced inside the two
+// formatters rather than at each call site: every amount in the app already
+// goes through fmt()/fmtSigned(), so masking here covers the dashboard, the
+// tracker cards, the charts and every modal at once, and a figure added later
+// is hidden automatically instead of leaking because someone forgot.
+//
+// This is PRIVACY, NOT SECURITY. The numbers are still in memory and in the
+// network responses; it only stops someone reading them over your shoulder.
+//
+// Per device (localStorage), like the theme: hiding on your laptop while
+// showing someone the app should not blank your phone.
+const PRIVATE_KEY = "bloom-private";
+function isPrivate() {
+  try { return localStorage.getItem(PRIVATE_KEY) === "1"; } catch { return false; }
+}
+function setPrivate(on) {
+  try { localStorage.setItem(PRIVATE_KEY, on ? "1" : "0"); } catch {}
+  document.documentElement.classList.toggle("is-private", !!on);
+}
+// Mask that keeps the shape of a figure (a sign, some digits) without its
+// value, so layout doesn't jump when you toggle.
+function maskedAmount(n) {
+  const neg = typeof n === "number" && isFinite(n) && n < 0;
+  return (neg ? "−" : "") + "••••";
+}
+
 // Currency formatting
 function fmt(n, currency) {
   if (n === null || n === undefined || !isFinite(n)) return "—";
+  if (isPrivate()) return maskedAmount(n);
   const cur = currency || (window.FinanceDB && window.FinanceDB.baseCurrency()) || "HKD";
   try {
     return new Intl.NumberFormat(undefined, {
@@ -122,6 +151,8 @@ function fmt(n, currency) {
 }
 function fmtSigned(n, currency) {
   if (n === null || n === undefined || !isFinite(n)) return "—";
+  // Keep the +/− so "grew" vs "fell" still reads, but hide the amount.
+  if (isPrivate()) return (n < 0 ? "−" : "+") + "••••";
   const s = fmt(Math.abs(n), currency);
   return (n < 0 ? "−" : "+") + s.replace(/^[−-]/, "");
 }
@@ -145,4 +176,9 @@ window.fmtSigned = fmtSigned;
 window.periodLabel = periodLabel;
 window.periodKey = periodKey;
 window.fmtUpdated = fmtUpdated;
+window.isPrivate = isPrivate;
+window.setPrivate = setPrivate;
+// Reflect the saved choice on <html> immediately, so CSS that depends on it is
+// correct on the very first paint rather than flashing the real figures.
+try { document.documentElement.classList.toggle("is-private", isPrivate()); } catch {}
 window.MONTH_NAMES = MONTH_NAMES;
