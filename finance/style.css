@@ -350,6 +350,45 @@ button.stat-tappable:hover .stat-more { color: var(--accent); border-color: var(
   padding: 3px 8px; border-radius: 20px;
   background: var(--accent-soft); color: var(--accent); letter-spacing: 0.02em;
 }
+/* An entry the resolver could not match. Amber rather than red: it is not an
+   error, it is a card we could not verify — still yours, just less reliable. */
+.tag-warn { background: rgba(192, 68, 63, 0.1); color: var(--neg); }
+
+/* ── PERKS ──
+   The confirm step, where an ambiguous name becomes a decision. Each candidate
+   is a big tap target on a phone and a comfortable row on a desktop. */
+.perk-confirm { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.perk-confirm:first-of-type { border-top: none; padding-top: 0; }
+.perk-typed { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px; }
+.perk-typed b { color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
+
+.perk-opts { display: flex; flex-direction: column; gap: 8px; }
+.perk-opt {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left;
+  font-family: inherit; color: var(--text); cursor: pointer;
+  background: var(--field-bg); border: 1px solid var(--border);
+  border-radius: 11px; padding: 11px 13px; transition: all 0.15s;
+}
+.perk-opt:hover { border-color: var(--border-hover); }
+.perk-opt.active { border-color: var(--accent); background: var(--accent-soft); }
+.perk-opt-name { font-size: 0.9rem; font-weight: 600; }
+.perk-opt-issuer { font-size: 0.75rem; color: var(--text-muted); }
+/* The line that earns the choice: what makes THIS one different. */
+.perk-opt-diff { font-size: 0.8rem; color: var(--text-secondary); margin-top: 3px; line-height: 1.4; }
+.perk-opt-link { font-size: 0.75rem; color: var(--accent); margin-top: 5px; align-self: flex-start; }
+
+.perk-confirm textarea, .modal textarea {
+  width: 100%; font-family: inherit; font-size: 0.9rem; line-height: 1.5;
+  background: var(--field-bg); border: 1px solid var(--border);
+  border-radius: 11px; padding: 11px 13px; color: var(--text); resize: vertical;
+}
+.modal textarea:focus { outline: none; border-color: var(--accent); }
+
+@media (max-width: 600px) {
+  /* Roomier targets on a phone, where this is a thumb decision. */
+  .perk-opt { padding: 13px; }
+  .perk-opt-diff { font-size: 0.82rem; }
+}
 
 /* info button + inline explanation box */
 .info-btn {

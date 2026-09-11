@@ -19,6 +19,72 @@ Setup docs: `setup/SETUP.md`, `setup/schema.sql` (asset tracker),
 
 ---
 
+## Perks — phase 1: the cards you hold (BUILT, 2026-09-11)
+
+A **third tracker** beside Asset and Expense: the cards and memberships you
+carry, and (phase 2) what they get you. Independent of the other two — shares no
+math, never on the same screen. Owner-only RLS like the asset tracker, since a
+card is yours alone, not the membership-based RLS the wallets use.
+
+**Why this phase exists on its own.** Before spending API credit gathering
+promos, we checked whether an AI web search actually finds usable Hong Kong
+promo detail. It does, better than expected: a live search returned the enJoy
+card's *8% at Wellcome on the 3rd/13th/23rd, min HK$100 in store*, and correctly
+caught Mox's **1 September 2026** change from 3% to 2%/1% depending on Mox+.
+That is real fine print, not marketing. But it also showed the value is a good
+INITIAL gathering plus occasional re-checks — card benefits barely change — not
+a per-question lookup.
+
+**Naming is the hard problem, and the reason for the whole confirm step.** Hang
+Seng sells both an "enJoy Card" and an "enJoy Visa Platinum Card"; an "MPOWER
+Platinum" and an "MMPOWER World Mastercard" differ by one letter. Get the
+product wrong and every benefit gathered against it is wrong.
+
+So the resolver **proposes and the user confirms — it never autocorrects.** A
+silent substitution is invisible when it is wrong: you would hold offers for a
+card you do not own with nothing on screen to reveal it. Three outcomes:
+one confident match (pre-selected), several candidates (you choose, each with a
+*distinguisher* naming what actually separates it from its siblings), or nothing
+found (kept exactly as typed, flagged `unverified` — the app never blocks you on
+its own ignorance, but it does say so).
+
+**Tier is its own field, not part of the name.** Same Mox Credit, 2% with Mox+
+and 1% without. A benefit gathered against the wrong tier is simply wrong, so
+tiers are offered at confirm time when they change what you get. Editing a tier
+is a plain text field: re-running a full resolution to change "Mox" to "Mox+"
+would be a pointless API call. Re-checking is its own button, for when the NAME
+is wrong; changing the name alone resets status to `unverified`.
+
+**Both names are stored** — `typed_name` and the resolved `name`. If a match was
+wrong, the typed name is the only way to see what you meant. Keeping just the
+corrected name makes a bad match permanent and invisible.
+
+**`perk_offers` exists now though phase 2 fills it**, so the data model needs no
+reshaping later. Deliberately keyed to a card, not a user: a Hang Seng enJoy
+Card's benefits are identical for everyone who holds one, so a future shared
+cache needs no rewrite. It carries `ends_on` (entries can grey themselves out
+rather than sitting there looking valid), `requirements`, and `source_url` —
+which is not a footnote but the way to check fine print a summary may have
+flattened.
+
+**Decided and deliberately excluded from future gathering:** new-customer and
+welcome offers, plus anything requiring a new application. Search results are
+dominated by them (our own searches surfaced "up to HKD2,000" and "140,000 yuu
+Points" welcome offers), and they are useless to someone who already holds the
+card. Issuance date is therefore NOT needed for eligibility; it is an optional
+field kept only for anniversary-style benefits.
+
+Checked in a real browser at 900px and 430px, light and dark: the ambiguous
+enJoy case showing two candidates with genuinely different distinguishers, the
+Mox tier choice, an unrecognised entry, saving a non-default candidate, and
+editing a tier without re-resolution. No console errors, no nested buttons, no
+horizontal overflow.
+
+**Not yet built:** the gathering itself, the offer list, and search. Phase 1 is
+useful alone as a record of what you carry.
+
+---
+
 ## Hide the numbers: placement + no more blink (BUILT, 2026-09-11)
 
 Refinements to the privacy eye built earlier today.

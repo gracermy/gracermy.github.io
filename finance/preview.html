@@ -164,6 +164,53 @@ window.__pvRoute=_q.get('route');window.__pvSnap=_q.get('snap')||'s2';
 <script src="snapshot.js"></script>
 <script src="charts.js"></script>
 <script src="statements.js"></script>
+<script src="perks.js"></script>
+<script>
+// Preview: Perks runs against in-memory data and a fake resolver, so the
+// add/confirm flow is fully clickable without a login or an API call.
+(function(){
+  if(!window.Perks) return;
+  let CARDS=[
+    {id:'p1', kind:'card', typed_name:'hang seng enjoy', name:'Hang Seng enJoy Card', issuer:'Hang Seng Bank',
+     tier:null, status:'confirmed', official_url:'https://www.hangseng.com/', resolved_at:new Date().toISOString(), sort_order:0},
+    {id:'p2', kind:'card', typed_name:'mox', name:'Mox Credit', issuer:'Mox Bank',
+     tier:'Mox+', status:'confirmed', official_url:'https://mox.com/', resolved_at:new Date().toISOString(), sort_order:1},
+    {id:'p3', kind:'card', typed_name:'that blue one', name:'that blue one', issuer:null,
+     tier:null, status:'unverified', official_url:null, resolved_at:null, sort_order:2},
+    {id:'p4', kind:'membership', typed_name:'yuu', name:'yuu Rewards Club', issuer:'DFI Retail Group',
+     tier:null, status:'confirmed', official_url:'https://www.yuurewards.com/', resolved_at:new Date().toISOString(), sort_order:3},
+  ];
+  Perks.loadCards=async()=>JSON.parse(JSON.stringify(CARDS));
+  Perks.loadOffers=async()=>[];
+  Perks.addCards=async(rows)=>{rows.forEach((r,i)=>CARDS.push({...r,id:'n'+(CARDS.length+i)}));return rows;};
+  Perks.updateCard=async(id,patch)=>{const c=CARDS.find(x=>x.id===id); if(c)Object.assign(c,patch);};
+  Perks.deleteCard=async(id)=>{CARDS=CARDS.filter(x=>x.id!==id);};
+  // Mirrors the real resolver: one exact match, one genuinely ambiguous pair,
+  // one with tiers, and one it cannot identify.
+  Perks.resolve=async(entries)=>{
+    await new Promise(r=>setTimeout(r,500));
+    return entries.map(t=>{
+      const k=t.toLowerCase();
+      if(k.includes('enjoy')) return {typed:t,kind:'card',candidates:[
+        {name:'Hang Seng enJoy Card',issuer:'Hang Seng Bank',tiers:[],
+         distinguisher:'8% off at Wellcome and Mannings on the 3rd, 13th and 23rd; min HK$100 in store.',
+         official_url:'https://www.hangseng.com/',confidence:'high'},
+        {name:'enJoy Visa Platinum Card',issuer:'Hang Seng Bank',tiers:[],
+         distinguisher:'Same yuu earning, plus Visa Platinum travel and dining privileges.',
+         official_url:'https://www.hangseng.com/',confidence:'medium'}]};
+      if(k.includes('mox')) return {typed:t,kind:'card',candidates:[
+        {name:'Mox Credit',issuer:'Mox Bank',tiers:['Mox+','No Mox+'],
+         distinguisher:'3% at supermarkets for everyone; from 1 Sep 2026, 2% elsewhere with Mox+ and 1% without.',
+         official_url:'https://mox.com/',confidence:'high'}]};
+      if(k.includes('yuu')) return {typed:t,kind:'membership',candidates:[
+        {name:'yuu Rewards Club',issuer:'DFI Retail Group',tiers:[],
+         distinguisher:'Points across Wellcome, Mannings, 7-Eleven, IKEA and KFC.',
+         official_url:'https://www.yuurewards.com/',confidence:'high'}]};
+      return {typed:t,kind:'card',candidates:[]};
+    });
+  };
+})();
+</script>
 <script>
 // In preview, make the statement parser return mock data (no real network call).
 if(window.BloomStatements){

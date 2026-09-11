@@ -431,6 +431,27 @@
       onClick: () => routeTo("wallets"),
     }));
 
+    // Perks: what your cards get you. No money figure, so no privacy eye —
+    // a card count is not a balance.
+    let perkValue = "Get started", perkHint = "add your cards";
+    if (window.Perks) {
+      try {
+        const cards = await Perks.loadCards();
+        if (cards.length) {
+          perkValue = cards.length + (cards.length === 1 ? " card" : " cards");
+          const unver = cards.filter((c) => c.status === "unverified").length;
+          perkHint = unver ? unver + " to check" : "and memberships";
+        }
+      } catch { /* schema not installed yet: the card still invites setup */ }
+    }
+    grid.append(trackerCard({
+      icon: TRACKER_ICON.perks,
+      title: "Perks",
+      desc: "What your cards and memberships get you",
+      value: perkValue, hint: perkHint,
+      onClick: () => routeTo("perks"),
+    }));
+
     app.append(grid);
   });
 
@@ -500,9 +521,10 @@
   const TRACKER_ICON = {
     asset: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 3 3 5-6 3 3"/><path d="M3 21h18"/></svg>',
     expense: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 2 21 6 17 10"/><path d="M21 6H8a4 4 0 0 0-4 4"/><polyline points="7 22 3 18 7 14"/><path d="M3 18h13a4 4 0 0 0 4-4"/></svg>',
+    perks: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>',
   };
 
-  // The two big cards on home. One live number each, so home is useful.
+  // The big cards on home. One live number each, so home is useful.
   // `value` may be a string, or a function returning one — pass a function when
   // the figure is money, so the eye can redraw it without rebuilding the card.
   // `eye: true` puts a small privacy toggle in the card's corner.
@@ -1661,6 +1683,400 @@
       el("button", { class: "btn-icon", onClick: () => onRemove(row) }, "✕"));
     row._read = () => ({ category: catSel.value, label: labelIn.value, amount: Number(amtIn.value) || 0 });
     return row;
+  }
+
+  // ── PERKS (third tracker: your cards and what they get you) ──
+  route("perks", async (app) => {
+    app.append(backBar("Home", "home"));
+    app.append(el("div", { class: "page-header-shell fade-up fd1" },
+      el("h1", {}, "Perks"),
+      el("p", {}, "The cards and memberships you hold, and what they get you.")
+    ));
+
+    if (!window.Perks) { app.append(el("div", { class: "shell" }, "Perks is not available.")); return; }
+
+    let cards = [];
+    try { cards = await Perks.loadCards(); }
+    catch (e) {
+      app.append(el("div", { class: "shell fade-up fd2" },
+        el("div", { class: "empty-state" },
+          el("p", {}, "Perks needs its database tables. Run setup/perks-schema.sql in Supabase, then reload."))));
+      return;
+    }
+
+    const addBtn = el("button", { class: "btn" }, "+ Add cards");
+    addBtn.addEventListener("click", () => openAddPerks("card"));
+    const addMemBtn = el("button", { class: "btn btn-ghost" }, "+ Add memberships");
+    addMemBtn.addEventListener("click", () => openAddPerks("membership"));
+
+    if (!cards.length) {
+      app.append(el("div", { class: "shell fade-up fd2" },
+        el("div", { class: "empty-state" },
+          el("p", {}, "Add the cards and memberships you carry. Type them however you like — the names get checked against the real products, because a Hang Seng enJoy Card and an enJoy Visa Platinum Card are not the same thing."),
+          el("div", { class: "btn-row", style: "justify-content:center;margin-top:14px" }, addBtn, addMemBtn))));
+      return;
+    }
+
+    const unverified = cards.filter((c) => c.status === "unverified");
+    if (unverified.length) {
+      app.append(el("div", { class: "shell fade-up fd2" },
+        el("div", { class: "section-hint", style: "margin:0" },
+          unverified.length === 1
+            ? "1 entry could not be matched to a real product, so its perks may not be accurate. Open it to fix the name."
+            : unverified.length + " entries could not be matched to real products, so their perks may not be accurate. Open one to fix its name.")));
+    }
+
+    const groups = [["card", "Cards"], ["membership", "Memberships"]];
+    for (const [kind, title] of groups) {
+      const mine = cards.filter((c) => (c.kind || "card") === kind);
+      if (!mine.length) continue;
+      const list = el("div", { class: "line-list" });
+      mine.forEach((c) => list.append(perkRow(c)));
+      app.append(el("div", { class: "shell fade-up fd2" }, el("h3", {}, title), list));
+    }
+
+    app.append(el("div", { class: "btn-row fade-up fd3", style: "margin-top:14px" }, addBtn, addMemBtn));
+
+    // Phase 2 lands here: gather offers for these cards and show when it last ran.
+    app.append(el("div", { class: "shell fade-up fd3" },
+      el("h3", {}, "Perks"),
+      el("div", { class: "section-hint", style: "margin-top:0" },
+        "Once your cards are in, Bloom can gather what each one gets you — merchants, dates, requirements, and a link to the real terms. That part is not built yet.")));
+  });
+
+  // One card / membership in the list. Tapping opens it for editing.
+  function perkRow(c) {
+    const sub = [c.issuer, c.tier].filter(Boolean).join(" · ");
+    return el("div", { class: "line-item tappable", onClick: () => openEditPerk(c) },
+      el("span", { class: "li-name" },
+        el("span", {}, c.name),
+        sub ? el("span", { class: "member-status" }, sub) : null),
+      c.status === "unverified"
+        ? el("span", { class: "tag tag-warn" }, "unchecked")
+        : null,
+      el("span", { class: "tracker-chev" }, "\u203a"));
+  }
+
+  // ── Add cards / memberships ───────────────────────────
+  // Three steps in one modal: type a list, let the resolver propose, confirm.
+  //
+  // The confirmation step is the point of the whole feature. The resolver
+  // PROPOSES and the user DECIDES: an autocorrect would silently swap
+  // "Hang Seng enJoy" for the wrong one of two real products, and nothing on
+  // screen would ever reveal it. Ambiguity is shown, not resolved behind your back.
+  function openAddPerks(kind) {
+    const isMember = kind === "membership";
+    const ta = el("textarea", {
+      rows: "5",
+      placeholder: isMember
+        ? "One per line, e.g.\nyuu Rewards\nAsia Miles\nClub Shopping"
+        : "One per line, e.g.\nHang Seng enJoy\nMox Credit\nDBS Live Fresh",
+    });
+    const err = el("div", { class: "error-msg" });
+    const body = el("div", {},
+      el("div", { class: "section-hint", style: "margin-top:0" },
+        "Type them however you remember them. Each name is checked against the real products, and anything ambiguous comes back for you to choose."),
+      ta, err);
+
+    const nextBtn = el("button", { class: "btn" }, "Check names");
+    nextBtn.addEventListener("click", async () => {
+      const entries = ta.value.split("\n").map((x) => x.trim()).filter(Boolean);
+      if (!entries.length) { err.textContent = "Type at least one name."; return; }
+      if (entries.length > 25) { err.textContent = "That is a lot at once — try 25 or fewer."; return; }
+      err.className = "section-hint"; err.textContent = "Checking\u2026 this takes a few seconds.";
+      nextBtn.disabled = true;
+      try {
+        const results = await Perks.resolve(entries, kind);
+        modal.close();
+        openConfirmPerks(entries, results, kind);
+      } catch (e) {
+        err.className = "error-msg";
+        err.textContent = e.message || "Could not check those names.";
+        nextBtn.disabled = false;
+      }
+    });
+
+    const modal = openModal({
+      title: isMember ? "Add memberships" : "Add cards",
+      body,
+      footer: el("div", { class: "btn-row", style: "margin:0" }, nextBtn),
+    });
+  }
+
+  // Step two: one block per typed entry, each with its candidates.
+  // Anything the resolver could not identify is KEPT, marked unverified — the
+  // app never blocks you on its own ignorance, but it does say so plainly.
+  function openConfirmPerks(entries, results, kind) {
+    const byTyped = {};
+    (results || []).forEach((r) => { if (r && r.typed) byTyped[String(r.typed).trim().toLowerCase()] = r; });
+
+    // One decision per entry. `pick` is the chosen candidate index, or -1 to
+    // keep exactly what was typed.
+    const decisions = entries.map((typed) => {
+      const r = byTyped[typed.toLowerCase()] || {};
+      const cands = Array.isArray(r.candidates) ? r.candidates : [];
+      return { typed, kind: r.kind || kind, candidates: cands, pick: cands.length === 1 ? 0 : -1, tier: "" };
+    });
+
+    const body = el("div", {});
+    const err = el("div", { class: "error-msg" });
+
+    const needsChoice = decisions.filter((d) => d.candidates.length > 1).length;
+    const notFound = decisions.filter((d) => !d.candidates.length).length;
+    const summary = [];
+    if (needsChoice) summary.push(needsChoice + (needsChoice === 1 ? " needs a choice" : " need a choice"));
+    if (notFound) summary.push(notFound + " not recognised");
+    body.append(el("div", { class: "section-hint", style: "margin-top:0" },
+      summary.length ? summary.join(" \u00b7 ") : "All matched. Check they are right, then save."));
+
+    decisions.forEach((d) => {
+      const block = el("div", { class: "perk-confirm" });
+      block.append(el("div", { class: "perk-typed" }, "You typed: ", el("b", {}, d.typed)));
+
+      if (!d.candidates.length) {
+        block.append(el("div", { class: "section-hint", style: "margin:4px 0 0" },
+          "Not recognised. It will be saved exactly as you typed it, marked unchecked \u2014 you can fix the name later."));
+        body.append(block);
+        return;
+      }
+
+      const opts = el("div", { class: "perk-opts" });
+      const tierWrap = el("div", {});
+
+      const paintTiers = () => {
+        tierWrap.innerHTML = "";
+        const c = d.candidates[d.pick];
+        const tiers = c && Array.isArray(c.tiers) ? c.tiers.filter(Boolean) : [];
+        if (!tiers.length) { d.tier = ""; return; }
+        // A tier is only offered when it changes what you get: a Mox Credit
+        // holder earns 2% with Mox+ and 1% without, on the same card.
+        tierWrap.append(el("div", { class: "section-hint", style: "margin:8px 0 4px" },
+          "This one has tiers, and they change what you get. Which is yours?"));
+        const row = el("div", { class: "pill-row", style: "margin-bottom:0" });
+        if (!tiers.includes(d.tier)) d.tier = tiers[0];
+        tiers.forEach((t) => {
+          const pill = el("button", { class: "pill" + (t === d.tier ? " active" : ""), type: "button" }, t);
+          pill.addEventListener("click", () => {
+            d.tier = t;
+            [...row.children].forEach((x) => x.classList.toggle("active", x === pill));
+          });
+          row.append(pill);
+        });
+        tierWrap.append(row);
+      };
+
+      d.candidates.forEach((c, i) => {
+        const opt = el("button", { class: "perk-opt" + (d.pick === i ? " active" : ""), type: "button" },
+          el("span", { class: "perk-opt-name" }, c.name || "(unnamed)"),
+          c.issuer ? el("span", { class: "perk-opt-issuer" }, c.issuer) : null,
+          // The distinguisher is the whole reason a choice is offered: it must
+          // say what makes this one DIFFERENT, not sell it.
+          c.distinguisher ? el("span", { class: "perk-opt-diff" }, c.distinguisher) : null,
+          c.official_url ? el("a", { class: "perk-opt-link", href: c.official_url, target: "_blank", rel: "noopener" }, "official page") : null);
+        opt.addEventListener("click", (e) => {
+          if (e.target.tagName === "A") return;   // let the link through
+          d.pick = i;
+          [...opts.children].forEach((x, xi) => x.classList.toggle("active", xi === i));
+          paintTiers();
+        });
+        opts.append(opt);
+      });
+
+      block.append(opts, tierWrap);
+      paintTiers();
+      body.append(block);
+    });
+
+    body.append(err);
+
+    const saveBtn = el("button", { class: "btn" }, "Save");
+    saveBtn.addEventListener("click", async () => {
+      const undecided = decisions.filter((d) => d.candidates.length > 1 && d.pick < 0);
+      if (undecided.length) {
+        err.className = "error-msg";
+        err.textContent = "Pick which one you hold for: " + undecided.map((d) => d.typed).join(", ");
+        return;
+      }
+      saveBtn.disabled = true;
+      const rows = decisions.map((d, i) => {
+        const c = d.pick >= 0 ? d.candidates[d.pick] : null;
+        return {
+          kind: d.kind === "membership" ? "membership" : "card",
+          typed_name: d.typed,
+          // No candidate means keep exactly what was typed, flagged unverified.
+          name: c ? (c.name || d.typed) : d.typed,
+          issuer: c ? (c.issuer || null) : null,
+          tier: d.tier || null,
+          status: c ? "confirmed" : "unverified",
+          official_url: c ? (c.official_url || null) : null,
+          resolved_at: c ? new Date().toISOString() : null,
+          sort_order: i,
+        };
+      });
+      try {
+        await Perks.addCards(rows);
+        modal.close();
+        routeTo("perks");
+      } catch (e) {
+        err.className = "error-msg";
+        err.textContent = e.message || "Could not save.";
+        saveBtn.disabled = false;
+      }
+    });
+
+    const modal = openModal({
+      title: "Confirm what you hold",
+      body,
+      footer: el("div", { class: "btn-row", style: "margin:0" }, saveBtn),
+    });
+  }
+
+  // Edit one card. Tier is a plain text field on purpose: moving between Mox
+  // and Mox+ is a one-word change, and making it re-run a full resolution would
+  // be a pointless API call and a pointless confirmation. Re-checking is offered
+  // as its own button, for when the NAME is what is wrong.
+  function openEditPerk(c) {
+    const nameIn = el("input", { value: c.name });
+    const issuerIn = el("input", { value: c.issuer || "", placeholder: "issuer (optional)" });
+    const tierIn = el("input", { value: c.tier || "", placeholder: "tier, e.g. Mox+ (optional)" });
+    const err = el("div", { class: "error-msg" });
+
+    const body = el("div", {},
+      el("div", { class: "field" }, el("label", {}, "Name"), nameIn),
+      el("div", { class: "field" }, el("label", {}, "Issuer"), issuerIn),
+      el("div", { class: "field" }, el("label", {}, "Tier"), tierIn),
+      el("div", { class: "section-hint", style: "margin-top:0" },
+        "Tier matters where it changes what you get \u2014 a Mox Credit holder earns 2% with Mox+ and 1% without."),
+      c.typed_name && c.typed_name !== c.name
+        ? el("div", { class: "section-hint" }, "Originally typed: \u201c" + c.typed_name + "\u201d")
+        : null,
+      c.official_url
+        ? el("div", { class: "section-hint" }, el("a", { href: c.official_url, target: "_blank", rel: "noopener" }, "Official page"))
+        : null,
+      err);
+
+    const saveBtn = el("button", { class: "btn" }, "Save");
+    saveBtn.addEventListener("click", async () => {
+      const newName = nameIn.value.trim();
+      if (!newName) { err.textContent = "A name is needed."; return; }
+      saveBtn.disabled = true;
+      try {
+        await Perks.updateCard(c.id, {
+          name: newName,
+          issuer: issuerIn.value.trim() || null,
+          tier: tierIn.value.trim() || null,
+          // Changing the NAME invalidates the earlier match; a tier or issuer
+          // tweak does not.
+          status: newName !== c.name ? "unverified" : c.status,
+        });
+        modal.close();
+        routeTo("perks");
+      } catch (e) { err.textContent = e.message || "Could not save."; saveBtn.disabled = false; }
+    });
+
+    const recheckBtn = el("button", { class: "btn btn-ghost" }, "Re-check name");
+    recheckBtn.addEventListener("click", async () => {
+      err.className = "section-hint"; err.textContent = "Checking\u2026";
+      recheckBtn.disabled = true;
+      try {
+        const results = await Perks.resolve([nameIn.value.trim()], c.kind || "card");
+        const cands = (results[0] && results[0].candidates) || [];
+        if (!cands.length) {
+          err.className = "error-msg";
+          err.textContent = "Still not recognised. You can keep the name as it is.";
+          recheckBtn.disabled = false;
+          return;
+        }
+        modal.close();
+        openRecheckPerk(c, cands);
+      } catch (e) {
+        err.className = "error-msg";
+        err.textContent = e.message || "Could not check that name.";
+        recheckBtn.disabled = false;
+      }
+    });
+
+    const delBtn = el("button", { class: "btn btn-ghost btn-danger" }, "Remove");
+    delBtn.addEventListener("click", async () => {
+      if (!confirm("Remove " + c.name + " from Perks?")) return;
+      try { await Perks.deleteCard(c.id); modal.close(); routeTo("perks"); }
+      catch (e) { err.textContent = e.message || "Could not remove."; }
+    });
+
+    const modal = openModal({
+      title: c.kind === "membership" ? "Edit membership" : "Edit card",
+      body,
+      footer: el("div", { class: "btn-row", style: "margin:0" }, saveBtn, recheckBtn, delBtn),
+    });
+  }
+
+  // Re-check results for one existing card: same choose-and-confirm as adding.
+  function openRecheckPerk(c, candidates) {
+    let pick = 0, tier = c.tier || "";
+    const err = el("div", { class: "error-msg" });
+    const opts = el("div", { class: "perk-opts" });
+    const tierWrap = el("div", {});
+
+    const paintTiers = () => {
+      tierWrap.innerHTML = "";
+      const cand = candidates[pick];
+      const tiers = cand && Array.isArray(cand.tiers) ? cand.tiers.filter(Boolean) : [];
+      if (!tiers.length) return;
+      tierWrap.append(el("div", { class: "section-hint", style: "margin:8px 0 4px" }, "Which tier is yours?"));
+      const row = el("div", { class: "pill-row", style: "margin-bottom:0" });
+      if (!tiers.includes(tier)) tier = tiers[0];
+      tiers.forEach((t) => {
+        const pill = el("button", { class: "pill" + (t === tier ? " active" : ""), type: "button" }, t);
+        pill.addEventListener("click", () => {
+          tier = t;
+          [...row.children].forEach((x) => x.classList.toggle("active", x === pill));
+        });
+        row.append(pill);
+      });
+      tierWrap.append(row);
+    };
+
+    candidates.forEach((cand, i) => {
+      const opt = el("button", { class: "perk-opt" + (i === 0 ? " active" : ""), type: "button" },
+        el("span", { class: "perk-opt-name" }, cand.name || "(unnamed)"),
+        cand.issuer ? el("span", { class: "perk-opt-issuer" }, cand.issuer) : null,
+        cand.distinguisher ? el("span", { class: "perk-opt-diff" }, cand.distinguisher) : null,
+        cand.official_url ? el("a", { class: "perk-opt-link", href: cand.official_url, target: "_blank", rel: "noopener" }, "official page") : null);
+      opt.addEventListener("click", (e) => {
+        if (e.target.tagName === "A") return;
+        pick = i;
+        [...opts.children].forEach((x, xi) => x.classList.toggle("active", xi === i));
+        paintTiers();
+      });
+      opts.append(opt);
+    });
+    paintTiers();
+
+    const saveBtn = el("button", { class: "btn" }, "Use this one");
+    saveBtn.addEventListener("click", async () => {
+      const cand = candidates[pick];
+      saveBtn.disabled = true;
+      try {
+        await Perks.updateCard(c.id, {
+          name: cand.name || c.name,
+          issuer: cand.issuer || null,
+          tier: tier || null,
+          status: "confirmed",
+          official_url: cand.official_url || null,
+          resolved_at: new Date().toISOString(),
+        });
+        modal.close();
+        routeTo("perks");
+      } catch (e) { err.textContent = e.message || "Could not save."; saveBtn.disabled = false; }
+    });
+
+    const modal = openModal({
+      title: "Which one do you hold?",
+      body: el("div", {},
+        el("div", { class: "perk-typed" }, "You typed: ", el("b", {}, c.typed_name || c.name)),
+        opts, tierWrap, err),
+      footer: el("div", { class: "btn-row", style: "margin:0" }, saveBtn),
+    });
   }
 
   // ── HISTORY ───────────────────────────────────────────
