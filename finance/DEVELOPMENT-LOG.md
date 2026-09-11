@@ -19,6 +19,45 @@ Setup docs: `setup/SETUP.md`, `setup/schema.sql` (asset tracker),
 
 ---
 
+## Hide the numbers: placement + no more blink (BUILT, 2026-09-11)
+
+Refinements to the privacy eye built earlier today.
+
+**The blink is gone, and it mattered.** Toggling used to re-run the route, which
+refetches every table from Supabase — so the screen blanked and rebuilt on each
+tap. Now each rendered amount keeps the function that produced it (`money()`
+wraps a `render()` and re-runs it on demand), and toggling only rewrites that
+text. Measured with a MutationObserver: **0 child removals from `#app`** on
+toggle, where the old version tore the whole screen down.
+
+**The charts were the exception, and the trap.** They are SVG drawn once, so
+when the route stopped re-rendering they kept showing `101k` on the axis — the
+privacy leak came *back* precisely because the blink was fixed. That block now
+re-renders itself on toggle: still no refetch, and only the charts repaint.
+
+**Placement moved to where the numbers are.** The full-size eye beside the page
+title is gone. Now a small recessive eye sits in the corner of each **tracker
+card** on Home (only when the card shows an actual amount — "Get started" and
+"Settled up" are labels, not money), and beside the **month heading** in the
+Asset Tracker's latest-month card, right next to the figures it hides.
+
+**`trackerCard` became a `<div role="button">`.** The eye is a button and the
+card was a button; nesting them is invalid HTML and browsers un-nest it, which
+breaks the layout. Keyboard support (Enter/Space) is added by hand since
+`role="button"` promises it. The eye stops propagation so tapping it does not
+also open the tracker — verified, along with the card still opening on click and
+on Enter.
+
+`statTile` and `trackerCard` now accept a string *or* a function for their value
+and sub-label; money passes a function. `.stat-value` / `.stat-sub` gained
+`display:block` because those nodes are `<span>`s when self-redrawing and
+`<div>`s otherwise.
+
+Verified: no blink on either screen, all numeric axis ticks masked after
+toggling, 0 nested buttons, no horizontal overflow at 430px or 900px.
+
+---
+
 ## Hide the numbers (BUILT, 2026-09-11)
 
 An eye button beside the title on **Home** and the **Asset Tracker dashboard**

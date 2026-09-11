@@ -308,6 +308,7 @@
   async function routeTo(name, arg) {
     const app = $("#app");
     currentRoute = name; currentArg = arg;
+    privacyWatchers = [];   // the nodes they redraw are about to be discarded
     app.innerHTML = "";
     $$(".nav-links a").forEach((a) => a.classList.toggle("active", a.dataset.route === name));
     await routes[name](app, arg);
@@ -345,10 +346,10 @@
   // and never share math: the asset tracker derives spending from net worth,
   // the expense tracker splits shared costs between people.
   route("home", async (app) => {
-    app.append(withPrivacyToggle(el("div", { class: "page-header-shell" },
+    app.append(el("div", { class: "page-header-shell fade-up fd1" },
       el("h1", {}, "Bloom"),
       el("p", {}, "Give your money room to bloom. Pick a tracker to get started.")
-    )));
+    ));
 
     const installCard = installPrompt();
     if (installCard) app.append(installCard);
@@ -357,13 +358,16 @@
 
     // Asset card: latest net worth, or a prompt if nothing is set up yet.
     let assetValue = "Get started", assetHint = "add your accounts";
+    let assetIsMoney = false;
     if (accounts.length) {
       const { snapshots, allMoves } = await loadTimeline();
       const timeline = Model.computeTimeline(snapshots, allMoves);
       if (timeline.length) {
         const latest = timeline[timeline.length - 1];
-        // At-cost, matching every other net-worth figure in the app.
-        assetValue = fmt(latest.netWorth, base());
+        // At-cost, matching every other net-worth figure in the app. Deferred
+        // into a function so the eye redraws it without refetching.
+        assetValue = () => fmt(latest.netWorth, base());
+        assetIsMoney = true;
         assetHint = "net worth, " + periodLabel(latest.snapshot.period_year, latest.snapshot.period_month);
       } else { assetValue = "Get started"; assetHint = "add your first month"; }
     }
@@ -372,11 +376,16 @@
       title: "Asset Tracker",
       desc: "Net worth, growth, and monthly spending",
       value: assetValue, hint: assetHint,
+      // Only worth offering once there is a figure to hide.
+      eye: assetIsMoney,
       onClick: () => routeTo("dashboard"),
     }));
 
     // Expense card: your overall position across wallets.
     let expValue = "Get started", expHint = "set up a wallet", expSign = null;
+    // Set only when the figure is an actual amount, so the eye appears (and
+    // hides something) only where there is money on the card.
+    let expMoney = null;
     if (window.Split) {
       const wallets = (await Split.loadWallets()).filter((w) => !w.archived);
       if (wallets.length) {
@@ -399,6 +408,7 @@
             if (Math.abs(net) < 0.005) { expValue = "Settled up"; expHint = count; expSign = 0; }
             else {
               expValue = fmt(Math.abs(net), currencies[0]);
+              expMoney = () => fmt(Math.abs(net), currencies[0]);
               expHint = (net > 0 ? "you're owed in " : "you owe across ") + count;
               expSign = net > 0 ? 1 : -1;
             }
@@ -414,7 +424,10 @@
       icon: TRACKER_ICON.expense,
       title: "Expense Tracker",
       desc: "Split bills with friends, flatmates, and partners",
-      value: expValue, hint: expHint, sign: expSign,
+      // expMoney is set only where the figure is an amount; "Settled up" and
+      // "2 wallets" are labels, not money, and neither needs hiding.
+      value: expMoney ? () => expMoney() : expValue,
+      hint: expHint, sign: expSign, eye: !!expMoney,
       onClick: () => routeTo("wallets"),
     }));
 
@@ -490,26 +503,45 @@
   };
 
   // The two big cards on home. One live number each, so home is useful.
-  function trackerCard({ icon, title, desc, value, hint, sign, onClick }) {
+  // `value` may be a string, or a function returning one — pass a function when
+  // the figure is money, so the eye can redraw it without rebuilding the card.
+  // `eye: true` puts a small privacy toggle in the card's corner.
+  //
+  // A <div> with role="button" rather than a real <button>, because the eye is
+  // a button itself and nesting buttons is invalid HTML (browsers unnest them,
+  // which breaks the layout).
+  function trackerCard({ icon, title, desc, value, hint, sign, onClick, eye }) {
     const cls = sign == null ? "" : sign > 0 ? "pos" : sign < 0 ? "neg" : "";
-    return el("button", { class: "tracker-card", type: "button", onClick },
+    const figure = typeof value === "function"
+      ? money(value, "tracker-value " + cls)
+      : el("b", { class: "tracker-value " + cls }, value);
+
+    const card = el("div", { class: "tracker-card", role: "button", tabindex: "0" },
       el("span", { class: "tracker-icon", html: icon }),
       el("span", { class: "tracker-body" },
         el("span", { class: "tracker-title" }, title),
         el("span", { class: "tracker-desc" }, desc),
         el("span", { class: "tracker-figure" },
-          el("b", { class: "tracker-value " + cls }, value),
+          figure,
           el("span", { class: "tracker-hint" }, hint))),
+      eye ? privacyEye(true) : null,
       el("span", { class: "tracker-chev" }, "›"));
+
+    card.addEventListener("click", onClick);
+    // role="button" is a promise the keyboard works too.
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); }
+    });
+    return card;
   }
 
   // ── DASHBOARD (Asset Tracker home) ────────────────────
   route("dashboard", async (app) => {
     app.append(backBar("Home", "home"));
-    app.append(withPrivacyToggle(el("div", { class: "page-header-shell" },
+    app.append(el("div", { class: "page-header-shell fade-up fd1" },
       el("h1", {}, "Asset Tracker"),
       el("p", {}, "Your assets, growth, and spending, all in one calm place.")
-    )));
+    ));
 
     if (accounts.length === 0) {
       app.append(el("div", { class: "shell fade-up fd2" },
@@ -550,7 +582,10 @@
     app.append(el("div", { class: "shell fade-up" },
       el("div", { class: "month-card-head", style: "margin-bottom:10px" },
         el("h3", { style: "margin:0" }, periodLabel(ls.period_year, ls.period_month)),
-        updated ? el("span", { class: "section-hint", style: "margin:0" }, "updated " + updated) : null),
+        // The eye lives with the figures it hides, rather than up by the page
+        // title where it is further from what it affects.
+        privacyEye(true),
+        updated ? el("span", { class: "section-hint", style: "margin:0;margin-left:auto" }, "updated " + updated) : null),
       ...monthStatTiles(latest),
       el("div", { style: "margin-top:14px" }, calcLine(latest))
     ));
@@ -578,7 +613,17 @@
     // 4) Statistics (charts).
     if (window.Charts) {
       const chartInner = el("div", {});
-      Charts.render(chartInner, timeline, c);
+      // Charts are SVG drawn once, so unlike the text figures they cannot
+      // redraw themselves: their axis ticks are money too, and would keep
+      // showing "101k" after the eye is tapped. Re-render just this block —
+      // still no refetch, and only the charts repaint rather than the page.
+      onPrivacyChange(() => {
+        if (!chartInner.isConnected && chartInner.__seen) return false;
+        chartInner.__seen = true;
+        chartInner.innerHTML = "";
+        Charts.render(chartInner, timeline, c);
+        return true;
+      });
       app.append(el("div", { class: "shell fade-up" }, el("h3", {}, "Statistics"), chartInner));
     }
   });
@@ -586,12 +631,21 @@
   // `onOpen` makes the tile a button that shows how the figure was reached.
   // Every number in this app is derived, so being able to see the arithmetic
   // is the difference between trusting it and guessing at it.
+  // `value` may be a string, or a function returning one. Money figures should
+  // pass a function, so the privacy eye can rewrite the tile in place instead
+  // of the screen being rebuilt around it.
   function statTile(label, value, signHint, sub, onOpen) {
     const cls = signHint == null ? "" : signHint > 0 ? "pos" : signHint < 0 ? "neg" : "";
+    const valueNode = typeof value === "function"
+      ? money(value, "stat-value " + cls)
+      : el("div", { class: "stat-value " + cls }, value);
+    const subNode = typeof sub === "function"
+      ? money(sub, "stat-sub")
+      : (sub ? el("div", { class: "stat-sub" }, sub) : null);
     const kids = [
       el("div", { class: "stat-label" }, label),
-      el("div", { class: "stat-value " + cls }, value),
-      sub ? el("div", { class: "stat-sub" }, sub) : null,
+      valueNode,
+      subNode,
     ];
     if (!onOpen) return el("div", { class: "stat" }, ...kids);
     return el("button", { class: "stat stat-tappable", type: "button",
@@ -662,29 +716,31 @@
     // rests on: Expense = Income − Growth, and that only holds if Growth
     // excludes market swings. A stock rising 5,000 is not 5,000 you failed to
     // spend. Market value is shown separately as an informational tile.
+    // Every money figure is passed as a FUNCTION so the privacy eye can rewrite
+    // it in place. The sub-labels that embed an amount get the same treatment.
     const tiles = [
-      statTile("Net worth", fmt(t.netWorth, c), null, "what you put in, at cost",
+      statTile("Net worth", () => fmt(t.netWorth, c), null, "what you put in, at cost",
         () => showNetWorthBreakdown(t)),
-      statTile("Growth", t.deltaNW === null ? "—" : fmtSigned(t.deltaNW, c), t.deltaNW, "vs previous month",
+      statTile("Growth", t.deltaNW === null ? "—" : () => fmtSigned(t.deltaNW, c), t.deltaNW, "vs previous month",
         t.deltaNW === null ? null : () => showGrowthBreakdown(t)),
-      statTile("Income", t.income ? fmt(t.income, c) : fmt(0, c), null, "this month",
+      statTile("Income", () => fmt(t.income || 0, c), null, "this month",
         () => showIncomeBreakdown(t)),
-      statTile("Expense", t.expense === null ? "not yet" : fmt(t.expense, c), t.expense === null ? null : -1, "income minus growth",
+      statTile("Expense", t.expense === null ? "not yet" : () => fmt(t.expense, c), t.expense === null ? null : -1, "income minus growth",
         t.expense === null ? null : () => showExpenseBreakdown(t)),
-      statTile("Liquid", fmt(t.liquid, c), null, "banks, wallets, cash",
+      statTile("Liquid", () => fmt(t.liquid, c), null, "banks, wallets, cash",
         () => showLiquidBreakdown(t)),
-      statTile("Illiquid (at cost)", fmt(t.illiquidCost, c), null, "what you contributed",
+      statTile("Illiquid (at cost)", () => fmt(t.illiquidCost, c), null, "what you contributed",
         () => showIlliquidBreakdown(t)),
-      statTile("Liabilities", t.liabilities ? fmt(-t.liabilities, c) : fmt(0, c), t.liabilities ? -1 : 0,
-        t.paidLiabilities ? "excludes " + fmt(t.paidLiabilities, c) + " already paid" : "what you still owe",
+      statTile("Liabilities", () => (t.liabilities ? fmt(-t.liabilities, c) : fmt(0, c)), t.liabilities ? -1 : 0,
+        t.paidLiabilities ? () => "excludes " + fmt(t.paidLiabilities, c) + " already paid" : "what you still owe",
         () => showLiabilitiesBreakdown(t)),
     ];
     // Market value is informational and deliberately last, so it never gets
     // mistaken for the figure the expense math uses.
     if (t.hasMarket) {
       const gain = t.marketNetWorth - t.netWorth;
-      tiles.push(statTile("Net worth (market)", fmt(t.marketNetWorth, c), null,
-        (gain >= 0 ? "+" : "") + fmt(gain, c) + " unrealised",
+      tiles.push(statTile("Net worth (market)", () => fmt(t.marketNetWorth, c), null,
+        () => (gain >= 0 ? "+" : "") + fmt(gain, c) + " unrealised",
         () => showMarketBreakdown(t)));
     }
     return [el("div", { class: "stat-grid" }, ...tiles)];
@@ -844,29 +900,59 @@
   }
 
   // A prominent top back-bar for sub-pages (→ dashboard by default).
-  // The eye toggle for private mode. Wraps a page header so the button sits
-  // beside the title, reusing the wallet-head layout.
+  // ── Private mode toggle ───────────────────────────────
+  // Hides every money figure so the app can be shown to someone without
+  // showing what you have.
   //
-  // Re-renders the current route on toggle rather than walking the DOM: every
-  // figure is produced by fmt()/fmtSigned(), so a fresh render is already
-  // correct everywhere, and nothing can be missed.
+  // Toggling REPAINTS IN PLACE rather than re-running the route. A re-render
+  // refetches from Supabase, so the screen blanked and rebuilt on every tap —
+  // a visible blink for something that should feel instant. Instead each
+  // rendered amount remembers how to draw itself, and toggling just rewrites
+  // that text. Nothing refetches, nothing reflows, nothing flashes.
   const EYE_OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
   const EYE_OFF  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
 
-  function withPrivacyToggle(header) {
-    const hidden = window.isPrivate && window.isPrivate();
+  // Everything on screen that needs redrawing when the setting flips. Cleared
+  // on every route change, since those nodes are gone.
+  let privacyWatchers = [];
+  function onPrivacyChange(fn) { privacyWatchers.push(fn); fn(); }
+  function repaintPrivacy() { privacyWatchers = privacyWatchers.filter((f) => f()); }
+
+  // A money <span> that redraws itself instead of being rebuilt. `render()`
+  // returns the current string; it is called again whenever the setting flips.
+  function money(render, cls) {
+    const node = el("span", cls ? { class: cls } : {});
+    onPrivacyChange(() => {
+      if (!node.isConnected && node.__seen) return false;  // detached: stop watching
+      node.__seen = true;
+      node.textContent = render();
+      return true;
+    });
+    return node;
+  }
+
+  // The eye itself. `compact` renders it small for a card corner.
+  function privacyEye(compact) {
     const btn = el("button", {
-      class: "icon-btn", type: "button",
-      title: hidden ? "Show amounts" : "Hide amounts",
-      "aria-label": hidden ? "Show amounts" : "Hide amounts",
-      "aria-pressed": hidden ? "true" : "false",
-      html: hidden ? EYE_OFF : EYE_OPEN,
+      class: compact ? "eye-btn eye-sm" : "icon-btn eye-btn", type: "button",
     });
-    btn.addEventListener("click", () => {
+    const sync = () => {
+      const hidden = window.isPrivate && window.isPrivate();
+      btn.innerHTML = hidden ? EYE_OFF : EYE_OPEN;
+      btn.title = hidden ? "Show amounts" : "Hide amounts";
+      btn.setAttribute("aria-label", btn.title);
+      btn.setAttribute("aria-pressed", hidden ? "true" : "false");
+      return true;
+    };
+    onPrivacyChange(sync);
+    btn.addEventListener("click", (e) => {
+      // On the tracker cards the eye sits inside a clickable card, so the tap
+      // must not also open the tracker.
+      e.preventDefault(); e.stopPropagation();
       window.setPrivate(!(window.isPrivate && window.isPrivate()));
-      routeTo(currentRoute, currentArg);   // repaint with the new setting
+      repaintPrivacy();
     });
-    return el("div", { class: "wallet-head privacy-head fade-up fd1" }, header, btn);
+    return btn;
   }
 
   function backBar(label, route, arg) {
