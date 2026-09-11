@@ -1737,12 +1737,147 @@
 
     app.append(el("div", { class: "btn-row fade-up fd3", style: "margin-top:14px" }, addBtn, addMemBtn));
 
-    // Phase 2 lands here: gather offers for these cards and show when it last ran.
-    app.append(el("div", { class: "shell fade-up fd3" },
-      el("h3", {}, "Perks"),
-      el("div", { class: "section-hint", style: "margin-top:0" },
-        "Once your cards are in, Bloom can gather what each one gets you — merchants, dates, requirements, and a link to the real terms. That part is not built yet.")));
+    // ── What your cards get you ──
+    let offers = [];
+    try { offers = await Perks.loadOffers(); } catch { offers = []; }
+    app.append(perksPanel(cards, offers));
   });
+
+  // The gathered perks: a search box over what is already stored, the results,
+  // and a refresh that re-gathers.
+  //
+  // Search reads STORED data only — no API call, no wait, no cost. Gathering is
+  // the expensive step and it happens once, on demand.
+  function perksPanel(cards, offers) {
+    const shell = el("div", { class: "shell fade-up fd3" });
+    const last = Perks.lastGathered(offers);
+    const days = Perks.daysSince(last);
+
+    const stamp = el("span", { class: "section-hint", style: "margin:0" },
+      !last ? "Never gathered yet."
+        : days === 0 ? "Gathered today."
+        : days === 1 ? "Gathered yesterday."
+        : "Gathered " + days + " days ago.");
+
+    const gatherBtn = el("button", { class: "btn btn-sm" }, last ? "Refresh" : "Gather perks");
+    const progress = el("div", { class: "section-hint", style: "margin-top:8px" });
+    const results = el("div", {});
+
+    const searchIn = el("input", { type: "search", placeholder: "Search a shop, card, or benefit…" });
+    const renderResults = (list, emptyMsg) => {
+      results.innerHTML = "";
+      if (!list.length) {
+        results.append(el("div", { class: "empty-state", style: "padding:16px" }, emptyMsg));
+        return;
+      }
+      list.forEach(({ offer, card }) => results.append(offerRow(offer, card)));
+    };
+
+    // Everything, grouped by merchant, so it can be browsed and not only queried.
+    const showAll = () => {
+      results.innerHTML = "";
+      if (!offers.length) {
+        results.append(el("div", { class: "empty-state", style: "padding:16px" },
+          "Nothing gathered yet. Tap " + (last ? "Refresh" : "Gather perks") + " to find what your cards get you."));
+        return;
+      }
+      const byCard = {};
+      cards.forEach((c) => { byCard[c.id] = c; });
+      const groups = {};
+      offers.forEach((o) => {
+        const key = (o.merchant || "Other").trim();
+        (groups[key] = groups[key] || []).push(o);
+      });
+      Object.keys(groups).sort((a, b) => a.localeCompare(b)).forEach((merchant) => {
+        results.append(el("div", { class: "perk-merchant" }, merchant));
+        groups[merchant]
+          .sort((a, b) => (Perks.isExpired(a) ? 1 : 0) - (Perks.isExpired(b) ? 1 : 0))
+          .forEach((o) => results.append(offerRow(o, byCard[o.card_id])));
+      });
+    };
+
+    const runSearch = () => {
+      const q = searchIn.value.trim();
+      if (!q) { showAll(); return; }
+      const hits = Perks.search(offers, cards, q);
+      renderResults(hits,
+        offers.length
+          ? "Nothing stored matches “" + q + "”. It may still exist — Bloom only knows what it has gathered."
+          : "Nothing gathered yet.");
+    };
+    searchIn.addEventListener("input", runSearch);
+
+    gatherBtn.addEventListener("click", async () => {
+      gatherBtn.disabled = true;
+      progress.className = "section-hint";
+      let done = 0; const failed = [];
+      for (const c of cards) {
+        progress.textContent = `Gathering ${done + 1} of ${cards.length}: ${c.name}…`;
+        try {
+          const { offers: found } = await Perks.gatherFor(c);
+          await Perks.replaceOffers(c.id, found);
+        } catch (e) {
+          failed.push(c.name + " (" + (e.message || "failed") + ")");
+        }
+        done++;
+      }
+      progress.textContent = failed.length ? "Done, but these failed: " + failed.join("; ") : "Done.";
+      if (failed.length) progress.className = "error-msg";
+      setTimeout(() => routeTo("perks"), 700);
+    });
+
+    // Filtered because this is the native append, which would render a null
+    // child as the literal text "null" (el() skips them, append does not).
+    [
+      el("div", { class: "month-card-head", style: "margin-bottom:10px" },
+        el("h3", { style: "margin:0" }, "What your cards get you"),
+        gatherBtn),
+      stamp,
+      // Staleness is stated plainly rather than hidden: an entry that looks
+      // current but is months old is worse than no entry at all.
+      days != null && days > 30
+        ? el("div", { class: "section-hint", style: "margin-top:6px;color:var(--neg)" },
+            "This is over a month old. Offers change — refresh, or check the source link before relying on anything here.")
+        : null,
+      el("div", { class: "section-hint", style: "margin-top:10px" },
+        "Gathered by AI from public pages, so treat it as a lead, not gospel. Every line links to its source — check that before you rely on it."),
+      searchIn,
+      progress,
+      results,
+    ].filter(Boolean).forEach((n) => shell.append(n));
+
+    showAll();
+    return shell;
+  }
+
+  // One gathered benefit. The source link is not a footnote: it is how you
+  // check the fine print a summary may have flattened.
+  function offerRow(o, card) {
+    const expired = Perks.isExpired(o);
+    const ends = o.ends_on ? new Date(o.ends_on + "T00:00:00") : null;
+    const endLabel = ends
+      ? (expired ? "ended " : "until ") + ends.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+      : null;
+
+    return el("div", { class: "perk-offer" + (expired ? " is-expired" : "") },
+      el("div", { class: "perk-offer-head" },
+        el("span", { class: "perk-offer-headline" }, o.headline),
+        expired ? el("span", { class: "tag tag-warn" }, "expired") : null),
+      // cardLabel() already includes the holder's tier, so the offer's own tier
+      // is shown only when it says something different (e.g. a benefit that
+      // applies to a tier other than the one recorded on the card).
+      el("div", { class: "perk-offer-card" },
+        card ? Perks.cardLabel(card) : "(card removed)",
+        o.tier && (!card || card.tier !== o.tier)
+          ? el("span", { class: "member-status" }, o.tier + " only") : null),
+      o.detail ? el("div", { class: "perk-offer-detail" }, o.detail) : null,
+      // Requirements get their own emphasised line: the minimum spend or the
+      // registration step is what actually decides whether you get the perk.
+      o.requirements ? el("div", { class: "perk-offer-req" }, o.requirements) : null,
+      el("div", { class: "perk-offer-foot" },
+        endLabel ? el("span", {}, endLabel) : null,
+        o.source_url ? el("a", { href: o.source_url, target: "_blank", rel: "noopener" }, "check the terms") : null));
+  }
 
   // One card / membership in the list. Tapping opens it for editing.
   function perkRow(c) {

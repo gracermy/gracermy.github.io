@@ -19,6 +19,66 @@ Setup docs: `setup/SETUP.md`, `setup/schema.sql` (asset tracker),
 
 ---
 
+## Perks — phase 2: gathering what your cards get you (BUILT, 2026-09-13)
+
+**Gather once, search free.** The alternative — searching live on every "what
+about Wellcome?" — costs money per question and takes 10-20 seconds. One
+on-demand gather stores everything, so searching afterwards is instant and free,
+and the list can be BROWSED rather than only queried. The price is staleness,
+which is why every entry carries when it was gathered and when it ends.
+
+**`gather-perks` Edge Function** runs Claude Opus 5 with the server-side web
+search tool (`web_search_20260209`, max 8 uses per card) and returns structured
+offers: merchant, headline, detail, **requirements**, tier, dates, and a source
+URL. Opus rather than Haiku here because missing a requirement has a real cost
+to Grace at the till.
+
+**Three rules the prompt states outright, because search will not do them by
+default:**
+- **Exclude welcome offers**, sign-up bonuses and anything conditional on
+  applying. Search results are dominated by them (banks market them hardest) and
+  they are useless to someone who already holds the card. Including them would
+  fill the list with attractive offers that cannot be used — worse than empty.
+- **Requirements are the point.** HK offers carry heavy fine print (min spend,
+  monthly caps, registration, eligible days, excluded goods) and that is exactly
+  what summarising loses. The prompt demands specifics: "min HK$100 net spend in
+  store", never "conditions apply". They get their own highlighted line in the UI.
+- **Never invent a source_url.** A benefit with no citable page is left out.
+
+**Refresh replaces rather than merges.** A benefit that has quietly disappeared
+from the issuer's page must vanish from the list too; merging would preserve it
+forever, which is precisely the stale-but-confident entry this feature exists to
+avoid. Expired offers stay visible but dimmed and tagged — removing them silently
+would leave you wondering where a deal you remembered went.
+
+**Search reads stored data only.** No API call, no wait, no cost. When nothing
+matches it says so honestly: *"Nothing stored matches X. It may still exist —
+Bloom only knows what it has gathered."* — rather than implying the offer does
+not exist.
+
+**Staleness is stated, not hidden**: "Gathered today / yesterday / N days ago",
+and past 30 days a red warning to refresh or check the source first.
+
+**Two bugs found by looking at the rendered page**, both invisible in the code:
+- A literal **"null"** printed under the timestamp. `shell.append()` is the
+  native DOM method, which stringifies null; the `el()` helper skips nulls but
+  append does not. Now filtered before appending.
+- The **tier printed twice** ("Mox Credit · Mox+" then "Mox+" again), because
+  `cardLabel()` already includes it. The offer's own tier now shows only when it
+  differs from the card's.
+
+Checked at 900px and 430px, light and dark: six offers grouped by merchant, one
+correctly expired and dimmed, requirements and source links on all six, search
+filtering to one result and giving an honest empty state. No console errors, no
+overflow.
+
+**Still to review together:** the resolver and the gatherer have never run
+against real Claude from a logged-in session — only against preview mocks shaped
+like their real responses. Whether the gathered output is actually good enough is
+the open question, and the reason phase 1 was built first.
+
+---
+
 ## Perks — phase 1: the cards you hold (BUILT, 2026-09-11)
 
 A **third tracker** beside Asset and Expense: the cards and memberships you

@@ -181,7 +181,37 @@ window.__pvRoute=_q.get('route');window.__pvSnap=_q.get('snap')||'s2';
      tier:null, status:'confirmed', official_url:'https://www.yuurewards.com/', resolved_at:new Date().toISOString(), sort_order:3},
   ];
   Perks.loadCards=async()=>JSON.parse(JSON.stringify(CARDS));
-  Perks.loadOffers=async()=>[];
+  // Offers shaped exactly like the gather function returns: real requirements,
+  // a source link on each, one already expired, one tier-specific.
+  const now=new Date(), iso=d=>d.toISOString().slice(0,10);
+  const past=new Date(now); past.setDate(past.getDate()-20);
+  const soon=new Date(now); soon.setDate(soon.getDate()+45);
+  let OFFERS=[
+    {id:'o1',card_id:'p1',merchant:'Wellcome',headline:'8% off on the 3rd, 13th and 23rd',
+     detail:'Applies at Wellcome and Market Place stores across Hong Kong.',
+     requirements:'Single net spend of HK$100 or above in store; HK$600 or above for online delivery. Excludes delivery and packaging charges.',
+     tier:null,starts_on:null,ends_on:null,source_url:'https://www.wellcome.com.hk/',gathered_at:now.toISOString()},
+    {id:'o2',card_id:'p1',merchant:'Mannings',headline:'Up to 8% off on designated days',
+     detail:null,requirements:'Min HK$100 net spend. Excludes prescription medicine and gift vouchers.',
+     tier:null,starts_on:null,ends_on:null,source_url:'https://www.hangseng.com/',gathered_at:now.toISOString()},
+    {id:'o3',card_id:'p2',merchant:'Supermarkets',headline:'3% unlimited cashback',
+     detail:'Applies at merchants classified under Grocery Stores / Supermarkets.',
+     requirements:'None stated. Merchant category is set by the card network, not by Mox.',
+     tier:null,starts_on:null,ends_on:null,source_url:'https://mox.com/features/mox-credit/',gathered_at:now.toISOString()},
+    {id:'o4',card_id:'p2',merchant:'Any merchant',headline:'2% unlimited cashback with Mox+',
+     detail:'From 1 September 2026 the base rate depends on Mox+ status.',
+     requirements:'Requires an active Mox+ subscription. Without Mox+ the rate is 1%.',
+     tier:'Mox+',starts_on:'2026-09-01',ends_on:null,source_url:'https://mox.com/',gathered_at:now.toISOString()},
+    {id:'o5',card_id:'p4',merchant:'7-Eleven',headline:'Double yuu Points weekends',
+     detail:null,requirements:'Scan the yuu app before paying. Points cap of 2,000 per month.',
+     tier:null,starts_on:null,ends_on:iso(soon),source_url:'https://www.yuurewards.com/',gathered_at:now.toISOString()},
+    {id:'o6',card_id:'p1',merchant:'IKEA',headline:'5% back on furniture',
+     detail:null,requirements:'Min spend HK$500. Was a limited campaign.',
+     tier:null,starts_on:null,ends_on:iso(past),source_url:'https://www.hangseng.com/',gathered_at:now.toISOString()},
+  ];
+  Perks.loadOffers=async()=>JSON.parse(JSON.stringify(OFFERS));
+  Perks.gatherFor=async(c)=>{await new Promise(r=>setTimeout(r,600));return {offers:[],notes:null};};
+  Perks.replaceOffers=async()=>[];
   Perks.addCards=async(rows)=>{rows.forEach((r,i)=>CARDS.push({...r,id:'n'+(CARDS.length+i)}));return rows;};
   Perks.updateCard=async(id,patch)=>{const c=CARDS.find(x=>x.id===id); if(c)Object.assign(c,patch);};
   Perks.deleteCard=async(id)=>{CARDS=CARDS.filter(x=>x.id!==id);};

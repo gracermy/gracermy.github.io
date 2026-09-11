@@ -63,6 +63,98 @@ const Perks = (() => {
     return out.results || [];
   }
 
+  // ── Gathering ─────────────────────────────────────────
+  // Fetches current benefits for ONE card. The caller loops over cards so
+  // progress can be shown and a single failure does not lose the whole run.
+  async function gatherFor(card) {
+    const client = sb();
+    const { data: sess } = await client.auth.getSession();
+    const token = sess?.session?.access_token;
+    if (!token) throw new Error("Please sign in again.");
+    const base = window.FinanceDB.functionsUrl();
+    if (!base) throw new Error("App is not configured for gathering.");
+
+    const resp = await fetch(base + "/gather-perks", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + token,
+        "content-type": "application/json",
+        "x-invite-passkey": window.FinanceDB.invitePasskey(),
+      },
+      body: JSON.stringify({
+        name: card.name, issuer: card.issuer || "", tier: card.tier || "", kind: card.kind || "card",
+      }),
+    });
+    const out = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const msg = out.error === "invalid_passkey" ? "Invite passkey rejected by the server."
+        : out.error === "not_authenticated" ? "Please sign in again."
+        : out.error === "claude_error" ? "The AI service returned an error. Check your Claude API key/credit."
+        : out.detail || out.error || "Could not gather perks.";
+      throw new Error(msg);
+    }
+    return { offers: out.offers || [], notes: out.notes || null };
+  }
+
+  // Replace one card's offers with a freshly gathered set. Delete-then-insert
+  // rather than merge: a benefit that has QUIETLY DISAPPEARED from the issuer's
+  // page should vanish from your list too. Merging would preserve it forever,
+  // which is exactly the stale-but-confident entry this feature must avoid.
+  async function replaceOffers(cardId, offers) {
+    const client = sb();
+    const { error: delErr } = await client.from("perk_offers").delete().eq("card_id", cardId);
+    if (delErr) throw delErr;
+    const rows = (offers || [])
+      .filter((o) => o && o.merchant && o.headline)
+      .map((o) => ({
+        card_id: cardId,
+        merchant: String(o.merchant).trim(),
+        headline: String(o.headline).trim(),
+        detail: o.detail || null,
+        requirements: o.requirements || null,
+        tier: o.tier || null,
+        starts_on: validDate(o.starts_on),
+        ends_on: validDate(o.ends_on),
+        source_url: o.source_url || null,
+        gathered_at: new Date().toISOString(),
+      }));
+    if (!rows.length) return [];
+    const { data, error } = await client.from("perk_offers").insert(rows).select();
+    if (error) throw error;
+    return data || [];
+  }
+
+  // The model may return "ongoing", "" or a malformed date; only a real
+  // YYYY-MM-DD reaches a date column.
+  function validDate(v) {
+    if (!v || typeof v !== "string") return null;
+    const m = v.trim().match(/^\d{4}-\d{2}-\d{2}$/);
+    return m ? v.trim() : null;
+  }
+
+  // ── Searching ─────────────────────────────────────────
+  // Searches WHAT WAS ALREADY GATHERED — no API call, no wait, no cost. This is
+  // the whole point of gathering in bulk: looking something up at the till
+  // should be instant.
+  function search(offers, cards, query) {
+    const q = String(query || "").trim().toLowerCase();
+    if (!q) return [];
+    const byCard = {};
+    (cards || []).forEach((c) => { byCard[c.id] = c; });
+    return (offers || [])
+      .map((o) => ({ offer: o, card: byCard[o.card_id] }))
+      .filter(({ offer, card }) => {
+        const hay = [
+          offer.merchant, offer.headline, offer.detail, offer.requirements,
+          card && card.name, card && card.issuer,
+        ].filter(Boolean).join(" ").toLowerCase();
+        return hay.includes(q);
+      })
+      // Live offers first, then expired: an expired match is still worth
+      // showing (it explains why you remembered a deal) but must never lead.
+      .sort((a, b) => (isExpired(a.offer) ? 1 : 0) - (isExpired(b.offer) ? 1 : 0));
+  }
+
   // ── Writing ───────────────────────────────────────────
   // `rows` are already-decided cards: either a candidate the user picked, or
   // an unverified fallback keeping exactly what they typed. Inserted in one go
@@ -118,6 +210,7 @@ const Perks = (() => {
 
   return {
     loadCards, loadOffers, resolve,
+    gatherFor, replaceOffers, search,
     addCards, updateCard, deleteCard,
     lastGathered, daysSince, isExpired, cardLabel,
   };
