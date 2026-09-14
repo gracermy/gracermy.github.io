@@ -19,6 +19,48 @@ Setup docs: `setup/SETUP.md`, `setup/schema.sql` (asset tracker),
 
 ---
 
+## Money that came back is now netted off (CHANGED, 2026-09-14)
+
+Grace's call, and on reflection the right one: drop the speculative "looks like
+a share of the 05 Aug dinner" notes, and SUBTRACT repayments from the spending
+total rather than listing them alongside it.
+
+**Why netting is correct here, having argued the opposite yesterday.** The app
+derives real expense as `income − Δnet worth`. When 150 comes back the balance
+is higher, so the derived expense is ALREADY 150 lower. The breakdown exists to
+explain that headline figure — showing gross 200 against a headline that already
+counts 50 would make the two disagree. Yesterday's "net worth already reflects
+it, so don't double-count" was right about the mechanism and wrong about the
+conclusion: it is the BREAKDOWN that was out of step, not the headline.
+
+**Where the subtraction lands**, since spreading it would be worse than useless:
+- One month, not all of them — repayments arrived in a specific month, and
+  splitting them would move figures in a month not being applied.
+- Its own visible line ("less money that came back  −198") rather than hidden
+  inside a category, so the arithmetic stays checkable: gross, what came back,
+  and what is applied are all on screen.
+- On Apply it becomes ONE negative `expense_lines` row labelled "Money that came
+  back", editable and deletable like any other. Not deducted from someone's
+  dinner, where it would be invisible later.
+
+**Three places that quietly assumed positive amounts:**
+- The save filter was `amount > 0`, which would have silently dropped the
+  negative row and left the saved total higher than the review showed. Now `!== 0`.
+- `aggregateExpenses` already summed correctly with negatives.
+- The spending pie filtered `amount > 0`, so a negative category vanished and the
+  pie disagreed with the headline. Credits are now folded proportionally into the
+  positive slices, so the pie totals the net figure. Where repayments exceed
+  spending it degrades to an empty chart rather than broken donut geometry (an
+  SVG arc with equal start and end points draws nothing).
+
+Each money-in line keeps a ✕, since "is this income or a repayment?" is a
+judgement the model can get wrong and the user can see instantly.
+
+Verified end to end: gross 918 for August, −198 returned, month heading and
+applied rows both 720, and the pie totalling 720 with no negative slice.
+
+---
+
 ## Statement reading: two real bugs (FIXED, 2026-09-14)
 
 Grace reported a line reading 1,212 on her statement showing as 1,285 in the

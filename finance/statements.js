@@ -211,7 +211,26 @@ const Statements = (() => {
     }
 
     const monthTotal = (mg) => mg.lines.reduce((s, l) => s + l.amount, 0);
-    const draftTotal = () => (draft._months || []).reduce((s, g) => s + monthTotal(g), 0);
+    const grossTotal = () => (draft._months || []).reduce((s, g) => s + monthTotal(g), 0);
+    const moneyInTotal = () => (draft._moneyIn || []).reduce((s, m) => s + (Number(m.amount) || 0), 0);
+    const draftTotal = () => grossTotal() - moneyInTotal();
+
+    // Repayments are netted against ONE month rather than spread across all of
+    // them: the money came back in a specific month, and splitting it would
+    // move figures in a month the user is not even applying right now.
+    // Falls back to the closing month when no dated line matches.
+    function moneyInFor(mg) {
+      const groups = draft._months || [];
+      if (!groups.length) return 0;
+      const total = moneyInTotal();
+      if (!total) return 0;
+      const target = groups.find((g) => (draft._moneyIn || []).some((m) => {
+        if (!m.date) return false;
+        const [y, mo] = String(m.date).split("-");
+        return Number(y) === g.year && Number(mo) === g.month;
+      })) || groups[groups.length - 1];
+      return mg === target ? total : 0;
+    }
 
     function renderReview() {
       reviewWrap.innerHTML = "";
@@ -294,16 +313,22 @@ const Statements = (() => {
         }
       }
 
-      // Money that came back (repayments from people you covered). Listed, never
-      // netted: your net-worth change already reflects the true position, so
-      // subtracting it here too would count the same money twice.
-      const moneyIn = Array.isArray(draft.money_in) ? draft.money_in.filter((m) => m && Number(m.amount) > 0) : [];
+      // Money that came back is SUBTRACTED from the spending total.
+      //
+      // This matches how the app already derives your real expense:
+      // expense = income − Δnet worth. When 150 comes back your balance is
+      // higher, so the derived expense is ALREADY lower by 150. A breakdown
+      // that showed the gross 200 would contradict the headline figure it is
+      // meant to explain.
+      draft._moneyIn = draft._moneyIn || (Array.isArray(draft.money_in)
+        ? draft.money_in.filter((m) => m && Number(m.amount) > 0) : []);
+      const moneyIn = draft._moneyIn;
       if (moneyIn.length) {
         const inTotal = moneyIn.reduce((s2, m) => s2 + Number(m.amount), 0);
-        reviewWrap.append(groupHeader(`Money in, not spending: ${Math.round(inTotal).toLocaleString()}`, "var(--pos)"));
+        reviewWrap.append(groupHeader(`Money that came back: −${Math.round(inTotal).toLocaleString()}`, "var(--pos)"));
         reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" },
-          "Money that came back to you — usually people repaying their share of something you paid for. It is listed here but NOT subtracted from your spending: the full amount you paid is still what you spent, and your net worth already reflects what came back."));
-        moneyIn.forEach((m) => reviewWrap.append(moneyInRow(m)));
+          "People repaying their share of something you paid for. This is subtracted from the spending below, so the breakdown matches what you were really out of pocket. Remove any line that is actually income."));
+        moneyIn.forEach((m) => reviewWrap.append(moneyInRow(m, () => { arrRemove(moneyIn, m); renderReview(); })));
       }
 
       const cur = curPeriod();
@@ -329,13 +354,22 @@ const Statements = (() => {
         }
         draft._months.forEach((mg) => {
           const isCurrent = mg.year === cur.year && mg.month === cur.month;
-          const label = `${MONTHS[(mg.month || 1) - 1]} ${mg.year} — ${Math.round(monthTotal(mg)).toLocaleString()}` + (isCurrent ? "  (this month, applied)" : "  (apply when you add this month)");
+          const label = `${MONTHS[(mg.month || 1) - 1]} ${mg.year} — ${Math.round(monthTotal(mg) - moneyInFor(mg)).toLocaleString()}` + (isCurrent ? "  (this month, applied)" : "  (apply when you add this month)");
           reviewWrap.append(el("div", { style: `font-weight:600;margin:14px 0 4px;font-size:0.8rem;${isCurrent ? "color:var(--accent)" : "color:var(--text-muted)"}` }, label));
           const wrapMg = el("div", isCurrent ? {} : { style: "opacity:0.6" });
           categorise(mg).forEach((c) => {
             wrapMg.append(catHeader(c));
             c.lines.forEach((l) => wrapMg.append(lineRow(l, () => { arrRemove(mg.lines, l); renderReview(); })));
           });
+          // The netting gets its own visible line rather than being hidden
+          // inside a category, so the arithmetic stays checkable: you can see
+          // the gross figure, what came back, and what is actually applied.
+          const back = moneyInFor(mg);
+          if (back > 0) {
+            wrapMg.append(el("div", { class: "stmt-cat-head" },
+              el("span", { class: "stmt-cat-name", style: "color:var(--pos)" }, "less money that came back"),
+              el("span", { class: "stmt-cat-total", style: "color:var(--pos)" }, "−" + Math.round(back).toLocaleString())));
+          }
           if (!mg.lines.length) wrapMg.append(el("div", { class: "section-hint", style: "margin-top:0" }, "No spending lines left in this month."));
           reviewWrap.append(wrapMg);
         });
@@ -384,14 +418,13 @@ const Statements = (() => {
 
     // A credit that came back to you. Read-only: it affects nothing, it is here
     // so you can see it was understood and not silently folded into spending.
-    function moneyInRow(m) {
+    function moneyInRow(m, onDelete) {
       const amt = Math.round(Number(m.amount) || 0).toLocaleString();
       return el("div", { class: "line-item stmt-line" },
         el("span", { class: "stmt-line-when" }, m.date || "—"),
-        el("span", { class: "stmt-line-ref", title: m.note || "" },
-          m.description || "(no description)",
-          m.note ? el("span", { class: "member-status" }, m.note) : null),
-        el("span", { class: "stmt-line-amt", style: "color:var(--pos)" }, "+" + amt));
+        el("span", { class: "stmt-line-ref" }, m.description || "(no description)"),
+        el("span", { class: "stmt-line-amt", style: "color:var(--pos)" }, "−" + amt),
+        el("button", { class: "btn-icon", type: "button", title: "Not money coming back", onClick: onDelete }, "✕"));
     }
 
     // A read-only transfer line. `suspect` marks one the AI kept as spending

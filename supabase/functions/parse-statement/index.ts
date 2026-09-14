@@ -60,7 +60,7 @@ Return an object with these fields:
     { "date": "<YYYY-MM-DD or null>", "description": "<as printed>", "amount": <positive number in BASE_CURRENCY> }
   ],
   "money_in": [                               // CREDITS that are neither salary nor a self-transfer: money that came back to you from OTHER PEOPLE. The commonest case is a shared bill — you pay for a group, they repay you their share over the following days. These are NOT spending and NOT income; they are money returning. List them so the user can see what came back.
-    { "date": "<YYYY-MM-DD or null>", "description": "<as printed>", "amount": <positive number in BASE_CURRENCY>, "note": "<why you think it is a repayment rather than income, one short phrase>" }
+    { "date": "<YYYY-MM-DD or null>", "description": "<as printed>", "amount": <positive number in BASE_CURRENCY> }
   ],
   "monthly_breakdown": [                      // spending split by the CALENDAR MONTH of each transaction's date. A statement window that crosses months (e.g. 5 Jun–4 Jul) produces two entries. Amounts are rough — the app rescales.
     { "year": <YYYY>, "month": <1-12>, "categories": [
@@ -115,8 +115,8 @@ CREDITS — MONEY COMING IN. This is the single most misread part of a statement
     your own money returning     -> counted in self_transfer_out's round-trip logic, NOT in money_in
     a repayment from a person    -> listed in "money_in"
 - The repayment case is common and specific: the user pays a whole bill for a group and the others transfer their shares back over the next days. A 200 dinner split four ways shows as ONE debit of 200 and THREE credits of about 50 from three different people. The 200 is the spending. The three 50s go in money_in. spending_total is 200 — do NOT net the credits off it, and do NOT reduce the 200 line to 50.
-- Several similar-sized credits from different personal names within a few days of a larger debit is the signature of a split bill. Say so in the "note" field.
-- If you genuinely cannot tell whether a credit is income or a repayment, put it in money_in and say you are unsure in the note. Misfiling a repayment as income silently inflates the income figure, which is worse.
+- Several similar-sized credits from different personal names within a few days of a larger debit is the signature of a split bill.
+- If you genuinely cannot tell whether a credit is income or a repayment, put it in money_in. Misfiling a repayment as salary silently inflates the income figure, which is worse.
 
 AMOUNTS ARE ALWAYS POSITIVE. Never output a negative number anywhere. Whether money went out or came in is expressed by WHICH ARRAY the line is in, never by its sign. A negative amount in a spending category corrupts the total.
 

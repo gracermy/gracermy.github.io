@@ -226,7 +226,24 @@ const Charts = (() => {
     if (!items.length || total <= 0) { wrap.appendChild(el("div", { class: "chart-empty" }, "No spending breakdown for this month.")); return wrap; }
 
     // Sort desc; fold anything past 7 slices into "other".
-    let data = items.map((i) => ({ label: i.label, amount: Number(i.amount) || 0 })).filter((i) => i.amount > 0).sort((a, b) => b.amount - a.amount);
+    //
+    // A category can be NEGATIVE when money came back (a friend repaying their
+    // share). A negative slice has no meaning in a donut — and an arc with
+    // equal start and end points draws nothing — so negatives are folded into
+    // the positive categories proportionally rather than dropped. Dropping them
+    // would make the pie's total disagree with the headline expense figure,
+    // which is the one number this chart is supposed to explain.
+    const raw = items.map((i) => ({ label: i.label, amount: Number(i.amount) || 0 }));
+    const credits = raw.filter((i) => i.amount < 0).reduce((s, i) => s + i.amount, 0);
+    let data = raw.filter((i) => i.amount > 0).sort((a, b) => b.amount - a.amount);
+    if (credits < 0 && data.length) {
+      const gross = data.reduce((s, i) => s + i.amount, 0);
+      if (gross > 0) {
+        const keep = Math.max(0, gross + credits) / gross;   // credits is negative
+        data = data.map((i) => ({ label: i.label, amount: i.amount * keep }))
+                   .filter((i) => i.amount > 0);
+      }
+    }
     if (data.length > 8) {
       const head = data.slice(0, 7);
       const rest = data.slice(7).reduce((s, i) => s + i.amount, 0);

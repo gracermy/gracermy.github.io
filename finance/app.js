@@ -1388,8 +1388,11 @@
           .map((r) => ({ snapshot_id: sid, ...r }));
         if (incPayload.length) { const { error } = await sb.from("income").insert(incPayload); if (error) throw error; }
 
-        // expense lines
-        const expPayload = $$(".exp-row", expWrap).map((r) => r._read()).filter((r) => r && r.amount > 0)
+        // expense lines. NEGATIVE amounts are kept on purpose: money that came
+        // back (a friend repaying their share) is a real, editable line that
+        // reduces the breakdown. Filtering on > 0 would silently drop it and
+        // leave the saved total higher than the review showed.
+        const expPayload = $$(".exp-row", expWrap).map((r) => r._read()).filter((r) => r && r.amount !== 0)
           .map((r) => ({ snapshot_id: sid, ...r }));
         if (expPayload.length) { const { error } = await sb.from("expense_lines").insert(expPayload); if (error) throw error; }
 
@@ -1482,6 +1485,20 @@
           label: l.description || l.category,
           amount: Math.round(Number(l.amount)),
         }));
+      // Repayments become one negative "money back" row rather than being
+      // silently deducted from someone's dinner. The saved breakdown then sums
+      // to the same net figure the review showed, and the line stays editable
+      // and deletable like any other.
+      const backTotal = (draft._moneyIn || [])
+        .filter((m) => {
+          if (!m.date) return true;                    // undated: assume this month
+          const [y, mo] = String(m.date).split("-");
+          return Number(y) === curY && Number(mo) === curM;
+        })
+        .reduce((s2, m) => s2 + (Number(m.amount) || 0), 0);
+      if (backTotal > 0) {
+        addExpRow({ category: "other", label: "Money that came back", amount: -Math.round(backTotal) });
+      }
       err.className = "ok-msg";
       const other = Array.isArray(draft._months) && draft._months.some((g) => (g.year !== curY || g.month !== curM) && monthLines(g).reduce((s, l) => s + (Number(l.amount) || 0), 0) > 0);
       err.textContent = "Draft applied." + (other ? " Note: this statement also has spending in another month. Open that month to apply its part." : " Review below, then save.");
