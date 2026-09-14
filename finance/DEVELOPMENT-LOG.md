@@ -19,6 +19,57 @@ Setup docs: `setup/SETUP.md`, `setup/schema.sql` (asset tracker),
 
 ---
 
+## Statement reading: two real bugs (FIXED, 2026-09-14)
+
+Grace reported a line reading 1,212 on her statement showing as 1,285 in the
+review, and asked how repayments from friends are handled. Two distinct bugs,
+and the first one was mine rather than the model's.
+
+**BUG 1 — the review was silently rescaling every line.** `buildMonths()` took
+the AI's `spending_total` as authoritative and multiplied every line by
+`stated / sum_of_lines` so they added up to it. With a 6% discrepancy in the
+model's total, a real 1,212 became 1,285. The number was never "out of the
+blue" — it was her real number, distorted by a ratio.
+
+That was defensible when a "line" was a rough category split (2026-09-07, where
+per-line precision explicitly did not matter). It became actively wrong the
+moment lines became individual transactions checked against a statement: it
+corrupts data that was already correct, and spreads one missing transaction
+across every other line so nothing looks wrong anywhere.
+
+**The lines are now the truth and are never rescaled.** The stated total is kept
+as a CHECK: if it disagrees by more than max(1, 0.5%), the review says so and
+names the gap ("These lines add up to 4,398 but the statement's own total reads
+5,032 — a gap of 634"). A missing transaction is now visible instead of smeared.
+The tolerance stops FX and rounding noise from crying wolf.
+
+**BUG 2 — credits were not modelled at all.** A statement has two columns and
+only debits are spending, but nothing said so. The split-bill case exposed it:
+pay 200 for four people, three friends repay ~50 each, and those credits either
+vanished or polluted `total_out`.
+
+Added `money_in` to the parse-statement draft, with prompt rules stating the
+three-way classification every credit must get (salary → `income_in`; own money
+returning → the round-trip logic; a person repaying you → `money_in`), the
+split-bill signature (several similar-sized credits from personal names within
+days of a larger debit), and an explicit "amounts are ALWAYS positive — direction
+is expressed by which array a line is in, never by its sign."
+
+**Repayments are listed, never netted** (Grace's choice, and the right one): the
+200 stays as the expense and the 150 shows separately as money in. Her net-worth
+change already reflects that she is only 50 out of pocket, so netting here too
+would count the same money twice. The UI says this in as many words, because it
+is the kind of thing that looks like a bug if unexplained.
+
+Also hardened: `spending_total` must not be reduced by repayments, with the
+worked example in the prompt.
+
+Verified against a reconstruction of Grace's own screenshot: the 1,212 line stays
+1,212, the gap is reported rather than absorbed, a 0.4 rounding difference
+correctly stays silent, and a draft with no stated total still renders.
+
+---
+
 ## Perks — phase 2: gathering what your cards get you (BUILT, 2026-09-13)
 
 **Gather once, search free.** The alternative — searching live on every "what

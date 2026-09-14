@@ -59,13 +59,16 @@ Return an object with these fields:
   "possible_transfers": [                     // debits you did NOT exclude but that LOOK like they might be transfers to your own account or e-wallet (e.g. to Octopus, PayMe, Alipay, WeChat Pay, a named wallet, or another bank in your own name). Listing them lets the user confirm. Do not also put these in "transfers".
     { "date": "<YYYY-MM-DD or null>", "description": "<as printed>", "amount": <positive number in BASE_CURRENCY> }
   ],
+  "money_in": [                               // CREDITS that are neither salary nor a self-transfer: money that came back to you from OTHER PEOPLE. The commonest case is a shared bill — you pay for a group, they repay you their share over the following days. These are NOT spending and NOT income; they are money returning. List them so the user can see what came back.
+    { "date": "<YYYY-MM-DD or null>", "description": "<as printed>", "amount": <positive number in BASE_CURRENCY>, "note": "<why you think it is a repayment rather than income, one short phrase>" }
+  ],
   "monthly_breakdown": [                      // spending split by the CALENDAR MONTH of each transaction's date. A statement window that crosses months (e.g. 5 Jun–4 Jul) produces two entries. Amounts are rough — the app rescales.
     { "year": <YYYY>, "month": <1-12>, "categories": [
         { "category": "<one of: ${CATEGORIES.join(", ")}>", "amount": <positive number in BASE_CURRENCY>,
           "lines": [                          // EVERY individual statement line that makes up this category amount, in the order printed. The user reads these to check the statement line by line.
             { "date": "<YYYY-MM-DD or null>", "time": "<HH:MM 24-hour, or null if the statement prints no time>",
               "description": "<the merchant / reference name as printed on the statement>",
-              "amount": <positive number in BASE_CURRENCY> }
+              "amount": <positive number in BASE_CURRENCY, ALWAYS POSITIVE — never negative, the direction field says which way it went> }
           ] }
       ] }
   ]
@@ -84,7 +87,7 @@ HOW TO COMPUTE spending_total — it is MONEY THAT LEFT and did NOT come back. I
   where:
     total_out = the sum of ALL debits / withdrawals / money leaving the account (fees, purchases, transfers to people, ATM, everything out).
     self_transfer_out = ONLY the debits that are genuinely NOT spending: cash you withdrew that came back in the same statement, money moved to your own other account/wallet, paying your OWN credit-card bill, and any debit whose exact matching credit also appears (round-trips). If in doubt whether an outgoing transfer to a person is spending, TREAT IT AS SPENDING (do not put it in self_transfer_out) and categorize it as "other".
-  Do NOT subtract salary or incoming money from spending_total — income is separate. Someone earning 20000 salary and spending 14000 has spending_total 14000, not -6000.
+  Do NOT subtract salary, repayments, or any other incoming money from spending_total — credits are tracked separately (see CREDITS below). If the user pays 200 for a group dinner and is repaid 150, spending_total includes the full 200, not 50. Someone earning 20000 salary and spending 14000 has spending_total 14000, not -6000.
 - Sanity check using the printed balances: opening_balance + (all credits including salary) - (all debits) should ≈ closing_balance. Use this to make sure you captured the debits correctly, so the same statement always yields the same spending_total.
 - Set spending_total to null ONLY if you truly cannot read the debits; then the app falls back to its own figure.
 
@@ -104,6 +107,18 @@ monthly_breakdown rules — THE GUIDING PRINCIPLE: only label what is CLEARLY a 
 - Include "time" only if the statement actually prints a time for that line. Never guess one; use null.
 - Lines belong to the month entry matching their own transaction date, exactly as the category amounts do.
 - EXCLUDE entirely (not spending at all): salary/income, paying your own credit-card bill, moving money between your own accounts, wallet top-ups, and cash withdrawn then re-deposited.
+
+CREDITS — MONEY COMING IN. This is the single most misread part of a statement, so be deliberate:
+- A statement has TWO columns: money out (debits) and money in (credits). ONLY DEBITS ARE SPENDING. Never put a credit in monthly_breakdown, and never let a credit reduce a spending line. If a line is money arriving, it does not belong in the categories at all.
+- Every credit must be classified as exactly ONE of:
+    salary / genuine income      -> counted in income_in, NOT in money_in
+    your own money returning     -> counted in self_transfer_out's round-trip logic, NOT in money_in
+    a repayment from a person    -> listed in "money_in"
+- The repayment case is common and specific: the user pays a whole bill for a group and the others transfer their shares back over the next days. A 200 dinner split four ways shows as ONE debit of 200 and THREE credits of about 50 from three different people. The 200 is the spending. The three 50s go in money_in. spending_total is 200 — do NOT net the credits off it, and do NOT reduce the 200 line to 50.
+- Several similar-sized credits from different personal names within a few days of a larger debit is the signature of a split bill. Say so in the "note" field.
+- If you genuinely cannot tell whether a credit is income or a repayment, put it in money_in and say you are unsure in the note. Misfiling a repayment as income silently inflates the income figure, which is worse.
+
+AMOUNTS ARE ALWAYS POSITIVE. Never output a negative number anywhere. Whether money went out or came in is expressed by WHICH ARRAY the line is in, never by its sign. A negative amount in a spending category corrupts the total.
 
 Other rules:
 - If the statement prints an exchange rate for a foreign-currency line, put it in exchange_rate_to_hkd.

@@ -164,16 +164,25 @@ const Statements = (() => {
         }
       }
 
-      // If the statement printed a stable spending total, scale the lines so
-      // they add up to it: the AI's per-line figures are the breakdown, the
-      // printed total is the authority.
+      // THE LINES ARE THE TRUTH. They are never rescaled.
+      //
+      // This used to multiply every line by stated/rawTotal so they summed to
+      // the statement's own total. That was defensible when a "line" was just a
+      // rough category split, but it is actively wrong now that each line is a
+      // real transaction you check against your statement: a 6% discrepancy in
+      // the model's total silently turned a real 1,212 into 1,285. A number you
+      // can look up must never be quietly rewritten.
+      //
+      // The stated total is kept as a CHECK instead: if it disagrees with the
+      // lines, the review says so and names the gap, so a genuinely missed
+      // transaction is visible rather than smeared across every other line.
       const rawTotal = MONTHS_IN.reduce((sum, g) => sum + g.lines.reduce((x, l) => x + l.amount, 0), 0);
       const stated = (d.spending_total != null && isFinite(d.spending_total) && Number(d.spending_total) >= 0)
         ? Number(d.spending_total) : null;
-      if (stated != null && rawTotal > 0 && Math.abs(stated - rawTotal) > 1) {
-        const factor = stated / rawTotal;
-        MONTHS_IN.forEach((g) => g.lines.forEach((l) => { l.amount = l.amount * factor; }));
-      }
+      // Rounding and FX mean tiny differences are noise, not a missing line.
+      const gap = stated != null ? stated - rawTotal : 0;
+      d._checkGap = (stated != null && rawTotal > 0 && Math.abs(gap) > Math.max(1, stated * 0.005))
+        ? { stated, lines: rawTotal, gap } : null;
       // Nothing itemised but a total is known: one "other" line in the closing month.
       if (!MONTHS_IN.length && stated > 0) {
         groupFor(d.period_year, d.period_month).lines.push({
@@ -285,6 +294,18 @@ const Statements = (() => {
         }
       }
 
+      // Money that came back (repayments from people you covered). Listed, never
+      // netted: your net-worth change already reflects the true position, so
+      // subtracting it here too would count the same money twice.
+      const moneyIn = Array.isArray(draft.money_in) ? draft.money_in.filter((m) => m && Number(m.amount) > 0) : [];
+      if (moneyIn.length) {
+        const inTotal = moneyIn.reduce((s2, m) => s2 + Number(m.amount), 0);
+        reviewWrap.append(groupHeader(`Money in, not spending: ${Math.round(inTotal).toLocaleString()}`, "var(--pos)"));
+        reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" },
+          "Money that came back to you — usually people repaying their share of something you paid for. It is listed here but NOT subtracted from your spending: the full amount you paid is still what you spent, and your net worth already reflects what came back."));
+        moneyIn.forEach((m) => reviewWrap.append(moneyInRow(m)));
+      }
+
       const cur = curPeriod();
       if ((draft._months || []).length) {
         const crossMonth = draft._months.length > 1;
@@ -295,6 +316,17 @@ const Statements = (() => {
         }
         reviewWrap.append(el("div", { class: "section-hint", style: "margin-top:0" },
           "Every line on the statement, grouped by category. Move a line to another category or delete it, and the totals follow."));
+        // A gap between the lines and the statement's own total usually means a
+        // transaction was missed. Saying so beats silently rescaling, which is
+        // what this used to do — it made every line wrong instead of one missing.
+        if (draft._checkGap) {
+          const g = draft._checkGap;
+          reviewWrap.append(el("div", { class: "error-msg", style: "margin:8px 0" },
+            `These lines add up to ${Math.round(g.lines).toLocaleString()}, but the statement's own total reads ${Math.round(g.stated).toLocaleString()} — a gap of ${Math.round(Math.abs(g.gap)).toLocaleString()}. `
+            + (g.gap > 0
+                ? "A transaction may be missing from the list below. The lines are shown exactly as read; check them against your statement."
+                : "There may be a duplicate or a credit wrongly counted as spending. The lines are shown exactly as read; check them against your statement.")));
+        }
         draft._months.forEach((mg) => {
           const isCurrent = mg.year === cur.year && mg.month === cur.month;
           const label = `${MONTHS[(mg.month || 1) - 1]} ${mg.year} — ${Math.round(monthTotal(mg)).toLocaleString()}` + (isCurrent ? "  (this month, applied)" : "  (apply when you add this month)");
@@ -348,6 +380,18 @@ const Statements = (() => {
       // Highlight rows that still need a choice.
       if (!obj._acct) wrap.style.borderColor = "var(--accent)";
       return wrap;
+    }
+
+    // A credit that came back to you. Read-only: it affects nothing, it is here
+    // so you can see it was understood and not silently folded into spending.
+    function moneyInRow(m) {
+      const amt = Math.round(Number(m.amount) || 0).toLocaleString();
+      return el("div", { class: "line-item stmt-line" },
+        el("span", { class: "stmt-line-when" }, m.date || "—"),
+        el("span", { class: "stmt-line-ref", title: m.note || "" },
+          m.description || "(no description)",
+          m.note ? el("span", { class: "member-status" }, m.note) : null),
+        el("span", { class: "stmt-line-amt", style: "color:var(--pos)" }, "+" + amt));
     }
 
     // A read-only transfer line. `suspect` marks one the AI kept as spending
