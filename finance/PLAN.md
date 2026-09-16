@@ -4,9 +4,11 @@
 > snapshots, derived expense, charts, AI statement reading). This file is the
 > design record for the **Asset Tracker** half of Bloom.
 >
-> Bloom has since gained a second, independent tracker for splitting bills:
-> see `SPLIT-PLAN.md`. The two share no math. Day-to-day history for both is in
-> `DEVELOPMENT-LOG.md`.
+> Bloom has since gained two more independent trackers: **Expense Tracker** for
+> splitting bills (`SPLIT-PLAN.md`) and **Perks** for the cards you hold (no plan
+> file — see `DEVELOPMENT-LOG.md`, 2026-09-11 and 2026-09-13). The three share no
+> math. Day-to-day history for all of them is in `DEVELOPMENT-LOG.md`, which is
+> the file to read for current state.
 
 ## Context
 
@@ -77,28 +79,32 @@ Derived values (net worth, Δ net worth, real expense) are **computed in the cli
 
 ## Build phases
 
+> Kept as the original design record: what was intended, not what remains.
+> Every phase below is built. For what actually shipped and what is still
+> unverified, read `DEVELOPMENT-LOG.md`.
+
 Each phase ends in a usable/deployable state.
 
-### Phase 0 — Foundations
+### Phase 0 — Foundations  ✅ BUILT
 - Grace creates the Supabase project; I provide SQL to create all tables + RLS policies + `income_defaults`.
 - Scaffold `/finance/` files; add real Supabase config path to `.gitignore`; commit `config.sample.js`.
 - Deploy: login page works on GitHub Pages, one test account logs in and sees an empty dashboard.
 
-### Phase 1 — Core net-worth engine (manual entry) — *usable on its own*
+### Phase 1 — Core net-worth engine (manual entry) — *usable on its own*  ✅ BUILT
 - Auth gate (redirect to login if no session; "stay logged in").
 - Manage accounts (add bank/wallet/cash/card/illiquid, set currency).
 - New snapshot form: liquid balances (amount + currency + rate), illiquid moves, liability balances, income (fixed auto-filled + side). Big-picture expense lines editable.
 - Compute + display: net worth, Δ vs previous snapshot, **real expense = income − Δ net worth**, expense breakdown.
 - Snapshot history list; open/edit past snapshots.
 
-### Phase 2 — Growth visualization
+### Phase 2 — Growth visualization  ✅ BUILT
 - Load `dataviz` skill first. Charts: net worth over time, expense per period, asset composition (liquid/illiquid/liability), income vs expense. Theme-aware (light/dark).
 
-### Phase 3 — AI statement reading (assets & liabilities)
+### Phase 3 — AI statement reading (assets & liabilities)  ✅ BUILT
 - Grace creates Claude API account; I deploy the `parse-statement` Edge Function with `CLAUDE_API_KEY` as a Supabase secret.
 - Upload asset/liability PDF (HSBC/Mox-type) → Haiku 4.5 returns structured draft: balances, printed exchange rates, liability balances, illiquid balances (e.g. MPF) → review/correct UI writes into the snapshot.
 
-### Phase 4 — Spending categorization
+### Phase 4 — Spending categorization  ✅ BUILT
 - From spending statements, AI categorizes transactions (food/transport/shopping/fitness/other) as an **editable draft**, auto-flagging transfers/self-payments for exclusion. Feeds `expense_lines` breakdown only — never the expense total.
 
 ---

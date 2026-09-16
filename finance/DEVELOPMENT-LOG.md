@@ -3,19 +3,28 @@
 A running record of what we built at `/finance`, why, and how. Most-recent
 first. Mirrors the style of `docs/development-log.md`.
 
-Bloom is now **two independent trackers** behind one login:
+Bloom is now **three independent trackers** behind one login:
 
 - **Asset Tracker**: the original net-worth engine (snapshots, derived
   spending, charts, AI statement reading). Plan: `finance/PLAN.md`.
 - **Expense Tracker**: bill splitting with shared wallets. Plan:
   `finance/SPLIT-PLAN.md`.
+- **Perks**: the cards and memberships you hold, and what they get you
+  (AI name resolution + on-demand gathering). See the 2026-09-11 and
+  2026-09-13 entries below; there is no separate plan file.
 
 They share no math and never appear on the same screen. Read the relevant plan
 first for the complete design context.
 
 Setup docs: `setup/SETUP.md`, `setup/schema.sql` (asset tracker),
 `setup/split-schema.sql` (wallets), `setup/push-schema.sql` +
-`setup/NOTIFICATIONS.md` (notifications).
+`setup/NOTIFICATIONS.md` (notifications), `setup/perks-schema.sql` (Perks).
+
+**Edge Functions live at `/supabase/functions/` in the REPO ROOT** — that is what
+`supabase functions deploy` reads. `finance/setup/edge-functions/` is a doc
+mirror only; it once drifted a month behind and nearly reverted live work.
+Deployed functions: `parse-statement`, `send-push`, `resolve-cards`,
+`gather-perks`.
 
 ---
 
@@ -923,21 +932,46 @@ accounts keep working.
 
 ---
 
-## Roadmap (remaining phases — not yet built)
+## Roadmap
 
-- **Phase 2 — Growth visualization.** Charts (net worth over time, expense per period,
-  asset composition, income vs expense), theme-aware. Load the `dataviz` skill first.
-  New file: `finance/charts.js`.
-- **Phase 3 — AI statement reading (assets & liabilities).** Supabase Edge Function
-  `parse-statement` holding the `CLAUDE_API_KEY` secret; upload asset/liability PDF →
-  Haiku 4.5 returns a structured **draft** (balances, printed FX rates, liabilities,
-  illiquid balances like MPF) → review/correct UI writes into a snapshot. This function is
-  also the real server-side gate for API spend. New file: `finance/statements.js`.
-- **Phase 4 — Spending categorization.** From spending statements (Mox-type), AI
-  categorizes transactions (food/transport/shopping/fitness/other) as an **editable draft**,
-  auto-flagging transfers/self-payments (e.g. paying own card bill, Octopus top-up) for
-  exclusion. Feeds `expense_lines` breakdown only — never the derived expense total.
+The original Phases 2, 3 and 4 (growth charts, AI statement reading, spending
+categorisation) are all **BUILT** — see the dated entries above. What follows is
+what is actually outstanding.
+
+### Awaiting Grace's testing (built, unverified against real data)
+
+Everything below works against mocks shaped like the real responses, but has
+never run against Grace's own statements or a logged-in session. This is the
+honest edge of the project:
+
+- **Statement reading after the 2026-09-14 fixes.** Whether lines now read at
+  their true amounts, whether the discrepancy warning fires usefully rather than
+  constantly, and whether the model reliably tells a repayment from salary.
+- **Perks name resolution** (`resolve-cards`). Never run against real Claude from
+  a logged-in session — only the preview mock. Whether candidates come back
+  correct and genuinely distinguishable is unknown.
+- **Perks gathering** (`gather-perks`). The open question the whole feature rests
+  on: is the gathered output good enough to act on? Watch for welcome offers
+  sneaking in despite the explicit exclusion, vague requirements, and wrong
+  products. Rough cost HK$1-3 per full gather.
+- **Digest frequency.** Grace is running it as a live test with her other user.
+  The first weekly digest at the corrected 10:00 HKT should have landed
+  2026-09-14.
+
+### Known gaps, deliberately not built
+
+- **Perks phase 3** — a per-merchant live lookup for shops the gather missed, and
+  caching by typed string so repeat resolutions are free. Both wait on whether
+  phase 2's output proves useful.
+- **`transactions` table is still unwritten.** It exists in `schema.sql` but
+  nothing inserts into it: statement line detail lives only in the browser during
+  review, so after Apply the `expense_lines` labels are the only record. Fine
+  today; the thing to build if past months should keep their full statement.
+- **Membership tiers** are resolved like card tiers, but the benefit of exact
+  naming is weaker for loyalty programmes than for bank products.
 
 ## Out of scope (later)
-Receipt (non-statement) photo upload; budgets/goals; model swap to Sonnet if accuracy
-needs it; server-side (strong) invite gate if the browser passkey proves insufficient.
+Receipt (non-statement) photo upload; budgets/goals; server-side (strong) invite
+gate if the browser passkey proves insufficient; sharing gathered Perks data
+between users (the schema keys offers to a card type rather than a user, so this
+stays possible without a rewrite).

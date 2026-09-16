@@ -1,5 +1,11 @@
 # Bloom Split — Expense Tracker Plan
 
+> **STATUS: BUILT and in daily use.** Kept as the design record for the Expense
+> Tracker. Bloom has since grown a **third** tracker, Perks, so "two trackers"
+> below is the framing at the time of writing, not current state. Wallet delete,
+> atomic `delete_wallet()`, and per-user digest frequency all came later — see
+> `DEVELOPMENT-LOG.md` for those and for current state.
+
 Bloom becomes **two independent trackers** behind one login:
 
 - **Asset Tracker** — the existing net-worth engine (snapshots, balances, growth).
