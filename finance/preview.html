@@ -93,11 +93,12 @@ const AUTO_ROUTES=[
   {id:'ar1',user_id:'u1',account_id:'a6',amount:1500,currency:'HKD'},
   {id:'ar2',user_id:'u1',account_id:'a7',amount:800,currency:'HKD'},
 ];
-const TABLES={accounts:ACCOUNTS,snapshots:SNAPS,balances:BALANCES,illiquid_moves:MOVES,income:INCOME,expense_lines:EXPENSES,transactions:[],income_defaults:[INCOME_DEFAULTS],auto_routes:AUTO_ROUTES,market_values:[]};
+const TABLES=window.__TABLES={accounts:ACCOUNTS,snapshots:SNAPS,balances:BALANCES,illiquid_moves:MOVES,income:INCOME,expense_lines:EXPENSES,transactions:[],income_defaults:[INCOME_DEFAULTS],auto_routes:AUTO_ROUTES,market_values:[]};
 
 function makeQuery(table){
   const api={_rows:(TABLES[table]||[]).slice(),
     select(){return api;}, eq(c,v){api._rows=api._rows.filter(r=>r[c]===v);return api;}, order(){return api;},
+    in(c,vals){api._rows=api._rows.filter(r=>vals.includes(r[c]));return api;},
     maybeSingle(){return Promise.resolve({data:api._rows[0]||null,error:null});},
     single(){return Promise.resolve({data:api._rows[0]||null,error:null});},
     insert(){return {select:()=>({single:()=>Promise.resolve({data:{id:'new'},error:null})}),then:(f)=>f({error:null})};},
@@ -169,7 +170,41 @@ window.__pvRoute=_q.get('route');window.__pvSnap=_q.get('snap')||'s2';
 <script src="snapshot.js"></script>
 <script src="charts.js"></script>
 <script src="statements.js"></script>
+<script src="split.js"></script>
 <script src="perks.js"></script>
+<script>
+// Preview: one long-lived wallet spanning several months, so the period picker
+// on the wallet screen has something real to step through.
+(function(){
+  if(!window.Split) return;
+  const n=new Date(), thisM=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;
+  const M=[{id:'m1',wallet_id:'w1',user_id:'u1',display_name:'Grace',is_owner:true,left_at:null},
+           {id:'m2',wallet_id:'w1',display_name:'Richard',is_owner:false,left_at:null},
+           {id:'m3',wallet_id:'w1',display_name:'Patricia',is_owner:false,left_at:null}];
+  const W={id:'w1',name:'Flatmates',emoji:'🏠',base_currency:'HKD',archived:false,created_by:'u1',
+           members:M,activeMembers:M,myMember:M[0]};
+  const E=[
+    {id:'e1',wallet_id:'w1',spent_on:thisM+'-03',description:'Groceries',category:'food',amount:420,currency:'HKD',exchange_rate:1,paid_by_member_id:'m1'},
+    {id:'e2',wallet_id:'w1',spent_on:thisM+'-11',description:'Internet',category:'bills',amount:360,currency:'HKD',exchange_rate:1,paid_by_member_id:'m2'},
+    {id:'e3',wallet_id:'w1',spent_on:'2026-09-05',description:'Dinner out',category:'food',amount:680,currency:'HKD',exchange_rate:1,paid_by_member_id:'m1'},
+    {id:'e4',wallet_id:'w1',spent_on:'2026-09-20',description:'Cleaning',category:'other',amount:300,currency:'HKD',exchange_rate:1,paid_by_member_id:'m3'},
+    {id:'e5',wallet_id:'w1',spent_on:'2026-08-02',description:'Sofa',category:'shopping',amount:2400,currency:'HKD',exchange_rate:1,paid_by_member_id:'m1'},
+  ];
+  const S=[];
+  E.forEach(e=>{const each=Math.round(e.amount/3*100)/100;
+    M.forEach(m=>S.push({id:e.id+'-'+m.id,expense_id:e.id,member_id:m.id,share_amount:each}));});
+  // Feed the mock DB so the real loadWalletLedger() path runs unchanged.
+  if(window.__TABLES){
+    window.__TABLES.wallets=[{id:'w1',name:'Flatmates',emoji:'🏠',base_currency:'HKD',archived:false,created_by:'u1'}];
+    window.__TABLES.wallet_members=M;
+    window.__TABLES.shared_expenses=E;
+    window.__TABLES.expense_shares=S;
+    window.__TABLES.settlements=[];
+  }
+  Split.loadWallets=async()=>[W];
+  Split.loadWallet=async()=>JSON.parse(JSON.stringify(W));
+})();
+</script>
 <script>
 // Preview: Perks runs against in-memory data and a fake resolver, so the
 // add/confirm flow is fully clickable without a login or an API call.

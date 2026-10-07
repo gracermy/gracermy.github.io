@@ -274,6 +274,56 @@ const Split = (() => {
   // ── Category totals (for the spending pie) ────────────
   // Sums expenses by category in the wallet's base currency. `memberId` limits
   // it to that person's share ("my share" vs the whole group's spend).
+  // ── Periods ───────────────────────────────────────────
+  // A wallet is a long-lived book — a flatshare runs for years — so the whole
+  // history in one figure stops meaning anything. These build the month options
+  // a wallet actually has, newest first, plus "All time".
+  //
+  // spent_on is a bare DATE ("2026-10-03"), so the month key is a string slice.
+  // No Date object is constructed: parsing "2026-10-03" as a Date is UTC-based,
+  // and in Hong Kong (UTC+8) that can land on the previous day and file an
+  // expense under the wrong month.
+  function monthKeyOf(dateStr) {
+    const d = String(dateStr || "");
+    return d.length >= 7 ? d.slice(0, 7) : null;    // "YYYY-MM"
+  }
+
+  // Every month this wallet has activity in, newest first.
+  function walletPeriods(expenses) {
+    const seen = new Set();
+    (expenses || []).forEach((e) => {
+      const k = monthKeyOf(e.spent_on);
+      if (k) seen.add(k);
+    });
+    return [...seen].sort().reverse();
+  }
+
+  // Expenses within one period. `key` is "YYYY-MM", or "all" for everything.
+  function expensesInPeriod(expenses, key) {
+    if (!key || key === "all") return expenses || [];
+    return (expenses || []).filter((e) => monthKeyOf(e.spent_on) === key);
+  }
+
+  // "October 2026" from "2026-10". Falls back to the raw key rather than
+  // throwing, so an unexpected value degrades to something readable.
+  function periodLabelOf(key) {
+    if (!key || key === "all") return "All time";
+    const [y, m] = String(key).split("-");
+    const names = window.MONTH_NAMES;
+    const idx = Number(m) - 1;
+    return (names && names[idx]) ? `${names[idx]} ${y}` : key;
+  }
+
+  // The month a wallet should open on: the most recent month with activity,
+  // which is usually the current one but gracefully handles a quiet month.
+  function defaultPeriod(expenses) {
+    const periods = walletPeriods(expenses);
+    if (!periods.length) return "all";
+    const now = new Date();
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    return periods.includes(thisMonth) ? thisMonth : periods[0];
+  }
+
   function categoryTotals(expenses, shares, memberId) {
     const byExpense = {};
     (expenses || []).forEach((e) => { byExpense[e.id] = e; });
@@ -555,6 +605,7 @@ const Split = (() => {
   return {
     claimInvites, loadWallets, loadWallet, currentUserId,
     createWallet, updateWallet, archiveWallet, deleteWallet, walletContents,
+    walletPeriods, expensesInPeriod, periodLabelOf, defaultPeriod, monthKeyOf,
     addMember, updateMember, removeMember, memberStatus,
     allocateEqual, allocateShares,
     saveExpense, deleteExpense, loadExpense, categoryTotals,

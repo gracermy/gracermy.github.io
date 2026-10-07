@@ -2534,42 +2534,17 @@
       return;
     }
 
-    // ── Spending by category ──
-    // Defaults to "Your share" (what this actually cost YOU) when we can work
-    // out which member you are; otherwise the whole wallet, which is always
-    // computable. Falling back matters: if your share came out empty we'd
-    // otherwise render an empty chart and look broken.
-    if (window.Charts) {
-      const myShareItems = w.myMember
-        ? Split.categoryTotals(expenses, shares, w.myMember.id) : [];
-      const allItems = Split.categoryTotals(expenses, shares, null);
-      const canShowMine = myShareItems.length > 0;
-
-      let mineOnly = canShowMine;
-      const chartBox = el("div", {});
-      const toggle = el("div", { class: "pill-row" });
-      const mineBtn = el("button", { class: "pill" + (mineOnly ? " active" : ""), type: "button" }, "Your share");
-      const allBtn = el("button", { class: "pill" + (mineOnly ? "" : " active"), type: "button" }, "Whole wallet");
-
-      const drawPie = () => {
-        chartBox.innerHTML = "";
-        chartBox.append(Charts.spendingPie(mineOnly ? myShareItems : allItems, cur));
-      };
-      mineBtn.addEventListener("click", () => {
-        mineOnly = true; mineBtn.classList.add("active"); allBtn.classList.remove("active"); drawPie();
-      });
-      allBtn.addEventListener("click", () => {
-        mineOnly = false; allBtn.classList.add("active"); mineBtn.classList.remove("active"); drawPie();
-      });
-      // Only offer the toggle when both views have something to show.
-      if (canShowMine && allItems.length) toggle.append(mineBtn, allBtn);
-      drawPie();
-
-      // No <h3> here: spendingPie renders its own "Where it went" heading.
-      app.append(el("div", { class: "shell fade-up fd3" },
-        toggle.childNodes.length ? toggle : null,
-        chartBox));
-    }
+    // ── Spending summary, per period ──
+    // A wallet is long-lived — a flatshare runs for years — so one all-time
+    // figure stops meaning anything. Opens on the current month (or the most
+    // recent month with activity) and steps back through the months the wallet
+    // actually has, plus All time.
+    //
+    // The PERIOD DOES NOT TOUCH THE BALANCE ABOVE. What you owe is a running
+    // position across the wallet's whole life; scoping it to a month would show
+    // a debt that is not the one you actually have to settle. Only the summary
+    // and chart below are scoped.
+    app.append(walletSummary(w, expenses, shares, cur));
 
     // ── Recent activity ──
     const activity = buildActivity(expenses, settlements, w);
@@ -2586,6 +2561,111 @@
     }
     app.append(shell);
   });
+
+  // The per-period spending summary: a period picker, your share and the
+  // wallet total for that period, and the category chart scoped to it.
+  //
+  // Rebuilt in place on change rather than re-routing, so switching months does
+  // not refetch the ledger or scroll the page.
+  function walletSummary(w, expenses, shares, cur) {
+    const shell = el("div", { class: "shell fade-up fd3" });
+    const periods = Split.walletPeriods(expenses);
+    let current = Split.defaultPeriod(expenses);
+
+    const picker = el("div", { class: "pill-row" });
+    const periodLabel = el("span", { class: "section-hint", style: "margin:0" },
+      Split.periodLabelOf(current));
+    const stats = el("div", { class: "stat-grid" });
+    const chartBox = el("div", {});
+    const emptyNote = el("div", { class: "section-hint", style: "margin-top:0" });
+
+    const draw = () => {
+      const scoped = Split.expensesInPeriod(expenses, current);
+      const mine = w.myMember ? Split.categoryTotals(scoped, shares, w.myMember.id) : [];
+      const all = Split.categoryTotals(scoped, shares, null);
+      const mineTotal = mine.reduce((s2, i) => s2 + i.amount, 0);
+      const allTotal = all.reduce((s2, i) => s2 + i.amount, 0);
+
+      stats.innerHTML = "";
+      // Your share leads: it is what the period actually cost YOU, which is the
+      // question a shared wallet is least able to answer at a glance.
+      stats.append(
+        statTile("Your share", () => fmt(mineTotal, cur), null,
+          scoped.length + (scoped.length === 1 ? " expense" : " expenses")),
+        statTile("Wallet total", () => fmt(allTotal, cur), null, "everyone together"));
+
+      chartBox.innerHTML = "";
+      emptyNote.textContent = "";
+      if (!scoped.length) {
+        // A quiet month is normal in a long-lived wallet and is not an error.
+        emptyNote.textContent = "Nothing spent in " + Split.periodLabelOf(current) + ".";
+        return;
+      }
+      // Your share where we can identify you, else the whole wallet — which is
+      // always computable, so the chart never renders empty and looks broken.
+      // Labelled either way: the donut centre is a number, and "260" means two
+      // different things depending on which it is.
+      const items = mine.length ? mine : all;
+      const pie = Charts.spendingPie(items, cur);
+      // Slot the label directly under the chart's own "Where it went" heading,
+      // rather than floating above it where it reads as a stray caption.
+      const h = pie.querySelector("h3");
+      const caption = el("div", { class: "section-hint", style: "margin:2px 0 6px" },
+        mine.length ? "Your share, by category" : "Whole wallet, by category");
+      if (h && h.nextSibling) pie.insertBefore(caption, h.nextSibling);
+      else pie.append(caption);
+      chartBox.append(pie);
+      if (!mine.length && all.length) {
+        emptyNote.textContent = "Showing the whole wallet: none of these expenses include a share for you.";
+      }
+    };
+
+    const setPeriod = (key, btn) => {
+      current = key;
+      [...picker.children].forEach((x) => x.classList.toggle("active", x === btn));
+      periodLabel.textContent = Split.periodLabelOf(current);
+      draw();
+    };
+
+    // Newest first, then All time last. Months are labelled "Oct 2026" to keep
+    // the row short; the current month reads "This month" because that is how
+    // you think of it.
+    const nowKey = (() => {
+      const n = new Date();
+      return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}`;
+    })();
+    const opts = [...periods.map((k) => ({
+      key: k,
+      label: k === nowKey ? "This month" : shortPeriod(k),
+    })), { key: "all", label: "All time" }];
+
+    opts.forEach((o) => {
+      const btn = el("button", { class: "pill" + (o.key === current ? " active" : ""), type: "button" }, o.label);
+      btn.addEventListener("click", () => setPeriod(o.key, btn));
+      picker.append(btn);
+    });
+
+    [
+      el("div", { class: "month-card-head", style: "margin-bottom:10px" },
+        el("h3", { style: "margin:0" }, "Spending"),
+        periodLabel),
+      // Only worth a picker when there is more than one period to pick.
+      opts.length > 1 ? picker : null,
+      stats, emptyNote, chartBox,
+    ].filter(Boolean).forEach((n) => shell.append(n));
+
+    draw();
+    return shell;
+  }
+
+  // "2026-10" -> "Oct 2026": short enough that a year of months still fits the
+  // picker without wrapping into a wall of buttons.
+  function shortPeriod(key) {
+    const [y, m] = String(key).split("-");
+    const names = window.MONTH_NAMES || [];
+    const nm = names[Number(m) - 1];
+    return nm ? nm.slice(0, 3) + " " + y : key;
+  }
 
   // Expenses and settlements merged into one date-sorted feed, newest first.
   function buildActivity(expenses, settlements, w) {

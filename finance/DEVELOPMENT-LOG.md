@@ -28,6 +28,49 @@ Deployed functions: `parse-statement`, `send-push`, `resolve-cards`,
 
 ---
 
+## Wallet spending, per month (BUILT, 2026-10-07)
+
+A wallet is a long-lived book — a flatshare runs for years — so a single
+all-time figure stops telling you anything. The wallet screen now opens on
+**this month** and steps back through the months the wallet actually has, plus
+All time.
+
+Two tiles lead the summary: **Your share** (what the period cost YOU, the
+question a shared wallet answers least well at a glance) and **Wallet total**
+beside it. The category chart is scoped to the same period.
+
+**The period deliberately does NOT touch the balance above it.** What you owe is
+a running position across the wallet's whole life; scoping it to a month would
+display a debt that is not the one you actually have to settle. Only the summary
+and chart are scoped.
+
+**Periods are derived from the data, not generated.** Only months with activity
+appear, so a wallet with a gap does not offer an empty month to click. The
+default is this month when it has activity, otherwise the most recent month that
+does — a quiet October should not open on a blank screen.
+
+**Month keys are string slices, never `Date` objects.** `spent_on` is a bare
+date ("2026-10-03"); parsing that as a Date is UTC-based, so in Hong Kong
+(UTC+8) an early-morning expense can land on the previous day and file under the
+wrong month. `slice(0, 7)` has no timezone.
+
+**Replaced the old Your share / Whole wallet chart toggle** — both numbers are
+now tiles, so the toggle was redundant. The chart keeps a caption saying which
+it is showing, since the donut centre is a bare number and "260" means different
+things depending on the answer.
+
+Switching months rebuilds the panel in place rather than re-routing, so it does
+not refetch the ledger or jump the scroll.
+
+Checked at 900px and 430px, light and dark, against a wallet spanning three
+months: Oct 780 total / 260 your third, Aug 2,400 / 800, All time 4,160 across
+5 expenses. Edge cases verified — a month with no activity simply is not
+offered, a single-month wallet still gets a picker, and an empty wallet falls
+through to the existing empty state. The preview now mocks a real wallet, so the
+Expense Tracker is finally testable there.
+
+---
+
 ## Money that came back is now netted off (CHANGED, 2026-09-14)
 
 Grace's call, and on reflection the right one: drop the speculative "looks like
