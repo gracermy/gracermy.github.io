@@ -47,13 +47,14 @@
   const schedule = window.AdventSchedule.buildSchedule(CFG);
   const dayInfo = (d) => schedule[d - 1];
 
-  // A random colour per door (the same on both phones), never the same colour
-  // two days in a row.
+  // A random colour per door (the same on both phones). A door never matches
+  // the day before it, or the door directly above it in either grid layout:
+  // 4 columns on phones (so day - 4) and 6 on wider screens (day - 6).
   const doorColors = (() => {
     const rand = window.AdventSchedule.rng(CFG.SEED * 31 + 7), out = [];
     const all = ["red", "green", "blue", "yellow"];
     for (let i = 0; i < 24; i++) {
-      const choices = all.filter((c) => c !== out[i - 1]);
+      const choices = all.filter((c) => c !== out[i - 1] && c !== out[i - 4] && c !== out[i - 6]);
       out.push(choices[Math.floor(rand() * choices.length)]);
     }
     return out;
