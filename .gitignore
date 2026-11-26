@@ -32,3 +32,7 @@ finance/vapid.json
 # Personal setup file with the VAPID private key and push hook secret filled in.
 # Generated for local use only; must never be committed.
 finance/setup/RUN-THESE-COMMANDS.md
+
+# Advent calendar content (questions, challenges, prompts). Kept out of this
+# public repo so it stays a surprise; it goes into Supabase via a private SQL file.
+advent/private/
