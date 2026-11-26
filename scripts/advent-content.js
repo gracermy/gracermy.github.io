@@ -51,6 +51,9 @@ for (const type of ["question", "challenge", "memory"]) {
 }
 rows["pool:spinner"] = content.spinner.map(({ id, text }) => ({ id, text }));
 rows["pool:coupon"] = content.coupon.map(({ id, text }) => ({ id, text }));
+// For the notification sender: names, and each day's type ("Door 5: question day").
+rows["pool:people"] = CFG.PEOPLE.map(({ id, name }) => ({ id, name }));
+rows["pool:schedule"] = schedule.map((s) => s.type);
 
 const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
 const values = Object.entries(rows)
@@ -76,4 +79,4 @@ fs.writeFileSync(path.join(root, "private", "content.sql"), sql);
 fs.writeFileSync(path.join(root, "private", "preview-seed.json"), JSON.stringify(rows, null, 2));
 
 console.log("Wrote advent/private/content.sql and preview-seed.json");
-console.log(`${Object.keys(rows).length} rows: ${schedule.filter((s) => s.type !== "coupon" && s.type !== "spinner").length} day contents + spinner + coupon ideas`);
+console.log(`${Object.keys(rows).length} rows written`);

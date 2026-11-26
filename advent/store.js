@@ -116,7 +116,9 @@
     get(key) { return state[key]; },
     all() { return state; },
 
-    async set(key, value) {
+    // quiet: a background save (like "door opened") that shouldn't pop up an
+    // error if it fails.
+    async set(key, value, { quiet = false } = {}) {
       const before = state;
       state = { ...state, [key]: value };
       if (value === null) delete state[key];
@@ -125,11 +127,26 @@
         catch (e) { state = before; alert("Couldn't save, the browser's storage may be full (photos take space)."); throw e; }
       } else {
         try { await rpc("advent_put", { p_pass: pass, p_key: key, p_value: value }); }
-        catch (e) { state = before; emit(before); alert("Couldn't save. Check your internet connection and try again."); throw e; }
+        catch (e) {
+          state = before; emit(before);
+          if (!quiet) alert("Couldn't save. Check your internet connection and try again.");
+          throw e;
+        }
       }
       emit(before);
     },
 
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+
+    // Notifications: register / forget this phone (see push-setup.sql).
+    canNotify: !!(remote && FIN.VAPID_PUBLIC_KEY),
+    vapidKey: FIN.VAPID_PUBLIC_KEY || "",
+    async savePush(person, sub) {
+      const j = sub.toJSON();
+      await rpc("advent_subscribe", { p_pass: pass, p_person: person, p_endpoint: sub.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth });
+    },
+    async forgetPush(endpoint) {
+      await rpc("advent_unsubscribe", { p_pass: pass, p_endpoint: endpoint });
+    },
   };
 })();

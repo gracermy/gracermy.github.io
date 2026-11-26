@@ -48,7 +48,14 @@ button { cursor: pointer; }
 }
 @media (prefers-reduced-motion: reduce) { .flake { display: none; } }
 
-#app { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 24px 16px 64px; }
+#app {
+  position: relative; z-index: 1; max-width: 880px; margin: 0 auto;
+  /* clear the phone's notch and home bar when opened from the Home Screen */
+  padding-top: calc(24px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
 
 /* ── gate / who ── */
 .center-card {
@@ -229,7 +236,7 @@ footer { text-align: center; margin-top: 30px; font-size: 14px; color: rgba(255,
 footer button { background: none; border: 0; color: inherit; text-decoration: underline; }
 
 /* toasts */
-#toasts { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 20; display: grid; gap: 8px; width: min(420px, calc(100vw - 32px)); }
+#toasts { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 20; display: grid; gap: 8px; width: min(420px, calc(100vw - 32px)); }
 .toast {
   background: var(--gold); color: var(--ink); padding: 12px 16px; border-radius: 14px; font-weight: 500;
   box-shadow: 0 10px 30px rgba(0,0,0,.3); animation: up .3s ease-out;
@@ -249,3 +256,12 @@ footer button { background: none; border: 0; color: inherit; text-decoration: un
 .photo-pick .big { font-size: 40px; }
 .photo-pick .memory-photo { border-radius: 0; }
 .file-input:focus-visible + .photo-pick { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+/* reminders card */
+.notify-card {
+  display: grid; gap: 10px; margin-bottom: 18px; padding: 14px 16px; border-radius: var(--radius);
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); color: var(--cream);
+}
+.notify-card p { margin-top: 4px; color: rgba(247,249,255,.8); font-size: 15px; }
+.notify-card .row { margin-top: 0; }
+.btn.ghost-light { background: transparent; color: var(--cream); border: 1.5px solid rgba(255,255,255,.3); }

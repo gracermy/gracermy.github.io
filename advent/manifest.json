@@ -1,0 +1,17 @@
+{
+  "name": "Our Advent Calendar",
+  "short_name": "Advent",
+  "description": "24 little doors, just for the two of us.",
+  "start_url": "/advent/",
+  "scope": "/advent/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0e1a3d",
+  "theme_color": "#0e1a3d",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -203,8 +203,10 @@
         <div class="banner"><div><strong>Since you last visited</strong>
           <ul>${banner.map((b) => `<li>${b}</li>`).join("")}</ul></div>
           <button class="x" id="dismiss" aria-label="Dismiss">×</button></div>` : ""}
+      ${notifyCardHTML()}
       <main id="tab"></main>
-      <footer>You're ${nm(me)} · <button id="switch">switch person</button> · <button id="lock">lock</button></footer>`;
+      <footer>You're ${nm(me)} · <button id="switch">switch person</button> · <button id="lock">lock</button>
+        ${pushState === "on" ? ` · 🔔 reminders on (<button id="push-off">turn off</button>)` : ""}</footer>`;
 
     const $tab = document.getElementById("tab");
     if (tab !== "wallet") tab = "calendar";
@@ -214,6 +216,7 @@
     $app.querySelector("#dismiss")?.addEventListener("click", () => { banner = []; render(); });
     document.getElementById("switch").onclick = () => { ls.del("advent_me"); me = null; banner = []; who(); };
     document.getElementById("lock").onclick = () => { ls.del("advent_pass"); location.reload(); };
+    bindNotify();
     bindTab($tab);
     if (openDay) renderSheet();
   }
@@ -270,16 +273,97 @@
         <div class="stack two">${gave.map(({ day, key, c }) => card(key, c, { from: `To ${nm(p)} · day ${day}`, canUse: false })).join("") || '<p class="empty">You haven\'t written any yet.</p>'}</div></section>`;
   }
 
-  function bindTab($t) {
-    $t.querySelectorAll("[data-day]").forEach((b) => b.onclick = async () => {
-      const d = +b.dataset.day;
-      if (!isOpen(d)) { toast(`Day ${d} isn't open yet. No peeking 👀`); return; }
-      ls.set(`advent_door_${me}_${d}`, "1");
-      // A day's content is released by the database when the day arrives;
-      // fetch it now if this phone hasn't got it yet.
-      if (needsContent(d) && !itemFor(d)) await S.refresh().catch(() => {});
-      openDay = d; render();
+  async function openDoor(d) {
+    if (!isOpen(d)) { toast(`Day ${d} isn't open yet. No peeking 👀`); return; }
+    ls.set(`advent_door_${me}_${d}`, "1");
+    // Record the open in the database too, so the 22:00 reminder knows who
+    // still hasn't opened today's door.
+    if (!S.get(`day:${d}:open:${me}`)) S.set(`day:${d}:open:${me}`, { by: me, at: now() }, { quiet: true }).catch(() => {});
+    // A day's content is released by the database when the day arrives;
+    // fetch it now if this phone hasn't got it yet.
+    if (needsContent(d) && !itemFor(d)) await S.refresh().catch(() => {});
+    openDay = d; render();
+  }
+
+  // Links from notifications: #day-5 opens door 5, #wallet opens the wallet.
+  function followLink(hash) {
+    const m = /^#day-(\d+)$/.exec(hash || "");
+    if (m && +m[1] >= 1 && +m[1] <= 24) { tab = "calendar"; openDoor(+m[1]); }
+    else if (hash === "#wallet") { tab = "wallet"; openDay = null; render(); }
+    if (hash) history.replaceState(null, "", location.pathname + location.search);
+  }
+  window.addEventListener("hashchange", () => me && followLink(location.hash));
+  navigator.serviceWorker?.addEventListener("message", (e) => {
+    if (e.data?.type === "open" && me) followLink(new URL(e.data.url, location.href).hash);
+  });
+
+  // ── notifications ──
+  // pushState: hidden (not available here) | needs-install | blocked | off | on
+  let pushState = "hidden";
+  const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  function b64ToBytes(s) {
+    const b64 = (s + "=".repeat((4 - (s.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
+    return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  }
+  async function checkPush() {
+    if (!S.canNotify) return "hidden";
+    if (isIOS() && !isStandalone()) return "needs-install";
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return "hidden";
+    if (Notification.permission === "denied") return "blocked";
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) S.savePush(me, sub).catch(() => {}); // keep the database copy fresh
+      return sub ? "on" : "off";
+    } catch { return "off"; }
+  }
+  function notifyCardHTML() {
+    if (pushState === "hidden" || pushState === "on" || ls.get("advent_push_later") === pushState) return "";
+    const body = {
+      "needs-install": `To get reminders on iPhone, add the calendar to your Home Screen first:
+        tap <strong>Share</strong> <span aria-hidden="true">⬆️</span> in Safari, then <strong>Add to Home Screen</strong>,
+        and open <strong>Advent</strong> from there.`,
+      off: `Get a reminder at 10:00 when the day's door opens, a nudge at 22:00 if you haven't opened it,
+        and a ping when ${nm(partner())} answers, writes or shares something.`,
+      blocked: `Notifications are blocked for this site. Turn them on in your phone's settings for this app, then come back.`,
+    }[pushState];
+    return `<div class="notify-card">
+      <div><strong>🔔 Reminders</strong><p>${body}</p></div>
+      <div class="row">
+        ${pushState === "off" ? `<button class="btn small" id="push-on">Turn on reminders</button>` : ""}
+        <button class="btn small ghost-light" id="push-later">Not now</button>
+      </div></div>`;
+  }
+  function bindNotify() {
+    document.getElementById("push-later")?.addEventListener("click", () => { ls.set("advent_push_later", pushState); render(); });
+    document.getElementById("push-on")?.addEventListener("click", async (e) => {
+      e.target.disabled = true;
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm !== "granted") { pushState = perm === "denied" ? "blocked" : "off"; render(); return; }
+        const reg = await navigator.serviceWorker.ready;
+        const sub = (await reg.pushManager.getSubscription()) ||
+          await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(S.vapidKey) });
+        await S.savePush(me, sub);
+        pushState = "on"; toast("Reminders are on 🔔"); render();
+      } catch {
+        e.target.disabled = false;
+        toast("Couldn't turn on reminders. Check your connection and try again.");
+      }
     });
+    document.getElementById("push-off")?.addEventListener("click", async () => {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) { await S.forgetPush(sub.endpoint).catch(() => {}); await sub.unsubscribe().catch(() => {}); }
+      } catch {}
+      pushState = "off"; ls.set("advent_push_later", "off"); toast("Reminders are off"); render();
+    });
+  }
+
+  function bindTab($t) {
+    $t.querySelectorAll("[data-day]").forEach((b) => b.onclick = () => openDoor(+b.dataset.day));
     $t.querySelectorAll("[data-use]").forEach((b) => b.onclick = async () => {
       if (!b.dataset.sure) { b.dataset.sure = "1"; b.textContent = "Tap again to use it"; return; }
       await S.set("wallet:used:" + b.dataset.use, { by: me, at: now() });
@@ -559,6 +643,9 @@
     if (last) banner = changesSince(last);
     ls.set(seenKey, String(now()));
     render();
+    pushState = await checkPush();
+    if (pushState !== "hidden") render();
+    followLink(location.hash);
   }
   start();
 })();
