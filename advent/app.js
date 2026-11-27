@@ -92,6 +92,8 @@
     const m = key.match(/^day:(\d+):(\w+)(?::(\w))?$/);
     if (!m) return null;
     const d = m[1], what = m[2], P = nm(v.by);
+    // Don't name the kind of day before you've discovered it yourself.
+    if (what !== "judge" && dayInfo(+d) && !found(dayInfo(+d).type)) return `${P} did something on day ${d} 👀 Open it to see`;
     return {
       coupon: `${P} wrote you a love coupon on day ${d} 💌`,
       answer: `${P} answered the day ${d} question 💭`,
@@ -190,15 +192,15 @@
       <header>
         <h1 class="serif">Our Advent Calendar</h1>
         <div class="sub">${nm(CFG.PEOPLE[0].id)} &amp; ${nm(CFG.PEOPLE[1].id)} · December ${CFG.YEAR}</div>
-        <div class="score">
+        ${found("question") ? `<div class="score">
           <span class="chip">💭 ${nm(me)} guessed ${questionScore(me)} right</span>
           <span class="chip">💭 ${nm(p)} guessed ${questionScore(p)} right</span>
-        </div>
+        </div>` : ""}
       </header>
-      <nav class="tabs">
+      ${hasWallet() ? `<nav class="tabs">
         ${[["calendar", "Calendar"], ["wallet", "Wallet"]]
           .map(([id, l]) => `<button data-tab="${id}" class="${tab === id ? "on" : ""}">${l}</button>`).join("")}
-      </nav>
+      </nav>` : ""}
       ${banner.length ? `
         <div class="banner"><div><strong>Since you last visited</strong>
           <ul>${banner.map((b) => `<li>${b}</li>`).join("")}</ul></div>
@@ -209,7 +211,7 @@
         ${pushState === "on" ? ` · 🔔 reminders on (<button id="push-off">turn off</button>)` : ""}</footer>`;
 
     const $tab = document.getElementById("tab");
-    if (tab !== "wallet") tab = "calendar";
+    if (tab !== "wallet" || !hasWallet()) tab = "calendar";
     $tab.innerHTML = tab === "wallet" ? walletHTML() : calendarHTML(before, daysTo);
 
     $app.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { tab = b.dataset.tab; ls.set("advent_tab", tab); render(); });
@@ -237,7 +239,7 @@
       ${before ? `<p class="notice">The first door opens in <strong>${daysTo} day${daysTo === 1 ? "" : "s"}</strong> ❄️</p>`
         : `<p class="notice">Tap a door to open it. A gold dot means something's waiting for you.</p>`}
       <div class="grid">${doors}</div>
-      <div class="legend">${Object.values(TYPES).map((t) => `<span>${t.emo} ${t.label}</span>`).join("")}</div>`;
+      <div class="legend">${legendHTML()}</div>`;
   }
 
   // ── wallet ──
@@ -265,17 +267,42 @@
         ? card(key, c, { from: `From ${nm(p)} · day ${day}` })
         : `<div class="coupon"><div class="ct">Sealed 💌</div><div class="cn">Open it on day ${day} first.</div></div>`).join("");
 
-    return `
+    const couponHTML = `
       <section class="panel"><h2 class="serif">For you</h2><p>Coupons ${nm(p)} wrote you. Tap "Use it" when you cash one in.</p>
-        <div class="stack two">${forMe || '<p class="empty">Nothing yet.</p>'}</div></section>
+        <div class="stack two">${forMe || '<p class="empty">Nothing yet.</p>'}</div></section>`;
+    const datesHTML = `
       <section class="panel"><h2 class="serif">Our dates</h2><p>Won on the spinner. Do them whenever.</p>
-        <div class="stack two">${dates.map(({ day, key, c }) => card(key, { title: c.text }, { from: `Spun by ${nm(c.by)} · day ${day}`, date: true })).join("") || '<p class="empty">No spins yet.</p>'}</div></section>
+        <div class="stack two">${dates.map(({ day, key, c }) => card(key, { title: c.text }, { from: `Spun by ${nm(c.by)} · day ${day}`, date: true })).join("") || '<p class="empty">No spins yet.</p>'}</div></section>`;
+    const gaveHTML = `
       <section class="panel"><h2 class="serif">You gave</h2><p>${nm(p)} decides when to use these.</p>
         <div class="stack two">${gave.map(({ day, key, c }) => card(key, c, { from: `To ${nm(p)} · day ${day}`, canUse: false })).join("") || '<p class="empty">You haven\'t written any yet.</p>'}</div></section>`;
+    // Each part of the wallet appears once you've opened your first door of that kind.
+    return (found("coupon") ? couponHTML : "") + (found("spinner") ? datesHTML : "") + (found("coupon") ? gaveHTML : "");
   }
+
+  // ── unlocking: no spoilers ──
+  // The scoreboard, the wallet and the legend only show a kind of day once
+  // you've opened a door of that kind.
+  function openedByMe(d) { return !!(ls.get(`advent_door_${me}_${d}`) || S.get(`day:${d}:open:${me}`)); }
+  function found(type) { return schedule.some((s) => s.type === type && isOpen(s.day) && openedByMe(s.day)); }
+  function hasWallet() { return found("coupon") || found("spinner"); }
+  function legendHTML() {
+    const seen = Object.keys(TYPES).filter(found);
+    const left = Object.keys(TYPES).length - seen.length;
+    return seen.map((t) => `<span>${TYPES[t].emo} ${TYPES[t].label}</span>`).join("") +
+      (left ? `<span>❓ ${seen.length ? `${left} more kind${left === 1 ? "" : "s"} of day to discover` : "Every door is a surprise"}</span>` : "");
+  }
+  const UNLOCK = {
+    coupon: "💌 Love coupons unlocked: your Wallet is open",
+    question: "💭 Question day unlocked: the scoreboard is on",
+    spinner: "🎡 Date spinner unlocked: dates go in your Wallet",
+    memory: "📸 Memory day unlocked",
+    challenge: "✨ Tiny challenge unlocked",
+  };
 
   async function openDoor(d) {
     if (!isOpen(d)) { toast(`Day ${d} isn't open yet. No peeking 👀`); return; }
+    const type = schedule[d - 1].type, isNew = !found(type);
     ls.set(`advent_door_${me}_${d}`, "1");
     // Record the open in the database too, so the 22:00 reminder knows who
     // still hasn't opened today's door.
@@ -284,13 +311,14 @@
     // fetch it now if this phone hasn't got it yet.
     if (needsContent(d) && !itemFor(d)) await S.refresh().catch(() => {});
     openDay = d; render();
+    if (isNew) toast(UNLOCK[type]);
   }
 
   // Links from notifications: #day-5 opens door 5, #wallet opens the wallet.
   function followLink(hash) {
     const m = /^#day-(\d+)$/.exec(hash || "");
     if (m && +m[1] >= 1 && +m[1] <= 24) { tab = "calendar"; openDoor(+m[1]); }
-    else if (hash === "#wallet") { tab = "wallet"; openDay = null; render(); }
+    else if (hash === "#wallet") { tab = hasWallet() ? "wallet" : "calendar"; openDay = null; render(); }
     if (hash) history.replaceState(null, "", location.pathname + location.search);
   }
   window.addEventListener("hashchange", () => me && followLink(location.hash));
