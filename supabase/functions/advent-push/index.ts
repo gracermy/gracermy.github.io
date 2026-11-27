@@ -32,7 +32,7 @@ type Person = "a" | "b";
 type Message = { title: string; body: string; url: string; tag: string };
 const other = (p: Person): Person => (p === "a" ? "b" : "a");
 
-// Messages never say what kind of day a door is until you've opened it,
+// Messages never say what kind of day a gift is until you've unwrapped it,
 // so nothing is spoiled on the lock screen.
 const DAILY_LINES = [
   "Something's waiting behind it. Go and open it together.",
@@ -96,42 +96,42 @@ async function onEvent(key: string, by: Person, n: Record<Person, string>) {
   const d = Number(m[1]), what = m[2];
   const url = `${APP_URL}#day-${d}`;
   const to = other(by);
-  // Not opened that door yet? Don't say what kind of day it is.
+  // Not unwrapped that day yet? Don't say what kind of day it is.
   if (what !== "judge" && !(await kv(`day:${d}:open:${to}`))) {
-    return send(to, { title: `${P} opened door ${d} 👀`, body: `And left something for you. Open it to see!`, url, tag: `day-${d}-${what}` });
+    return send(to, { title: `${P} unwrapped day ${d} 👀`, body: `And left something for you. Unwrap yours to see!`, url, tag: `day-${d}-${what}` });
   }
   const text: Record<string, [string, string]> = {
-    coupon: [`${P} wrote you a love coupon 💌`, `It's sealed in door ${d}. Write yours to swap!`],
+    coupon: [`${P} wrote you a love coupon 💌`, `It's sealed inside day ${d}. Write yours to swap!`],
     answer: [`${P} answered today's question 💭`, `Answer yours to see what ${P} said.`],
-    judge:  [`${P} marked your guess`, `Open door ${d} to see if you got it right.`],
-    spin:   [`${P} spun the wheel 🎡`, `Your date from door ${d} is in the wallet.`],
-    memory: [`${P} shared a memory 📸`, `Share yours in door ${d} to see it.`],
-    done:   [`${P} finished the challenge ✨`, `Door ${d}: your turn!`],
+    judge:  [`${P} marked your guess`, `Open day ${d} to see if you got it right.`],
+    spin:   [`${P} spun the wheel 🎡`, `Your date from day ${d} is in the wallet.`],
+    memory: [`${P} shared a memory 📸`, `Share yours on day ${d} to see it.`],
+    done:   [`${P} finished the challenge ✨`, `Day ${d}: your turn!`],
   };
   if (!text[what]) return 0;
   // If the reader has already done their part, the nudge reads differently.
   const mineDone = await kv(`day:${d}:${what}:${other(by)}`);
   let [title, body] = text[what];
-  if (mineDone && what === "answer") body = `Both answers are in. Open door ${d} to see them!`;
-  if (mineDone && what === "memory") body = `Both photos are in. Open door ${d} to see them!`;
-  if (mineDone && what === "coupon") body = `Open door ${d} to unseal it.`;
+  if (mineDone && what === "answer") body = `Both answers are in. Open day ${d} to see them!`;
+  if (mineDone && what === "memory") body = `Both photos are in. Open day ${d} to see them!`;
+  if (mineDone && what === "coupon") body = `Open day ${d} to unseal it.`;
   if (mineDone && what === "done") body = `You both did it! 🎉`;
   return send(other(by), { title, body, url, tag: `day-${d}-${what}` });
 }
 
 async function onDaily(d: number) {
   const body = DAILY_LINES[(d - 1) % DAILY_LINES.length];
-  const msg = { title: `Door ${d} is open! 🎄`, body, url: `${APP_URL}#day-${d}`, tag: `daily-${d}` };
+  const msg = { title: `Day ${d} is ready to unwrap! 🎁`, body, url: `${APP_URL}#day-${d}`, tag: `daily-${d}` };
   return (await send("a", msg)) + (await send("b", msg));
 }
 
 async function onNudge(d: number, n: Record<Person, string>) {
   let sent = 0;
   for (const p of ["a", "b"] as Person[]) {
-    if (await kv(`day:${d}:open:${p}`)) continue; // already opened today's door
+    if (await kv(`day:${d}:open:${p}`)) continue; // already unwrapped today's gift
     const partnerOpened = await kv(`day:${d}:open:${other(p)}`);
     sent += await send(p, {
-      title: `You haven't opened door ${d} yet 👀`,
+      title: `Day ${d} is still wrapped 👀`,
       body: partnerOpened ? `${n[other(p)]} already did. Don't keep them waiting!` : `There's still time before midnight.`,
       url: `${APP_URL}#day-${d}`, tag: `nudge-${d}`,
     });

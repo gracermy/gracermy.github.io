@@ -143,25 +143,39 @@
 
   function gate(err = "") {
     $app.innerHTML = `
-      <div class="center-card">
-        <div style="font-size:44px">🎄</div>
+      <div class="gate">
+        <div class="padlock" aria-hidden="true">
+          <span class="shackle"></span>
+          <span class="lock-body"><span class="keyhole"></span></span>
+          <span class="sparkle s1">✦</span><span class="sparkle s2">✦</span><span class="sparkle s3">✦</span>
+        </div>
         <h1 class="serif">Our Advent Calendar</h1>
-        <p>24 little doors, just for the two of us.</p>
-        <form id="gate">
-          <input type="password" id="pw" placeholder="Our password" autocomplete="current-password" autofocus>
-          <button class="btn block">Open</button>
-          <p class="err" id="err">${esc(err)}</p>
+        <p>24 little surprises, just for the two of us.</p>
+        <form id="gate" autocomplete="on">
+          <label class="pw-field">
+            <span class="sr-only">Password</span>
+            <input type="password" id="pw" placeholder="Our secret word" autocomplete="current-password" autofocus>
+          </label>
+          <button class="btn block gold">Unlock ✨</button>
+          <p class="err" id="err" role="alert">${esc(err)}</p>
         </form>
-        ${S.mode === "local" ? '<p style="font-size:13px;margin:8px 0 0">Test mode: saved in this browser only, any password works.</p>' : ""}
+        ${S.mode === "local" ? '<p class="test-note">Test mode: saved in this browser only, any password works.</p>' : ""}
       </div>`;
+    const $gate = $app.querySelector(".gate");
     document.getElementById("gate").onsubmit = async (e) => {
       e.preventDefault();
       const pw = document.getElementById("pw").value.trim().toLowerCase();
       const $err = document.getElementById("err"), $btn = e.target.querySelector("button");
       $btn.disabled = true; $err.textContent = "";
       try {
-        if (await S.check(pw)) { ls.set("advent_pass", pw); start(); return; }
+        if (await S.check(pw)) {
+          ls.set("advent_pass", pw);
+          $gate.classList.add("unlocked");          // the lock pops open, then in we go
+          setTimeout(start, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 750);
+          return;
+        }
         $err.textContent = "Not quite. Try again 🙈";
+        $gate.classList.remove("shake"); void $gate.offsetWidth; $gate.classList.add("shake");
       } catch (x) {
         $err.textContent = x.notSetUp ? "The database isn't set up yet (run setup.sql)." : "Couldn't connect. Check your internet.";
       }
@@ -207,7 +221,7 @@
           <button class="x" id="dismiss" aria-label="Dismiss">×</button></div>` : ""}
       ${installCardHTML()}${notifyCardHTML()}
       <main id="tab"></main>
-      <footer>You're ${nm(me)} · <button id="switch">switch person</button> · <button id="lock">lock</button>
+      <footer>You're ${nm(me)} · <button id="switch">switch person</button>
         ${pushState === "on" ? ` · 🔔 reminders on (<button id="push-off">turn off</button>)` : ""}</footer>`;
 
     const $tab = document.getElementById("tab");
@@ -217,7 +231,6 @@
     $app.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { tab = b.dataset.tab; ls.set("advent_tab", tab); render(); });
     $app.querySelector("#dismiss")?.addEventListener("click", () => { banner = []; render(); });
     document.getElementById("switch").onclick = () => { ls.del("advent_me"); me = null; banner = []; who(); };
-    document.getElementById("lock").onclick = () => { ls.del("advent_pass"); location.reload(); };
     bindInstall();
     bindNotify();
     bindTab($tab);
@@ -228,16 +241,17 @@
   function calendarHTML(before, daysTo) {
     const doors = schedule.map(({ day, type }) => {
       const open = isOpen(day), opened = open && ls.get(`advent_door_${me}_${day}`);
-      return `<button class="door c-${doorColors[day - 1]} ${open ? "" : "locked"} ${opened ? "opened" : ""} ${isToday(day) ? "today" : ""}"
-        data-day="${day}" ${open ? "" : 'aria-disabled="true"'} aria-label="Day ${day}">
-        <span class="num">${day}</span>
-        <span class="emo">${opened ? TYPES[type].emo : open ? "🎁" : "🔒"}</span>
+      return `<button class="gift c-${doorColors[day - 1]} ${open ? "" : "locked"} ${opened ? "opened" : ""} ${isToday(day) ? "today" : ""}"
+        data-day="${day}" ${open ? "" : 'aria-disabled="true"'} aria-label="Day ${day}${opened ? "" : open ? ", ready to unwrap" : ", not yet"}">
+        ${opened
+          ? `<span class="num">${day}</span><span class="emo">${TYPES[type].emo}</span>`
+          : `<span class="bow"></span><span class="knot"></span><span class="tag">${day}</span>`}
         ${opened && needsMe(day) ? '<span class="dot" title="Something waiting for you"></span>' : ""}
       </button>`;
     }).join("");
     return `
-      ${before ? `<p class="notice">The first door opens in <strong>${daysTo} day${daysTo === 1 ? "" : "s"}</strong> ❄️</p>`
-        : `<p class="notice">Tap a door to open it. A gold dot means something's waiting for you.</p>`}
+      ${before ? `<p class="notice">The first gift arrives in <strong>${daysTo} day${daysTo === 1 ? "" : "s"}</strong> ❄️</p>`
+        : `<p class="notice">Tap a gift to unwrap it. A gold dot means something's waiting for you.</p>`}
       <div class="grid">${doors}</div>
       <div class="legend">${legendHTML()}</div>`;
   }
@@ -290,7 +304,7 @@
     const seen = Object.keys(TYPES).filter(found);
     const left = Object.keys(TYPES).length - seen.length;
     return seen.map((t) => `<span>${TYPES[t].emo} ${TYPES[t].label}</span>`).join("") +
-      (left ? `<span>❓ ${seen.length ? `${left} more kind${left === 1 ? "" : "s"} of day to discover` : "Every door is a surprise"}</span>` : "");
+      (left ? `<span>❓ ${seen.length ? `${left} more kind${left === 1 ? "" : "s"} of day to discover` : "Every gift is a surprise"}</span>` : "");
   }
   const UNLOCK = {
     coupon: "💌 Love coupons unlocked: your Wallet is open",
@@ -301,7 +315,7 @@
   };
 
   async function openDoor(d) {
-    if (!isOpen(d)) { toast(`Day ${d} isn't open yet. No peeking 👀`); return; }
+    if (!isOpen(d)) { toast(`Day ${d} is still wrapped. No peeking 👀`); return; }
     const type = schedule[d - 1].type, isNew = !found(type);
     ls.set(`advent_door_${me}_${d}`, "1");
     // Record the open in the database too, so the 22:00 reminder knows who
@@ -416,7 +430,7 @@
     if (pushState === "hidden" || pushState === "on" || pushState === "needs-install" ||
         ls.get("advent_push_later") === pushState) return "";
     const body = {
-      off: `Get a reminder at 10:00 when the day's door opens, a nudge at 22:00 if you haven't opened it,
+      off: `Get a reminder at 10:00 when the day's gift is ready to unwrap, a nudge at 22:00 if you haven't opened it,
         and a ping when ${nm(partner())} answers, writes or shares something.`,
       blocked: `Notifications are blocked for this site. Turn them on in your phone's settings for this app, then come back.`,
     }[pushState];

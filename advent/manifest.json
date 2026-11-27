@@ -1,7 +1,7 @@
 {
   "name": "Our Advent Calendar",
   "short_name": "Advent",
-  "description": "24 little doors, just for the two of us.",
+  "description": "24 little surprises, just for the two of us.",
   "start_url": "/advent/",
   "scope": "/advent/",
   "display": "standalone",

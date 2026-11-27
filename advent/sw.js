@@ -6,7 +6,7 @@
 //   * the page itself is network-first, so a new deploy shows up on next open;
 //   * bumping CACHE_VERSION wipes the old cache.
 
-const CACHE_VERSION = "advent-v4";
+const CACHE_VERSION = "advent-v5";
 
 const SHELL = [
   "./",

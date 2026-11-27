@@ -58,6 +58,7 @@ button { cursor: pointer; }
 }
 
 /* ── gate / who ── */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .center-card {
   max-width: 380px; margin: 12vh auto 0; background: var(--card); color: var(--ink);
   border-radius: 22px; padding: 32px 26px; text-align: center;
@@ -65,7 +66,55 @@ button { cursor: pointer; }
 }
 .center-card h1 { font-size: 40px; line-height: 1.1; margin-bottom: 6px; }
 .center-card p { color: var(--ink-soft); margin-bottom: 20px; }
-.center-card .err { color: var(--red); margin: 10px 0 0; min-height: 1.5em; }
+
+/* The password screen: a gold padlock that pops open on the right word. */
+.gate { max-width: 360px; margin: 9vh auto 0; text-align: center; }
+.gate h1 { font-size: clamp(40px, 11vw, 54px); line-height: 1.05; margin-top: 22px; }
+.gate > p { color: rgba(247,249,255,.75); margin: 8px 0 24px; }
+.padlock { position: relative; width: 108px; height: 128px; margin: 0 auto; }
+.shackle {
+  position: absolute; left: 22px; top: 0; width: 64px; height: 70px;
+  border: 11px solid #e9edf6; border-bottom: 0; border-radius: 40px 40px 0 0;
+  box-shadow: inset 0 3px 0 rgba(255,255,255,.6), 0 2px 0 rgba(0,0,0,.15);
+  transform-origin: 85% 100%; transition: transform .45s cubic-bezier(.3,1.6,.5,1);
+}
+.lock-body {
+  position: absolute; left: 0; bottom: 0; width: 108px; height: 80px; border-radius: 20px;
+  background: linear-gradient(160deg, #ffe27a, var(--gold) 45%, var(--gold-deep));
+  box-shadow: inset 0 -6px 0 rgba(0,0,0,.12), inset 0 3px 0 rgba(255,255,255,.5), 0 14px 34px rgba(245,197,24,.35);
+  display: grid; place-items: center;
+}
+/* a red ribbon wrapped round the lock, because it's Christmas */
+.lock-body::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 30px; height: 14px; background: var(--red);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.25);
+}
+.keyhole {
+  position: relative; z-index: 1; width: 18px; height: 18px; border-radius: 50%; background: var(--night);
+  margin-top: 8px;
+}
+.keyhole::after {
+  content: ""; position: absolute; left: 6px; top: 12px; width: 6px; height: 14px; border-radius: 0 0 3px 3px; background: var(--night);
+}
+.sparkle { position: absolute; color: var(--gold); opacity: 0; font-size: 18px; pointer-events: none; }
+.sparkle.s1 { left: -14px; top: 30px; } .sparkle.s2 { right: -16px; top: 18px; } .sparkle.s3 { right: 4px; top: -16px; font-size: 14px; }
+.gate.unlocked .shackle { transform: translateY(-14px) rotate(28deg); }
+.gate.unlocked .sparkle { animation: twinkle .7s ease-out forwards; }
+.gate.unlocked .sparkle.s2 { animation-delay: .08s; } .gate.unlocked .sparkle.s3 { animation-delay: .16s; }
+@keyframes twinkle { 0% { opacity: 0; transform: scale(.3); } 50% { opacity: 1; transform: scale(1.3); } 100% { opacity: 0; transform: scale(1) translateY(-10px); } }
+.gate.unlocked form { opacity: .4; transition: opacity .3s; }
+.gate.shake .padlock { animation: shake .45s; }
+@keyframes shake { 20%, 60% { transform: translateX(-9px) rotate(-4deg); } 40%, 80% { transform: translateX(9px) rotate(4deg); } }
+.pw-field input {
+  text-align: center; font-size: 18px; padding: 15px 18px; border-radius: 999px;
+  background: rgba(255,255,255,.95); border: 2px solid transparent; letter-spacing: .04em;
+}
+.pw-field input:focus { border-color: var(--gold); box-shadow: 0 0 0 4px rgba(245,197,24,.25); }
+.btn.gold { background: var(--gold); color: var(--ink); padding: 14px 20px; font-size: 17px; }
+.btn.gold:hover { background: #ffd84d; }
+.gate .err { color: #ffb3bb; margin: 12px 0 0; min-height: 1.5em; }
+.gate .test-note { font-size: 13px; color: rgba(247,249,255,.6); margin-top: 6px; }
+@media (prefers-reduced-motion: reduce) { .shackle { transition: none; } .gate.shake .padlock, .gate.unlocked .sparkle { animation: none; } }
 .who-row { display: flex; gap: 12px; justify-content: center; }
 
 input[type=text], input[type=password], textarea {
@@ -115,32 +164,80 @@ nav.tabs button.on { background: var(--cream); color: var(--ink); }
 .notice { text-align: center; color: rgba(255,248,238,.8); margin-bottom: 16px; }
 .notice strong { color: var(--gold); }
 
-/* ── doors ── */
-.grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
-@media (max-width: 640px) { .grid { grid-template-columns: repeat(4, 1fr); } }
+/* ── the calendar: 24 wrapped presents ── */
+.grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; padding-top: 8px; }
+@media (max-width: 640px) { .grid { grid-template-columns: repeat(4, 1fr); gap: 11px; } }
 
-.door {
-  position: relative; aspect-ratio: 1; border-radius: 14px; border: 0;
-  background: linear-gradient(145deg, var(--red), var(--red-deep));
-  color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  box-shadow: inset 0 0 0 2px rgba(255,255,255,.12), 0 6px 14px rgba(0,0,0,.25);
-  transition: transform .15s;
+.gift {
+  --wrap: var(--red); --wrap-deep: var(--red-deep); --ribbon: var(--gold); --ribbon-deep: var(--gold-deep);
+  position: relative; aspect-ratio: 1; border-radius: 10px; border: 0; padding: 0;
+  background:
+    radial-gradient(circle at 25% 30%, rgba(255,255,255,.14) 0 2px, transparent 3px) 0 0 / 16px 16px,
+    linear-gradient(150deg, var(--wrap), var(--wrap-deep));
+  color: var(--ink);
+  box-shadow: inset 0 -4px 0 rgba(0,0,0,.14), 0 8px 16px rgba(0,0,0,.28);
+  transition: transform .18s;
 }
-/* Door colours are picked at random per day (see doorColors in app.js). */
-.door.c-green { background: linear-gradient(145deg, #2fa865, var(--green-deep)); }
-.door.c-blue { background: linear-gradient(145deg, #4a85e6, var(--blue-deep)); }
-.door.c-yellow { background: linear-gradient(145deg, #ffd84d, var(--gold-deep)); color: var(--ink); }
-.door:hover:not(.locked) { transform: translateY(-3px) rotate(-1deg); }
-.door .num { font-family: "Instrument Serif", serif; font-size: clamp(26px, 6vw, 38px); line-height: 1; }
-.door .emo { font-size: 20px; margin-top: 4px; }
-.door.locked { filter: saturate(.55) brightness(.7); cursor: default; }
-.door.opened { background: var(--card); color: var(--ink); }
-.door.today { outline: 3px solid var(--gold); outline-offset: 2px; animation: glow 2s ease-in-out infinite; }
-@keyframes glow { 50% { outline-color: rgba(245,197,24,.35); } }
-.door .dot {
-  position: absolute; top: 6px; right: 6px; width: 12px; height: 12px; border-radius: 50%;
-  background: var(--gold); box-shadow: 0 0 0 2px var(--card);
+/* Wrapping colours are random per day (see doorColors in app.js); each gets a ribbon that stands out. */
+.gift.c-green  { --wrap: #2fa865; --wrap-deep: var(--green-deep); --ribbon: var(--red); --ribbon-deep: var(--red-deep); }
+.gift.c-blue   { --wrap: #4a85e6; --wrap-deep: var(--blue-deep); --ribbon: var(--gold); --ribbon-deep: var(--gold-deep); }
+.gift.c-yellow { --wrap: #ffd84d; --wrap-deep: var(--gold-deep); --ribbon: var(--red); --ribbon-deep: var(--red-deep); }
+.gift.c-red    { --ribbon: #f7f9ff; --ribbon-deep: #c9d3ea; }
+
+/* ribbon: one band down, one across */
+.gift:not(.opened)::before, .gift:not(.opened)::after {
+  content: ""; position: absolute; background: linear-gradient(90deg, var(--ribbon), var(--ribbon-deep));
 }
+.gift:not(.opened)::before { left: 50%; top: 0; bottom: 0; width: 16%; transform: translateX(-50%); }
+.gift:not(.opened)::after { top: 50%; left: 0; right: 0; height: 16%; transform: translateY(-50%);
+  background: linear-gradient(180deg, var(--ribbon), var(--ribbon-deep)); }
+
+/* bow on top */
+.gift .bow { position: absolute; left: 50%; top: -9px; width: 0; height: 0; z-index: 2; }
+.gift .bow::before, .gift .bow::after {
+  content: ""; position: absolute; top: 0; width: 17px; height: 13px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  border: 4px solid var(--ribbon); background: transparent;
+  box-shadow: 0 1px 0 var(--ribbon-deep);
+}
+.gift .bow::before { right: 1px; transform: rotate(-22deg); }
+.gift .bow::after { left: 1px; transform: rotate(22deg); }
+.gift .knot {
+  position: absolute; left: 50%; top: -3px; width: 10px; height: 10px; border-radius: 3px; z-index: 3;
+  transform: translateX(-50%); background: var(--ribbon-deep);
+}
+
+/* the number tag where the ribbons cross */
+.gift .tag {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1;
+  width: 46%; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center;
+  background: #fffdf6; color: var(--ink); box-shadow: 0 2px 6px rgba(0,0,0,.25), inset 0 0 0 2px var(--ribbon);
+  font-family: "Instrument Serif", serif; font-size: clamp(19px, 4.6vw, 28px); line-height: 1;
+}
+
+.gift:hover:not(.locked) { transform: translateY(-3px) rotate(-1.5deg); }
+/* Not yet: keep the real Christmas colours (darkening red/yellow turns them
+   brown), just smaller, flatter, with a frosted tag. */
+.gift.locked { cursor: default; transform: scale(.92); opacity: .88; box-shadow: inset 0 -4px 0 rgba(0,0,0,.14), 0 4px 8px rgba(0,0,0,.2); }
+.gift.locked .tag { background: rgba(255,255,255,.88); color: var(--ink-soft); box-shadow: inset 0 0 0 2px var(--ribbon); }
+.gift.today { animation: wiggle 2.5s ease-in-out infinite; box-shadow: inset 0 -4px 0 rgba(0,0,0,.14), 0 0 0 3px var(--gold), 0 0 22px rgba(245,197,24,.55); }
+.gift.today .tag::after {
+  content: "today"; position: absolute; bottom: -19px; left: 50%; transform: translateX(-50%);
+  font-family: "Source Sans 3", sans-serif; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  background: var(--gold); color: var(--ink); padding: 1px 7px; border-radius: 999px; white-space: nowrap;
+}
+
+/* unwrapped: the paper's off and you can see what it was */
+.gift.opened {
+  background: #fffdf6; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  box-shadow: inset 0 0 0 3px var(--wrap), 0 6px 14px rgba(0,0,0,.22);
+}
+.gift.opened .num { font-family: "Instrument Serif", serif; font-size: clamp(20px, 4.6vw, 28px); line-height: 1; color: var(--wrap-deep); }
+.gift.opened .emo { font-size: clamp(20px, 5vw, 28px); margin-top: 2px; }
+.gift .dot {
+  position: absolute; top: -5px; right: -5px; width: 14px; height: 14px; border-radius: 50%; z-index: 4;
+  background: var(--gold); box-shadow: 0 0 0 2px var(--night);
+}
+@media (prefers-reduced-motion: reduce) { .gift.today { animation: none; } }
 
 .legend { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-top: 18px; font-size: 14px; color: rgba(255,248,238,.7); }
 
