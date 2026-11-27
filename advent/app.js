@@ -203,7 +203,7 @@
         <div class="banner"><div><strong>Since you last visited</strong>
           <ul>${banner.map((b) => `<li>${b}</li>`).join("")}</ul></div>
           <button class="x" id="dismiss" aria-label="Dismiss">×</button></div>` : ""}
-      ${notifyCardHTML()}
+      ${installCardHTML()}${notifyCardHTML()}
       <main id="tab"></main>
       <footer>You're ${nm(me)} · <button id="switch">switch person</button> · <button id="lock">lock</button>
         ${pushState === "on" ? ` · 🔔 reminders on (<button id="push-off">turn off</button>)` : ""}</footer>`;
@@ -216,6 +216,7 @@
     $app.querySelector("#dismiss")?.addEventListener("click", () => { banner = []; render(); });
     document.getElementById("switch").onclick = () => { ls.del("advent_me"); me = null; banner = []; who(); };
     document.getElementById("lock").onclick = () => { ls.del("advent_pass"); location.reload(); };
+    bindInstall();
     bindNotify();
     bindTab($tab);
     if (openDay) renderSheet();
@@ -318,12 +319,49 @@
       return sub ? "on" : "off";
     } catch { return "off"; }
   }
+  // ── install to Home Screen (same approach as Bloom) ──
+  // Android/desktop fire `beforeinstallprompt`, which we keep and replay from
+  // the Install button. iOS has no such API, so there we explain Share ->
+  // Add to Home Screen; on iPhone that's also the only way reminders work.
+  let deferredInstall = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstall = e;
+    if (me) render();
+  });
+  window.addEventListener("appinstalled", () => { deferredInstall = null; if (me) render(); });
+  function installCardHTML() {
+    if (isStandalone() || ls.get("advent_install_later") === "1") return "";
+    if (!deferredInstall && !isIOS()) return "";
+    const text = isIOS()
+      ? `Tap <strong>Share</strong> <span aria-hidden="true">⬆️</span> at the bottom of Safari, then
+         <strong>Add to Home Screen</strong>. Then open <strong>Advent</strong> from your Home Screen:
+         it opens full screen, and it's the only way reminders work on iPhone.`
+      : `Install the calendar as an app: it opens full screen, straight from your home screen.`;
+    return `<div class="notify-card install-card">
+      <div><strong>📲 Add Advent to your Home Screen</strong><p>${text}</p></div>
+      <div class="row">
+        ${deferredInstall ? `<button class="btn small" id="install-now">Install</button>` : ""}
+        <button class="btn small ghost-light" id="install-later">Not now</button>
+      </div></div>`;
+  }
+  function bindInstall() {
+    document.getElementById("install-later")?.addEventListener("click", () => { ls.set("advent_install_later", "1"); render(); });
+    document.getElementById("install-now")?.addEventListener("click", async () => {
+      const evt = deferredInstall;
+      deferredInstall = null;
+      if (!evt) return;
+      evt.prompt();
+      try { await evt.userChoice; } catch {}
+      render();
+    });
+  }
+
   function notifyCardHTML() {
-    if (pushState === "hidden" || pushState === "on" || ls.get("advent_push_later") === pushState) return "";
+    // Before installing on iPhone, the install card above says what to do.
+    if (pushState === "hidden" || pushState === "on" || pushState === "needs-install" ||
+        ls.get("advent_push_later") === pushState) return "";
     const body = {
-      "needs-install": `To get reminders on iPhone, add the calendar to your Home Screen first:
-        tap <strong>Share</strong> <span aria-hidden="true">⬆️</span> in Safari, then <strong>Add to Home Screen</strong>,
-        and open <strong>Advent</strong> from there.`,
       off: `Get a reminder at 10:00 when the day's door opens, a nudge at 22:00 if you haven't opened it,
         and a ping when ${nm(partner())} answers, writes or shares something.`,
       blocked: `Notifications are blocked for this site. Turn them on in your phone's settings for this app, then come back.`,
