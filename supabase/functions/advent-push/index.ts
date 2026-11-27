@@ -6,7 +6,8 @@
 // and sends that. Because of that it needs no secret — a stray call can only
 // deliver notifications that were already due, once.
 //
-// Deploy:  npx supabase@latest functions deploy advent-push --no-verify-jwt
+// Deploy: Supabase dashboard -> Edge Functions -> advent-push -> Code, paste,
+// Deploy (JWT verification off). Or: npx supabase@latest functions deploy advent-push --no-verify-jwt
 // Uses the VAPID_KEYS / VAPID_SUBJECT secrets Bloom's send-push already set.
 // (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided automatically.)
 
@@ -31,13 +32,14 @@ type Person = "a" | "b";
 type Message = { title: string; body: string; url: string; tag: string };
 const other = (p: Person): Person => (p === "a" ? "b" : "a");
 
-const TYPE_LABEL: Record<string, string> = {
-  coupon: "💌 Love coupon day",
-  question: "💭 Question day",
-  spinner: "🎡 Date spinner day",
-  memory: "📸 Memory day",
-  challenge: "✨ Tiny challenge day",
-};
+// Messages never say what kind of day a door is until you've opened it,
+// so nothing is spoiled on the lock screen.
+const DAILY_LINES = [
+  "Something's waiting behind it. Go and open it together.",
+  "What's inside? Only one way to find out.",
+  "A little surprise for the two of you.",
+  "Open it and see what today brings.",
+];
 
 async function kv(key: string) {
   const { data } = await db.from("advent_kv").select("value").eq("key", key).maybeSingle();
@@ -93,6 +95,11 @@ async function onEvent(key: string, by: Person, n: Record<Person, string>) {
   if (!m) return 0;
   const d = Number(m[1]), what = m[2];
   const url = `${APP_URL}#day-${d}`;
+  const to = other(by);
+  // Not opened that door yet? Don't say what kind of day it is.
+  if (what !== "judge" && !(await kv(`day:${d}:open:${to}`))) {
+    return send(to, { title: `${P} opened door ${d} 👀`, body: `And left something for you. Open it to see!`, url, tag: `day-${d}-${what}` });
+  }
   const text: Record<string, [string, string]> = {
     coupon: [`${P} wrote you a love coupon 💌`, `It's sealed in door ${d}. Write yours to swap!`],
     answer: [`${P} answered today's question 💭`, `Answer yours to see what ${P} said.`],
@@ -112,14 +119,9 @@ async function onEvent(key: string, by: Person, n: Record<Person, string>) {
   return send(other(by), { title, body, url, tag: `day-${d}-${what}` });
 }
 
-async function dayType(d: number) {
-  const schedule = (await kv("pool:schedule")) as string[] | null;
-  return schedule?.[d - 1] || "";
-}
-
 async function onDaily(d: number) {
-  const label = TYPE_LABEL[await dayType(d)] || "A new surprise";
-  const msg = { title: `Door ${d} is open! 🎄`, body: `${label}. Go and open it together.`, url: `${APP_URL}#day-${d}`, tag: `daily-${d}` };
+  const body = DAILY_LINES[(d - 1) % DAILY_LINES.length];
+  const msg = { title: `Door ${d} is open! 🎄`, body, url: `${APP_URL}#day-${d}`, tag: `daily-${d}` };
   return (await send("a", msg)) + (await send("b", msg));
 }
 
