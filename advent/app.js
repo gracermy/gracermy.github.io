@@ -369,11 +369,37 @@
     return `<div class="notify-card install-card">
       <div><strong>📲 Add Advent to your Home Screen</strong><p>${text}</p></div>
       <div class="row">
-        ${deferredInstall ? `<button class="btn small" id="install-now">Install</button>` : ""}
+        ${deferredInstall ? `<button class="btn small" id="install-now">Install</button>`
+          : isIOS() ? `<button class="btn small" id="install-how">Show me how</button>` : ""}
         <button class="btn small ghost-light" id="install-later">Not now</button>
       </div></div>`;
   }
+  // iPhone can't install from a button (Apple doesn't allow it), so this
+  // walks through Safari's Share -> Add to Home Screen with an arrow to it.
+  function installGuide() {
+    document.querySelector(".overlay")?.remove();
+    const ov = document.createElement("div");
+    ov.className = "overlay";
+    ov.innerHTML = `<div class="sheet install-guide" role="dialog" aria-label="Add to Home Screen">
+      <div class="top"><span class="kind">📲 Add to Home Screen</span><button class="close" aria-label="Close">×</button></div>
+      <h2 class="serif">Three taps and it's an app</h2>
+      <ol class="steps">
+        <li><span class="n">1</span><span>Tap <strong>Share</strong> <span class="ico" aria-hidden="true">⬆️</span> in Safari's toolbar.
+          <small>On newer iPhones it's inside the <strong>•••</strong> button first.</small></span></li>
+        <li><span class="n">2</span><span>Scroll down and tap <strong>Add to Home Screen</strong> <span class="ico" aria-hidden="true">➕</span></span></li>
+        <li><span class="n">3</span><span>Tap <strong>Add</strong>, then open <strong>Advent</strong> 🎄 from your Home Screen.</span></li>
+      </ol>
+      <p class="muted">Opened from the Home Screen, it runs full screen and can send you the daily reminders.</p>
+      <button class="btn block" id="guide-ok">Got it</button>
+      <div class="guide-arrow" aria-hidden="true">⬇️</div></div>`;
+    document.body.append(ov);
+    const close = () => ov.remove();
+    ov.querySelector(".close").onclick = close;
+    ov.querySelector("#guide-ok").onclick = close;
+    ov.onclick = (e) => { if (e.target === ov) close(); };
+  }
   function bindInstall() {
+    document.getElementById("install-how")?.addEventListener("click", installGuide);
     document.getElementById("install-later")?.addEventListener("click", () => { ls.set("advent_install_later", "1"); render(); });
     document.getElementById("install-now")?.addEventListener("click", async () => {
       const evt = deferredInstall;
