@@ -237,22 +237,65 @@
     if (openDay) renderSheet();
   }
 
+  // ── calendar: hand-drawn presents (SVG, coloured by the c-* class) ──
+  const GIFT_DEFS = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <pattern id="gift-dots" width="12" height="12" patternUnits="userSpaceOnUse">
+      <circle cx="3" cy="3" r="1.3" fill="#fff" opacity=".28"/><circle cx="9" cy="9" r="1.3" fill="#fff" opacity=".28"/></pattern>
+    </defs></svg>`;
+  function giftArt(day, opened) {
+    const label = `<circle class="label" cx="50" cy="71" r="14.5"/>
+      <text class="num" x="50" y="71.5" text-anchor="middle" dominant-baseline="central">${day}</text>`;
+    if (opened) {
+      // lid's off: you can see inside the box
+      return `<svg class="art" viewBox="0 0 100 100" aria-hidden="true">
+        <path class="w2" d="M14 47 L20 37 H80 L86 47 Z"/>
+        <path class="inside" d="M20 39 H80 L84 46 H16 Z"/>
+        <g class="body">
+          <rect class="w" x="12" y="45" width="76" height="51" rx="6"/>
+          <rect class="pat" x="12" y="45" width="76" height="51" rx="6"/>
+          <rect class="r" x="44" y="45" width="12" height="51"/>
+          ${label}
+        </g></svg>`;
+    }
+    return `<svg class="art" viewBox="0 0 100 100" aria-hidden="true">
+      <g class="body">
+        <rect class="w" x="12" y="42" width="76" height="54" rx="6"/>
+        <rect class="pat" x="12" y="42" width="76" height="54" rx="6"/>
+        <rect class="shade" x="12" y="42" width="76" height="7"/>
+        <rect class="r" x="44" y="42" width="12" height="54"/>
+        ${label}
+      </g>
+      <g class="lid">
+        <rect class="w" x="7" y="29" width="86" height="16" rx="4"/>
+        <rect class="pat" x="7" y="29" width="86" height="16" rx="4"/>
+        <rect class="hl" x="9" y="30" width="82" height="3" rx="1.5"/>
+        <rect class="r" x="44" y="29" width="12" height="16"/>
+        <path class="r" d="M50 30 C 41 13, 21 12, 25 24 C 27 30, 40 31, 50 30 Z"/>
+        <path class="r" d="M50 30 C 59 13, 79 12, 75 24 C 73 30, 60 31, 50 30 Z"/>
+        <path class="r2" d="M49 29 C 42 20, 32 19, 32 24 C 33 28, 41 29, 49 29 Z"/>
+        <path class="r2" d="M51 29 C 58 20, 68 19, 68 24 C 67 28, 59 29, 51 29 Z"/>
+        <path class="r" d="M47 31 L 40 42 L 44 41 L 46 44 Z"/>
+        <path class="r" d="M53 31 L 60 42 L 56 41 L 54 44 Z"/>
+        <rect class="knot" x="44.5" y="23.5" width="11" height="10" rx="3.5"/>
+      </g></svg>`;
+  }
+
   // ── calendar ──
   function calendarHTML(before, daysTo) {
     const doors = schedule.map(({ day, type }) => {
       const open = isOpen(day), opened = open && ls.get(`advent_door_${me}_${day}`);
-      return `<button class="gift c-${doorColors[day - 1]} ${open ? "" : "locked"} ${opened ? "opened" : ""} ${isToday(day) ? "today" : ""}"
+      return `<button class="gift c-${doorColors[day - 1]} ${open ? "" : "locked"} ${opened ? "opened" : ""} ${isToday(day) ? "today" : ""} ${justOpened === day ? "just" : ""}"
         data-day="${day}" ${open ? "" : 'aria-disabled="true"'} aria-label="Day ${day}${opened ? "" : open ? ", ready to unwrap" : ", not yet"}">
-        ${opened
-          ? `<span class="num">${day}</span><span class="emo">${TYPES[type].emo}</span>`
-          : `<span class="bow"></span><span class="knot"></span><span class="tag">${day}</span>`}
+        ${giftArt(day, opened)}
+        ${opened ? `<span class="pop" aria-hidden="true">${TYPES[type].emo}</span>` : ""}
+        ${isToday(day) && !opened ? '<span class="today-pill">today</span>' : ""}
         ${opened && needsMe(day) ? '<span class="dot" title="Something waiting for you"></span>' : ""}
       </button>`;
     }).join("");
     return `
       ${before ? `<p class="notice">The first gift arrives in <strong>${daysTo} day${daysTo === 1 ? "" : "s"}</strong> ❄️</p>`
         : `<p class="notice">Tap a gift to unwrap it. A gold dot means something's waiting for you.</p>`}
-      <div class="grid">${doors}</div>
+      ${GIFT_DEFS}<div class="grid">${doors}</div>
       <div class="legend">${legendHTML()}</div>`;
   }
 
@@ -314,16 +357,54 @@
     challenge: "✨ Tiny challenge unlocked",
   };
 
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const calm = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let justOpened = null, unwrapping = false;
+
+  // A little burst of sparkles from where the gift was.
+  function burst(x, y) {
+    const colors = ["#f5c518", "#ffffff", "#d62839", "#2fa865", "#4a85e6"];
+    for (let i = 0; i < 18; i++) {
+      const p = document.createElement("div");
+      const ang = (i / 18) * Math.PI * 2 + Math.random() * .4, dist = 45 + Math.random() * 55;
+      p.className = "burst" + (i % 3 === 0 ? " star" : "");
+      if (i % 3 === 0) p.textContent = "✦";
+      p.style.left = x + "px"; p.style.top = y + "px";
+      p.style.setProperty("--c", colors[i % colors.length]);
+      p.style.setProperty("--dx", Math.cos(ang) * dist + "px");
+      p.style.setProperty("--dy", Math.sin(ang) * dist - 20 + "px");
+      document.body.append(p);
+      setTimeout(() => p.remove(), 1000);
+    }
+  }
+
   async function openDoor(d) {
     if (!isOpen(d)) { toast(`Day ${d} is still wrapped. No peeking 👀`); return; }
+    if (unwrapping) return;
+    const first = !ls.get(`advent_door_${me}_${d}`);
+    const btn = document.querySelector(`.gift[data-day="${d}"]`);
+    const animate = first && btn && !calm();
+    // Start fetching the day's surprise while the paper comes off.
+    const fetching = needsContent(d) && !itemFor(d) ? S.refresh().catch(() => {}) : null;
+    if (animate) {
+      unwrapping = true;
+      btn.classList.add("unwrapping");          // shake, then the lid flies off
+      setTimeout(() => { const r = btn.getBoundingClientRect(); burst(r.left + r.width / 2, r.top + r.height * .35); }, 420);
+      await wait(820);
+    }
     const type = schedule[d - 1].type, isNew = !found(type);
     ls.set(`advent_door_${me}_${d}`, "1");
-    // Record the open in the database too, so the 22:00 reminder knows who
-    // still hasn't opened today's door.
+    // Record it in the database too, so the 22:00 reminder knows who
+    // still hasn't unwrapped today's gift.
     if (!S.get(`day:${d}:open:${me}`)) S.set(`day:${d}:open:${me}`, { by: me, at: now() }, { quiet: true }).catch(() => {});
-    // A day's content is released by the database when the day arrives;
-    // fetch it now if this phone hasn't got it yet.
-    if (needsContent(d) && !itemFor(d)) await S.refresh().catch(() => {});
+    if (animate) {                               // show the open box, what's inside pops up
+      justOpened = d; openDay = null; render();
+      await wait(650);
+      justOpened = null;
+    }
+    // A day's content is released by the database when the day arrives.
+    if (fetching) await fetching;
+    unwrapping = false;
     openDay = d; render();
     if (isNew) toast(UNLOCK[type]);
   }
